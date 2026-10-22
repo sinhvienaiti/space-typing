@@ -22,6 +22,8 @@
     "telemetry:audit": "node --import tsx scripts/audit-admin-telemetry.ts",
     "expedition:audit": "node --import tsx scripts/audit-admin-expedition.ts",
     "daily-weekly:audit": "node --import tsx scripts/audit-admin-daily-weekly.ts",
+    "td:balance": "node --import tsx scripts/td/balance.ts",
+    "td:golden:update": "node --import tsx scripts/td/golden.ts",
     "check": "pnpm test && pnpm build",
     "duel:server": "tsx server/duel/ws-server.ts",
     "account:migrate": "wrangler d1 migrations apply DB --local -c cloud/wrangler.jsonc --persist-to .account-local/wrangler",

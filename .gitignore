@@ -19,6 +19,12 @@ rclone.conf
 # Screenshots from pnpm visual:shot (docs/VISUAL_TESTING.md).
 .visual/
 .duel-local/
+# Typing Defense media: models, images and sounds never go in Git; only the
+# README (where the files go) and the manifests are tracked (docs/td/BUILD_NOW.md §2).
+public/assets/td/**
+!public/assets/td/**/
+!public/assets/td/README.md
+!public/assets/td/**/manifest.json
 # Local account database (PGlite) and server log: pnpm account:local.
 .account-local/
 # Cloudflare local secrets and state (pnpm account:local).

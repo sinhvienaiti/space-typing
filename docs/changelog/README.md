@@ -21,6 +21,12 @@ Mỗi bản cập nhật có một file trong thư mục này. File ghi rõ đã
 | Ngày | Bản cập nhật | Mục review đã xử lý |
 |---|---|---|
 | 2026-10-22 | [Bộ prompt asset Typing Defense](./2026-10-22-td-asset-prompts.md) | (tài liệu) |
+| 2026-10-22 | [Typing Defense 1A.5: sửa sau review (luật bot riêng mỗi lượt, file vàng so đủ trường, luồng chính của Chrome trong cổng 5, test người đọc và gợi ý nhịp, Nhanh ẩu ở cùng tải, tải đầy TK 25.12)](./2026-10-22-td-1a5-review.md) | (review mốc 1A.5, mục 1–7) |
+| 2026-10-22 | [Typing Defense 1A.5: bot, báo cáo `td:balance`, test vàng, đo hiệu năng, cổng cứng §7, bộ ảnh cho chủ dự án](./2026-10-22-td-1a5-bot.md) | (mã mới TD) |
+| 2026-10-22 | [Typing Defense 1A.4: sửa sau review (vàng gọi sớm, Tab không có ân hạn, chỗ trống gợi ý nhanh, chip lý do, test, chuột trên trình duyệt, thẻ trên HUD, Dải Chữ, Delete)](./2026-10-22-td-1a4-review.md) | (review mốc 1A.4, mục 1–10) |
+| 2026-10-22 | [Typing Defense 1A.4: điều khiển, HUD, hộp cát (bàn phím đủ đường, chuột, camera, thẻ nhà, 4 chân dung, Tải, Chuỗi, ân hạn, `move`, Đặt sẵn 4 ô)](./2026-10-22-td-1a4-controls.md) | (mã mới TD) |
+| 2026-10-22 | [Typing Defense 1A.3: sửa sau review (kẹt cạnh suối, ngắt trợ lực, cầu, dây, ngân sách 1A.4, test, tầng 2)](./2026-10-22-td-1a3-review.md) | (review mốc 1A.3, mục 1–7) |
+| 2026-10-22 | [Typing Defense 1A.3: người và ô (A*, Draconis, Thư Đồng, đổi chỗ, ô theo Lũy)](./2026-10-22-td-1a3-agents.md) | (mã mới TD) |
 | 2026-10-22 | [Thiết kế Typing Defense (TD)](./2026-10-22-td-design.md) | (thiết kế; thay một phần V5) |
 | 2026-10-21 | [Đợt sửa 1: chống đứng hình, chống mất tiến độ và tiền](./2026-10-21-fix-batch-1.md) | 4, 6, 13 (một phần), 17, 18 (một phần), 19, 20, 21, 29, 30, 32, 35 |
 | 2026-10-21 | [Thiết kế Rift Defense V5](../RIFT_DEFENSE_PLAN_V5_2026-10-21.md) | (thiết kế; các lỗi Defense 5, 7, 8, 14, 16 nằm trong kế hoạch V5) |
