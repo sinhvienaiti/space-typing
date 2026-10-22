@@ -5,8 +5,7 @@
 // Shot at once and gives the tower 2 power charges (the 5 dots under it), which its next shots spend. If
 // the first night ends before two power words were typed, the sandbox's "Sinh đêm" brings another wave.
 // Checks: a power word typed, charges seen on a tower and spent again, a Word Shot fired, the night over
-// with lives left, and the page's log replayed on Node to its hash (the cards are measured and reported;
-// td-1a6-attention gates them). Pictures
+// with lives left, the page's log replayed on Node to its hash, and the cards clean (cardsClean). Pictures
 // td-1a6-night-power (a power card up) and td-1a6-night-charges (dots on a tower). Exits 1 on a failed check.
 //   URL=http://127.0.0.1:3140/ OUT_DIR=… node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a6-night.mjs --width=1280 --height=720
 import { KIND, Seen, boot, cardStats, cardSummary, cardsClean, consoleChecks, finish, key, look, out, replayOnNode, sandbox, send, sizeOf, state, td, typeFor } from "./td-1a6-common.mjs";

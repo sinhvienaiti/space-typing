@@ -7,7 +7,7 @@
 //   3. an archer is put down by the hero; the builder's build call is typed until it stands.
 // Each job must be finished by a typed word (its callEnd has finished: true, so the words pushed the work,
 // not the worker alone). The page's command log is replayed on Node to the page's hash. The cards are
-// measured and reported (td-1a6-attention gates them). Pictures
+// measured and gated (cardsClean). Pictures
 // td-1a6-day-{harvest,chop,build}. Exits 1 when a check fails.
 //   URL=http://127.0.0.1:3140/ OUT_DIR=… node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a6-day.mjs --width=1280 --height=720
 import { KIND, Seen, boot, cardStats, cardSummary, cardsClean, click, consoleChecks, finish, look, out, replayOnNode, sandbox, send, sizeOf, state, td, typeFor } from "./td-1a6-common.mjs";

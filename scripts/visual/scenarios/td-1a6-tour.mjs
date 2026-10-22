@@ -10,7 +10,7 @@
 //   10 the tactical pause (learn)        11 the night: a power call up
 //   12 the night: charge dots on a tower  13 the merge at 2× at night (charges, a power call)
 //   14 the sandbox panel
-// The zoom-1 pictures' cards are measured and reported (td-1a6-attention gates them); no console error.
+// Every look's cards are measured and gated (cardsClean: no overlap, clear of the HUD, ≥ 18 px); no console error.
 //   URL=http://127.0.0.1:3140/ OUT_DIR=… node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a6-tour.mjs --width=1280 --height=720
 import {
   KIND, arrows, boot, cardStats, cardSummary, cardsClean, click, consoleChecks, finish, key, letter, look, out, sandbox, send, sizeOf, state, td, typeFor, until, wheel,
