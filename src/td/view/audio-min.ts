@@ -1,10 +1,10 @@
 /**
  * Typing sounds made in code (docs/td/BUILD_NOW.md §5.5, TK 24.6), no files:
- * a dealt word ticks softly in its building's timbre (at most 6 a second), a
+ * a call's new word ticks softly in its kind's pitch (at most 6 a second), a
  * right key clicks a semitone higher per letter, a wrong or stray key thocks
  * 12 dB lower, a finished word plays a pentatonic note by chain tier
- * (Perfect and Flash add a ting), an expired word puffs, Word Shots and
- * blasts hiss with a sweep, word gold ticks. One mute switch.
+ * (Perfect and Flash add a ting), Word Shots and blasts hiss with a sweep.
+ * One mute switch. Each call kind's own alert is R2 (BUILD_1A6 §9).
  */
 import { FX, type RareEvent } from "../sim/events";
 import { PROJECTILE } from "../sim/stores/projectiles";
@@ -75,11 +75,8 @@ export class TypingAudio {
         while (this.ticks.length > 0 && now - this.ticks[0]! > 1000) this.ticks.shift();
         if (this.ticks.length >= TICKS_PER_S) continue;
         this.ticks.push(now);
-        const b = w.buildings.slotOf(event.building);
-        const family = b >= 0 ? w.c.buildings[w.buildings.def[b]!]!.family : "attack";
-        if (family === "military") this.voice(0.03, 0.025, 990, "square");
-        else if (family === "economy" || family === "core") this.voice(0.035, 0.04, 1760);
-        else this.voice(0.03, 0.04, 1320, "triangle");
+        const c = w.calls.slotOf(event.call);
+        this.voice(0.035, 0.04, 990 + 165 * (c >= 0 ? w.calls.kind[c]! : 0), "triangle");
       } else if (event.t === "wordKey") {
         const s = w.words.slotOf(event.word);
         if (event.result === KEY.wrong || event.result === KEY.stray) {
@@ -90,7 +87,7 @@ export class TypingAudio {
         const step = event.grade === "sloppy" ? 0 : Math.min(PENTATONIC.length - 1, chainTier(w.typing.chain) + 1);
         this.voice(0.28, event.grade === "sloppy" ? 0.06 : event.grade === "ok" ? 0.1 : 0.13, PENTATONIC[step]!);
         if (event.grade === "perfect" || event.grade === "flash") this.voice(0.18, 0.05, 2093);
-      } else if (event.t === "wordMiss") this.voice(0.2, 0.07, 0, "sine", 0, 450);
+      }
     }
     let blasts = 0;
     for (let index = from; index < ring.written; index += 1) {
@@ -100,7 +97,6 @@ export class TypingAudio {
         this.voice(0.12, 0.05, 0, "sine", 0, 2400, "highpass");
         this.voice(0.12, 0.05, 660, "sawtooth", 1500);
       } else if (kind === FX.burst && blasts++ < 2) this.voice(0.25, 0.08, 0, "sine", 0, 380);
-      else if (kind === FX.wordGold) this.voice(0.07, 0.05, 1568);
     }
   }
 }

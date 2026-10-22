@@ -1,28 +1,29 @@
 /**
- * Starting constants of Typing Defense, the 1A part of
- * docs/td/TYPING_DEFENSE_DESIGN.md Phụ lục A. This file is the source of
- * truth: the bot retunes numbers here, never in the rules' code. Times are
- * seconds, distances metres; compile.ts turns times into ticks once.
- * Per-building and per-enemy numbers live in slice-1a.ts.
+ * Starting constants of Typing Defense: the 1A part of
+ * docs/td/TYPING_DEFENSE_DESIGN.md Phụ lục A, with step 1A.6 "Lời Gọi"
+ * (docs/td/BUILD_1A6.md) on top. This file is the source of truth: the bot
+ * retunes numbers here, never in the rules' code. Times are seconds,
+ * distances metres; compile.ts turns times into ticks once. Per-building and
+ * per-enemy numbers live in slice-1a.ts.
  */
 export const TICK_HZ = 60;
 export const MAX_STEPS_PER_FRAME = 10;
 
 /** Store capacities: headroom. The rule caps below are what play allows. */
-export const STORE = { enemies: 640, soldiers: 96, projectiles: 512, buildings: 40, agents: 8, words: 24 } as const;
-export const CAP = { soldiers: 64, agents: 4, liveWords: 16, streamLiveMax: 12, streamLiveMin: 4, wordsPerBuilding: 4 } as const;
+export const STORE = { enemies: 640, soldiers: 96, projectiles: 512, buildings: 40, agents: 8, words: 24, calls: 64, npcs: 48 } as const;
+/** streamLive*: TK 6.5's stream cap, which typing/decks.ts still computes from a band. */
+export const CAP = { soldiers: 64, agents: 4, streamLiveMax: 12, streamLiveMin: 4 } as const;
 
-/** TK 6.2. Index 0 is Dừng (stop); denser tempos come later in the list. */
-export const TEMPO = [
-  { periodS: 0, tAttack: 0, tEconomy: 0, auraK: 0, minLevel: 1, newWords: false },
-  { periodS: 8, tAttack: 0.85, tEconomy: 0.85, auraK: 0.5, minLevel: 1, easyOnly: true, newWords: true },
-  { periodS: 6, tAttack: 0.9, tEconomy: 0.9, auraK: 0.6, minLevel: 1, newWords: true },
-  { periodS: 4, tAttack: 1.0, tEconomy: 1.0, auraK: 0.75, minLevel: 1, newWords: true },
-  { periodS: 3, tAttack: 1.1, tEconomy: 1.0, auraK: 0.85, minLevel: 1, newWords: true },
-  { periodS: 2, tAttack: 1.2, tEconomy: 1.05, auraK: 1.0, minLevel: 2, maxLen: 6, newWords: false },
-  { periodS: 1, tAttack: 1.35, tEconomy: 1.1, auraK: 1.0, minLevel: 3, maxLen: 5, newWords: false },
-] as const;
-export const DEFAULT_TEMPO_S = { slowE: 6, normal: 4, slowEBelow: 30 } as const;
+/** BUILD_1A6 §2: what a mode sets. lifeK scales the clock a word is scored against (TK 6.4's k_L); powerCdS is §4.5's cooldown. */
+export const MODES = {
+  relax: { dayS: 120, open: 2, typeS: 6, hpMul: 0.75, floorE: 12, lifeK: 1.25, powerCdS: 12, pause: true },
+  balanced: { dayS: 75, open: 3, typeS: 8, hpMul: 1, floorE: 20, lifeK: 1.0, powerCdS: 8, pause: false },
+  challenge: { dayS: 50, open: 4, typeS: 11, hpMul: 1.15, floorE: 35, lifeK: 0.9, powerCdS: 6, pause: false },
+  learn: { dayS: 120, open: 2, typeS: 6, hpMul: 0.75, floorE: 12, lifeK: 1.25, powerCdS: 12, pause: true },
+} as const;
+/** §2: dawn's length; building at night takes ×1.5 as long. */
+export const PHASE = { dawnS: 3, nightBuildMul: 1.5 } as const;
+
 export const LENGTH_BY_E = [
   { minE: 0, len: [3, 5] },
   { minE: 25, len: [3, 6] },
@@ -30,59 +31,78 @@ export const LENGTH_BY_E = [
   { minE: 65, len: [4, 8] },
 ] as const;
 
-export const LIFE = { base: 1.2, perChar: 12, min: 3.0, max: 6.0, k: { easy: 1.25, normal: 1.0, hard: 0.9 }, hardMin: 2.7, graceS: 0.6, graceAt: 0.5 } as const;
-export const EMIT = { settleS: 0.4, firstDelayS: 0.6, staggerS: 0.2, staggerMaxS: 0.6, letterSlack: 6, upgradePauseS: 1.0 } as const;
+/** TK 6.4's word life L_w. A call's word never runs out (§5.2): L_w is only the clock speed is scored against (§5.4). */
+export const LIFE = { base: 1.2, perChar: 12, min: 3.0, max: 6.0, hardMin: 2.7 } as const;
+/** letterSlack: TK 6.5's stream cap (decks.ts). */
+export const EMIT = { letterSlack: 6 } as const;
 export const LETTERS = { cooldownS: 1.0, reserve: 3, avoid: "qxzj", avoidUntilLevel: 10, tier2EarlyFree: 5, tier2EarlyMaxLevel: 3, maxEditCheckLen: 8, minWordsPerLetter: 3 } as const;
 export const SCORE = { errNum: 1.5, errMin: 0.15, errMax: 0.4, phraseLen: 12, fastBase: 0.35, fastK: 0.8, effBase: 0.4, effK: 0.6, qA: 0.6, qS: 0.4, flashS: 0.7 } as const;
 export const WORD_D = { known: 1.0, learning: 0.85 } as const;
-export const EXPECTED = { default: 35, min: 12, max: 140, floor: { easy: 12, normal: 20, hard: 35 } } as const;
-/** TK 6.5: who gets first letters first; the stream and review words leave the reserve to the others. */
-export const KIND_PRIORITY = ["seal", "direct", "ultWord", "finisher", "pickup", "spellWord", "rare", "stream", "review"] as const;
-export const RESERVE_KINDS = ["stream", "review"] as const;
-/** TK 6.14: evenness C = clamp((0.7 − CV) / 0.4) over the last 30 key gaps; TK 6.13 load, tempo hint. */
-export const EVENNESS = { gaps: 30, cvTop: 0.7, cvSpan: 0.4 } as const;
-export const LOAD = { share: 0.75, hintWords: 10, hintUp: 0.95, hintDown: 0.7, calm: 1.0, busy: 1.25 } as const;
+export const EXPECTED = { default: 35, min: 12, max: 140 } as const;
+/** TK 6.5: who gets first letters first; call and review words leave the reserve to the others. */
+export const KIND_PRIORITY = ["seal", "direct", "ultWord", "finisher", "pickup", "spellWord", "rare", "call", "review"] as const;
+export const RESERVE_KINDS = ["call", "review"] as const;
 
-export const HEAT = { max: 5, flash: 1.5, good: 1, ok: 0.5, sloppy: -1, expired: -1, prepCap: 2.5, holdBase: 4, holdC: 2, decayPerS: 0.25, recentWords: 5 } as const;
+/** §5.4: +1 a word that is not sloppy, ÷2 a sloppy one, nothing else. A tier multiplies a whole Perfect call's bonus, at most ×1.3. */
 export const CHAIN = {
-  good: 1, untouchedExpire: -2,
-  tiers: [{ from: 0, rc: 0.4 }, { from: 5, rc: 0.55 }, { from: 10, rc: 0.7 }, { from: 20, rc: 0.85 }, { from: 40, rc: 1.0 }],
+  good: 1,
+  tiers: [{ from: 0, mul: 1 }, { from: 5, mul: 1.075 }, { from: 10, mul: 1.15 }, { from: 20, mul: 1.225 }, { from: 40, mul: 1.3 }],
   callouts: [10, 25, 50, 100],
 } as const;
-export const ORDER_GRACE = { maxS: 2, cooldownS: 3 } as const;
 
-export const PRESENCE = 0.15;
-export const AURA_ATTACK = { rate: 0.5, dmg: 0.4, crit: 0.15, area: 0.5, targets: 2, caps: { rate: 1.5, dmg: 1.4, area: 1.5, targets: 2 } } as const;
-export const AURA_ECONOMY = { cycle: 0.4, perProduce: 0.25 } as const;
-export const AURA_MILITARY = { respawn: 0.4, buff: 0.3, tempSoldierAt: 0.6, shout: 0.1 } as const;
-export const REWARD = { lenDiv: 6, lenMin: 0.8, lenMax: 1.2, qA: [0.4, 0.6], qS: [0.8, 0.4], qQ: [0.5, 0.5], shotQ: [0.8, 1.2], perfectCrit: 1.75 } as const;
-export const FIVE_GOOD = { words: 5, mineGold: 5, tempSoldierS: 15, tempSoldierMax: 2 } as const;
-/** TK 11.3: Accuracy narrows a blast's fall-off (rim 50 % → 70 %); the cannon's Flow widens it by at most 40 %, with no extra target. */
-export const CANNON_AURA = { edge: 0.2, areaCap: 1.4 } as const;
+/**
+ * §5.1: words a call asks for (build by footprint, an upgrade 3), what a sloppy word's share of the work keeps,
+ * the power call's life. §5.3: the attention window, and how many economy calls the night keeps open.
+ */
+export const CALL = {
+  words: { harvest: 3, chop: 4, mine: 2, power: 1, quiz: 1, upgrade: 3, build: { S: 2, M: 3, L: 4, XL: 4 } },
+  sloppy: 0.6, powerLifeS: 6, windowS: 20, nightEconomy: 1,
+} as const;
+/** A power word's Word Shot (TK 6.11): D̄ × (0.8 + 1.2·Q) × lenF, lenF = clamp((len + 1)/6; 0.8; 1.2). */
+export const REWARD = { lenDiv: 6, lenMin: 0.8, lenMax: 1.2, shotQ: [0.8, 1.2] } as const;
+/** §4.5: power charges of a tower; a power word adds 2, a whole Perfect call 1 more. */
+export const POWER = { max: 5, perWord: 2, perfect: 1 } as const;
 export const RICHNESS = [0.8, 1.0, 1.25] as const;
 
-export const ASSIST = { enterM: 3.0, exitM: 4.5, settleS: 0.4, socketGapM: 1.0, homeSideM: 5.5, homeGapM: 2.4 } as const; // idle helpers: a row west of the Bastion (TK 23.7)
+/** §6: help rings (hero 10 m, helpers 6 m) and the helpers' passive on economy work; idle helpers stand in a row west of the Bastion (TK 23.7). */
+export const AGENT = { heroRingM: 10, helperRingM: 6, passive: 1.5, socketGapM: 1.0, homeSideM: 5.5, homeGapM: 2.4 } as const;
 
 /** TK 10. Crits multiply by 1.75; armour and resist tiers are 0 / 30 / 60 / 80 %. */
 export const COMBAT = { critMul: 1.75, armorTiers: [0, 30, 60, 80], minDamage: 1, splashHits: ["ground", "low"] } as const;
 
+/** §3: the run's start; a building's old price G becomes round(0.3 G) wood and the rest gold; a food sale. */
 export const ECONOMY = {
-  startGold: 220, lives: 20,
-  waveGapS: 30, earlyCall: { goldPerS: 1, goldCap: 30 }, waveBonus: { base: 10, perWave: 2 },
-  undoWindowS: 5, pileEveryS: 5,
+  start: { gold: 220, wood: 40, food: 0, seeds: 4 }, lives: 20,
+  earlyCall: { goldPerS: 1, goldCap: 30 }, waveBonus: { base: 10, perWave: 2 },
+  undoWindowS: 5, woodShare: 0.3, sale: { food: 10, gold: 10 },
 } as const;
 
-/** TK 11.10, 12.5. The prototype's attack cap is fixed at 6. */
+/** §4.1: 4 plots a farm, 1.1 m off its centre; sow 2 s, grow 40 s, harvest 12 s for 5 food; seeds 4 for 30 gold, or 1 for 8 bought on the spot. */
+export const FARM = { plots: 4, plotM: 1.1, sowS: 2, growS: 40, harvestS: 12, food: 5, pack: { seeds: 4, gold: 30 }, seedGold: 8, perfectFood: 3 } as const;
+/** §4.2: a tree blocks building within 1.5 m and falls after 20 s of chopping for 8 wood; unmarked, only trees within 30 m of the Bastion are chopped. */
+export const TREE = { radiusM: 1.5, wood: 8, chopS: 20, perfectWood: 2, nearKeepM: 30 } as const;
+/** §4.2: villagers at the start, a hire's price, the most by Bastion level. NPCs walk at `speed` m/s (not in the design; a starting number). */
+export const VILLAGERS = { start: 2, gold: 25, food: 5, cap: [3, 5, 7, 9] } as const;
+export const NPC = { speed: 3, farmSpeed: 1.5 } as const;
+/**
+ * §4.4: the miner hauls every 10 s; a pile at half its size calls for help; a word hauls it all and pays 1 gold. The
+ * miner carries 0.8 × the level's yield a trip (not the whole pile: then no pile would ever reach half, docs/td/BUILD_NOTES.md).
+ */
+export const MINE = { haulEveryS: 10, haulK: 0.8, callAt: 0.5, wordGold: 1, perfectGold: 5 } as const;
+
+/** TK 11.10, 12.5; §4.3 build times by footprint, an upgrade 0.75 of it; a whole Perfect build call leaves +10 % hit points. */
 export const BUILD = {
   caps: { total: 16, attack: 6, barracks: 3 },
   footprintR: { S: 2.0, M: 2.3, L: 2.7, XL: 3.5 },
   gapM: 1.0, roadClearM: 1.9, keepClearM: 11, snapM: 0.25, nodeSnapM: 1.5,
-  buildTimeS: { S: 1.5, M: 1.5, L: 2.5, XL: 2.5 },
+  buildTimeS: { S: 8, M: 14, L: 18, XL: 18 }, upgradeK: 0.75, sturdy: 1.1,
 } as const;
 
-/** TK 13. Soldiers walk at `speed` m/s (not in the design; a starting number). */
-export const SOLDIER = { respawnS: 10, engageM: 3, leashM: 5, regenPctS: 0.05, regenDelayS: 3, maxPerEnemy: 3, spacingM: 1.2, speed: 4.0, contactM: 0.5 } as const;
+/** TK 13. Soldiers walk at `speed` m/s (not in the design; a starting number); §4.6: a respawn eats 1 food, or takes twice as long without. */
+export const SOLDIER = { respawnS: 10, engageM: 3, leashM: 5, regenPctS: 0.05, regenDelayS: 3, maxPerEnemy: 3, spacingM: 1.2, speed: 4.0, contactM: 0.5, food: 1 } as const;
 export const RALLY = { radiusM: 12, roadMaxM: 3 } as const;
+/** §10 "Đặt sẵn": Bastion level, villagers, and how many trees nearest the Bastion are marked. */
+export const PRESET = { keepLevel: 3, villagers: 5, marks: 8 } as const;
 
 /** TK 14.2: what each tier's gold and leak may be. */
 export const TIERS = {

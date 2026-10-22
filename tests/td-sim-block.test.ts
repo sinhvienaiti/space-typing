@@ -85,7 +85,7 @@ describe("blocking (TK 13)", () => {
   });
 
   it("at most 3 soldiers fight one enemy; the rest stay free", () => {
-    const w = world();
+    const w = world({ gold: 1000 });
     const a = build(w, "barracks", 2, 18);
     ready(w);
     run(w, 120);
@@ -138,7 +138,7 @@ describe("blocking (TK 13)", () => {
     expect(soldiers.every((s) => w.units.target[s] === -1)).toBe(true);
   });
 
-  it("a fallen soldier stands up at its barracks 10 s later, at full health", () => {
+  it("a fallen soldier stands up at its barracks 10 s later at full health, eating 1 food; with none, 10 s more and up anyway (BUILD_1A6 §4.6)", () => {
     const { w, b, soldiers, rx, rz } = barracksWorld();
     const serpent = enemyPoint(w, "thuong-luong", rx, rz);
     w.enemies.hp[serpent] = 100000;
@@ -156,15 +156,26 @@ describe("blocking (TK 13)", () => {
     expect(w.units.respawnAt[fallen]).toBe(fellAt + SOLDIER.respawnS * 60);
     expect(w.stats[STAT.soldierDeaths]).toBe(1);
     w.enemies.release(serpent);
+    w.food = 1;
     w.tick = w.units.respawnAt[fallen]! - 1;
     soldiersStep(w);
     expect(w.units.hp[fallen]).toBe(0);
     w.tick += 1;
     soldiersStep(w);
     expect(w.units.hp[fallen]).toBe(60);
+    expect([w.food, w.stats[STAT.foodEaten]]).toEqual([0, 1]);
     const dx = w.units.x[fallen]! - w.buildings.x[b]!;
     const dz = w.units.z[fallen]! - w.buildings.z[b]!;
     expect(Math.sqrt(dx * dx + dz * dz)).toBeLessThanOrEqual(SOLDIER.speed / 60 + 1e-9);
+    // Down again with no food: the respawn waits another 10 s, then the soldier stands up without eating.
+    w.units.hp[fallen] = 0;
+    w.units.respawnAt[fallen] = w.tick + 1;
+    w.tick += 1;
+    soldiersStep(w);
+    expect([w.units.hp[fallen], w.units.hungry[fallen], w.units.respawnAt[fallen]]).toEqual([0, 1, w.tick + SOLDIER.respawnS * 60]);
+    w.tick = w.units.respawnAt[fallen]!;
+    soldiersStep(w);
+    expect([w.units.hp[fallen], w.units.hungry[fallen], w.food, w.stats[STAT.foodEaten]]).toEqual([60, 0, 0, 1]);
   });
 
   it("regains 5 % of its health a second after 3 s without fighting", () => {

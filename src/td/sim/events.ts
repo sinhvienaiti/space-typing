@@ -6,7 +6,7 @@
  */
 import type { Grade } from "../content/types";
 
-export const FX = { spawn: 1, fire: 2, hit: 3, burst: 4, death: 5, leak: 6, coin: 7, block: 8, soldierDown: 9, fizzle: 10, wordGold: 11 } as const;
+export const FX = { spawn: 1, fire: 2, hit: 3, burst: 4, death: 5, leak: 6, coin: 7, block: 8, soldierDown: 9, fizzle: 10 } as const;
 
 const RING = 8192;
 
@@ -32,27 +32,25 @@ export class CombatRing {
 }
 
 export type RareEvent = { tick: number } & (
-  | { t: "built"; building: number; def: number }
-  | { t: "sold"; building: number; refund: number }
+  | { t: "built"; building: number; def: number } // a site or an upgrade begins
+  | { t: "finished"; building: number; level: number }
+  | { t: "sold"; building: number; gold: number; wood: number }
   | { t: "levelSet"; building: number; level: number }
   | { t: "rejected"; command: string; reason: string }
+  | { t: "phase"; phase: "day" | "night" | "dawn"; day: number }
   | { t: "waveStart"; wave: number }
   | { t: "waveEnd"; wave: number; bonus: number }
-  | { t: "waveCalled"; wave: number; bonus: number }
-  | { t: "pileCollected"; building: number; gold: number }
+  | { t: "nightCalled"; day: number; bonus: number }
   | { t: "leak"; enemy: number; lives: number }
   | { t: "defeat" }
-  | { t: "agentOrdered"; agent: number; building: number } // building −1: home, or a point for the hero
-  | { t: "agentArrived"; agent: number; building: number }
-  | { t: "agentLeft"; agent: number; building: number }
-  | { t: "tempoChanged"; building: number; tempo: number }
-  | { t: "wordSpawn"; word: number; building: number }
+  | { t: "agentOrdered"; agent: number; building: number } // building −1: a point
+  | { t: "harvested"; building: number; plot: number }
+  | { t: "felled"; tree: number }
+  | { t: "call"; call: number; kind: number; state: "made" | "open" | "bright" | "dim" }
+  | { t: "callEnd"; call: number; kind: number; perfect: boolean; finished: boolean }
+  | { t: "wordSpawn"; word: number; call: number }
   | { t: "wordKey"; word: number; result: number }
-  | { t: "wordHit"; word: number; building: number; grade: Grade; errors: number; quality: number; gold: number }
-  | { t: "wordMiss"; word: number; building: number; touched: boolean }
-  | { t: "wordCancel"; word: number }
-  | { t: "wordExtend"; word: number }
-  | { t: "streamDeferred"; building: number; reason: "full" | "jam" }
+  | { t: "wordHit"; word: number; call: number; grade: Grade; errors: number; quality: number }
   | { t: "chain"; chain: number; tier: number; callout: boolean }
 );
 

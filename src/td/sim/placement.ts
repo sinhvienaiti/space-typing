@@ -2,14 +2,14 @@
  * Free placement (docs/td/TYPING_DEFENSE_DESIGN.md 12.5–12.6), shared by the
  * build menu's red ring and the `build` command. The checks run in the
  * design's fixed order and the first failure is the reason shown; 1A has no
- * slopes or scenery, so those two steps are absent.
+ * slopes, and its only scenery is the standing trees (BUILD_1A6 §4.2).
  */
-import { ASSIST, BUILD, RALLY } from "../content/rules";
+import { AGENT, BUILD, RALLY, TREE } from "../content/rules";
 import { CELL } from "./nav/grid";
 import { reachesAll } from "./nav/connectivity";
 import type { World } from "./world";
 
-export const PLACE_CHECKS = ["phase", "capTotal", "capType", "bounds", "node", "water", "road", "keep", "overlap", "rally", "path", "gold"] as const;
+export const PLACE_CHECKS = ["phase", "capTotal", "capType", "bounds", "node", "water", "road", "keep", "overlap", "tree", "rally", "path", "gold", "wood"] as const;
 export type PlaceReason = (typeof PLACE_CHECKS)[number];
 export type Placement = { ok: true; x: number; z: number; node: number } | { ok: false; reason: PlaceReason };
 
@@ -28,7 +28,7 @@ export function socketCell(w: World, x: number, z: number, reach: number, out = 
   return w.grid.cell(out.x, out.z);
 }
 
-/** `free`: the gold check is left out (the sandbox preset; the spots the keyboard offers). */
+/** `free`: the price checks are left out (the sandbox preset; the spots the keyboard offers). */
 export function canPlace(w: World, def: number, qx: number, qz: number, free = false): Placement {
   const spec = Number.isInteger(def) ? w.c.buildings[def] : undefined;
   if (w.phase === "defeat") return no("phase");
@@ -78,17 +78,21 @@ export function canPlace(w: World, def: number, qx: number, qz: number, free = f
     if (dx * dx + dz * dz < gap * gap) return no("overlap");
   }
 
+  const near = r + TREE.radiusM;
+  if (w.map.trees.some(([tx, tz], t) => w.trees.standing[t] === 1 && (tx - x) * (tx - x) + (tz - z) * (tz - z) < near * near)) return no("tree");
+
   if (spec.barracks !== null && !w.lanes.slice(0, -1).some((lane) => lane.gap2(x, z) <= RALLY.radiusM * RALLY.radiusM)) return no("rally");
 
   // With the building down, a walker must still get from the Bastion to every socket.
-  const sockets = others.map((slot) => socketCell(w, B.x[slot]!, B.z[slot]!, w.c.buildings[B.def[slot]!]!.radius + ASSIST.socketGapM));
-  sockets.push(socketCell(w, x, z, r + ASSIST.socketGapM));
+  const sockets = others.map((slot) => socketCell(w, B.x[slot]!, B.z[slot]!, w.c.buildings[B.def[slot]!]!.radius + AGENT.socketGapM));
+  sockets.push(socketCell(w, x, z, r + AGENT.socketGapM));
   w.grid.stamp(x, z, r, CELL.probe, true);
   const reachable = reachesAll(w.grid, w.keepCell, sockets);
   w.grid.stamp(x, z, r, CELL.probe, false);
   if (!reachable) return no("path");
 
-  if (!free && w.gold < spec.costs[0] * 1000) return no("gold");
+  if (!free && w.gold < spec.gold[0]! * 1000) return no("gold");
+  if (!free && w.wood < spec.wood[0]!) return no("wood");
   return { ok: true, x, z, node };
 }
 
@@ -109,7 +113,7 @@ export function spotCandidates(w: World, def: number): Point[] {
   return spots.sort((p, q) => bend(p) - bend(q) || p.x - q.x || p.z - q.z);
 }
 
-/** The first of `spots` from `k` on, going `dir` round, that `def` may take (gold aside), −1 none: a few canPlace a press, not ~500 (~40 ms). */
+/** The first of `spots` from `k` on, going `dir` round, that `def` may take (price aside), −1 none: a few canPlace a press, not ~500 (~40 ms). */
 export function nextSpot(w: World, def: number, spots: readonly Point[], k: number, dir: 1 | -1): number {
   for (let n = 0; n < spots.length; n += 1, k = (k + dir + spots.length) % spots.length) {
     if (canPlace(w, def, Math.round(spots[k]!.x / BUILD.snapM), Math.round(spots[k]!.z / BUILD.snapM), true).ok) return k;

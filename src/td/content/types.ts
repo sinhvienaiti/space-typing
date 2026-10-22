@@ -1,20 +1,18 @@
 /**
  * What a Typing Defense content slice defines (docs/td/TYPING_DEFENSE_DESIGN.md
- * 25.4). Ids are kebab-case; times are seconds and distances metres until
- * compile.ts turns them into ticks; hit points, damage and prices are whole
- * numbers. Each definition keeps its look in a `view` block, which the
- * content hash leaves out: a new colour never changes a replay.
+ * 25.4; docs/td/BUILD_1A6.md). Ids are kebab-case; times are seconds and
+ * distances metres until compile.ts turns them into ticks; hit points, damage
+ * and prices are whole numbers. Each definition keeps its look in a `view`
+ * block, which the content hash leaves out: a new colour never changes a replay.
  */
-export type Difficulty = "easy" | "normal" | "hard";
+export type Mode = "relax" | "balanced" | "challenge" | "learn";
 export type Family = "core" | "attack" | "military" | "economy" | "resource" | "support";
-export type ResourceId = "gold" | "food" | "wood";
-export type WordKind = "stream" | "finisher" | "rare" | "review" | "direct" | "seal" | "pickup" | "ultWord" | "spellWord";
-export type Grade = "flash" | "perfect" | "good" | "ok" | "sloppy" | "expired" | "cancelled";
+export type WordKind = "call" | "finisher" | "rare" | "review" | "direct" | "seal" | "pickup" | "ultWord" | "spellWord";
+export type Grade = "flash" | "perfect" | "good" | "ok" | "sloppy";
 export type DamageType = "physical" | "magic" | "true";
 export type Footprint = "S" | "M" | "L" | "XL";
 export type EnemyTier = "swarm" | "small" | "medium" | "heavy";
 export type Altitude = "ground" | "low" | "high";
-export type Specialty = "shot" | "drum" | "craft";
 
 export type Range = readonly [number, number];
 export type Point = readonly [number, number];
@@ -27,17 +25,16 @@ export type AttackLevel = { damage: Range; periodS: number; rangeM: number; spla
 /** `edgePct`: damage left at the rim of a blast (TK 11.3: 50 %). */
 export type AttackSpec = { damageType: DamageType; critPct: number; edgePct?: number; hits: readonly Altitude[]; projectileSpeed: number; levels: readonly AttackLevel[] };
 
-export type WordReward =
-  | { kind: "shot"; dBar: PerLevel; pierce: number; splashMul?: number }
-  | { kind: "resource"; resource: ResourceId; perLevel: PerLevel; richness: boolean }
-  | { kind: "soldiers"; respawnCutS: number; healPct: number }
-  | { kind: "keep"; goldPerWord: number; crossbowShot: boolean };
+/** A power word's Word Shot (TK 6.11): D̄ by level, extra targets, a wider blast. */
+export type ShotSpec = { dBar: PerLevel; pierce: number; splashMul?: number };
+/** A powered shot (BUILD_1A6 §4.5): damage ×, extra targets, blast radius ×. */
+export type PowerSpec = { dmgMul?: number; targets?: number; areaMul?: number };
 
 export type BarracksLevel = { hp: number; damage: Range; periodS: number; armorPct: number };
 export type MineLevel = { amount: number; everyS: number; pile: number };
 
 /** The Bastion's levels (TK 12.4); its crossbow is the definition's attack. */
-export type KeepLevel = { slots: number; tempoUnlock?: number };
+export type KeepLevel = { slots: number };
 
 export type BuildingDef = {
   id: string;
@@ -53,8 +50,11 @@ export type BuildingDef = {
   barracks?: { soldiers: number; respawnS: number; levels: readonly BarracksLevel[] };
   mine?: { levels: readonly MineLevel[] };
   keep?: { levels: readonly KeepLevel[] };
-  reward: WordReward;
-  specialty?: Specialty;
+  /** A farm's four plots (§4.1). */
+  farm?: true;
+  /** Towers and the Bastion: the power word's shot (the Bastion's is a crossbow bolt) and a powered shot. */
+  shot?: ShotSpec;
+  power?: PowerSpec;
   view: ViewBlock;
 };
 
@@ -83,7 +83,7 @@ export type EnemyDef = {
 /** `affinity`: building ids where the hero's passive applies (its Word Shots set enemies burning). */
 export type HeroDef = { id: string; flySpeed: number; takeoffS: number; landS: number; attack: AttackSpec; affinity: readonly string[]; burn: { dps: number; durationS: number }; view: ViewBlock };
 
-export type HelperDef = { id: string; specialty: Specialty; speed: number; presence: number; specialtyPct: number; settleS: number; view: ViewBlock };
+export type HelperDef = { id: string; speed: number; view: ViewBlock };
 
 export type Rect = { x0: number; x1: number; z0: number; z1: number };
 export type OreNode = { x: number; z: number; richness: 1 | 2 | 3 };
@@ -93,8 +93,10 @@ export type MapDef = {
   /** Ground routes from the gate to the Bastion; packs take turns. */
   routes: readonly (readonly Point[])[];
   flyRoute: readonly Point[]; flyHeightM: number; water: readonly Rect[]; bridges: readonly Rect[]; nodes: readonly OreNode[];
-  /** The sandbox's "Đặt sẵn 4 ô": building id, x, z and the agent sent there (0 the hero, 1–3 the helpers). */
-  preset?: readonly (readonly [string, number, number, number])[];
+  /** Trees to chop (BUILD_1A6 §4.2), in a fixed order: a tree's index is its id. */
+  trees: readonly Point[];
+  /** The sandbox's "Đặt sẵn" (§10): building id, x and z, put down at once. */
+  preset?: readonly (readonly [string, number, number])[];
 };
 
 export type WaveEntry = { enemy: string; count: number };

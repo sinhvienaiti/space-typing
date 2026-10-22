@@ -1,0 +1,349 @@
+import { describe, expect, it } from "vitest";
+import { createRng } from "../src/platform/rng";
+import { CHAIN, FARM, MODES, TREE } from "../src/td/content/rules";
+import type { Command, CommandBody } from "../src/td/sim/commands";
+import { hashHex } from "../src/td/sim/hash";
+import { STAT } from "../src/td/sim/stats";
+import { PLOT } from "../src/td/sim/stores/buildings";
+import { CALL_KIND, CALL_STATE } from "../src/td/sim/stores/calls";
+import { closeCall, makeCall } from "../src/td/sim/systems/calls";
+import { createWorld, runLog, step, type World } from "../src/td/sim/world";
+import { wordText } from "../src/td/typing/decks";
+import { built, goTo, q, run, send, world } from "./td/fixtures";
+import { live, realDeck, smallDeck, type } from "./td/typing";
+
+/** Calls for help (docs/td/BUILD_1A6.md §5): lifecycle, the AttentionDirector, words, the chain, the bonus, the invariants of §12. */
+const T = (seconds: number) => Math.round(seconds * 60);
+const deck = smallDeck(["apple", "bread", "cider", "dream", "eagle", "fable", "grape", "house", "ivory", "lemon", "mango", "olive", "peach", "river", "stone", "tiger"]);
+const N1 = [26, -30] as const;
+
+/** A world with a ready mine on N1 whose pile is over half full: its call is made and opened on the next tick. */
+function mineCall(options: Parameters<typeof world>[0] = {}) {
+  const w = world({ deck, gold: 1000, ...options });
+  const mine = built(w, "gold-mine", N1[0], N1[1]);
+  w.buildings.haulAt[mine] = 1e9; // the miner waits: the pile is the test's
+  w.buildings.pile[mine] = 31000;
+  run(w, 1);
+  return { w, mine, c: w.buildings.call[mine]! };
+}
+
+const textOf = (w: World, s: number): string => wordText(w.typing.deck, w.words.word[s]!);
+const wordOfCall = (w: World, c: number): string => textOf(w, w.calls.word[c]!);
+
+describe("a call's life (§5.2)", () => {
+  it("is made queued and opened under the cap; bright in a help ring it holds one word and its first letter; dim outside it gives them back, at no loss", () => {
+    const { w, mine, c } = mineCall();
+    expect(c).toBeGreaterThanOrEqual(0);
+    expect([w.calls.kind[c], w.calls.state[c], w.calls.bright[c], w.calls.word[c], w.calls.words[c]]).toEqual([CALL_KIND.mine, CALL_STATE.open, 0, -1, 2]);
+    goTo(w, 0, N1[0], N1[1] + 6);
+    expect(w.calls.bright[c]).toBe(1);
+    const s = w.calls.word[c]!;
+    expect(s).toBeGreaterThanOrEqual(0);
+    const first = w.typing.deck.letters[w.typing.deck.start[w.words.word[s]!]!]!;
+    expect(w.typing.letters.owner[first]).toBe(s);
+    const [chain, gold] = [w.typing.chain, w.gold];
+    goTo(w, 0, 0, 30);
+    expect([w.calls.bright[c], w.calls.word[c], w.typing.letters.owner[first], w.words.count]).toEqual([0, -1, -1, 0]);
+    expect(w.typing.chain).toBe(chain);
+    expect(w.gold).toBeGreaterThanOrEqual(gold);
+    expect(w.buildings.call[mine]).toBe(c); // still open, waiting
+  });
+
+  it("a locked call keeps its word out of every ring, gets its next word locked, and lets go only when done or on Esc", () => {
+    const { w, mine, c } = mineCall();
+    goTo(w, 0, N1[0], N1[1] + 6);
+    const word = wordOfCall(w, c);
+    type(w, word[0]!);
+    send(w, { t: "move", agent: 0, qx: q(0), qz: q(30) });
+    run(w, T(8)); // far away now
+    expect(Math.hypot(w.agents.x[0]! - N1[0], w.agents.z[0]! - N1[1])).toBeGreaterThan(10);
+    expect([w.calls.bright[c], textOf(w, w.typing.router.lock)]).toEqual([1, word]);
+    const gold = w.gold;
+    const pile = w.buildings.pile[mine]!;
+    type(w, word.slice(1));
+    // The word hauled the pile and paid 1 gold; the call's second word came at once, locked.
+    expect(w.gold - gold).toBe(pile + 1000);
+    expect(w.calls.done[c]).toBe(1);
+    const next = w.calls.word[c]!;
+    expect([next >= 0, w.typing.router.lock]).toEqual([true, next]);
+    run(w, 30);
+    expect(w.calls.bright[c]).toBe(1);
+    send(w, { t: "unlock" });
+    run(w, 1);
+    expect([w.calls.bright[c], w.calls.word[c], w.typing.router.lock]).toEqual([0, -1, -1]);
+  });
+
+  it("scores a word from the tick its call got it, not from when the call was made", () => {
+    const { w, c } = mineCall();
+    run(w, T(5)); // open but dim
+    goTo(w, 0, N1[0], N1[1] + 6);
+    const s = w.calls.word[c]!;
+    expect(w.words.born[s]).toBeGreaterThan(w.calls.born[c]! + T(5));
+    const hit = type(w, textOf(w, s), 60, true).find((event) => event.t === "wordHit");
+    expect(hit).toMatchObject({ grade: "flash" });
+  });
+
+  it("a whole Perfect call pays its bonus, by the chain's tier (at most ×1.3); a sloppy word loses it", () => {
+    for (const [chain, bonus] of [[0, 5], [CHAIN.tiers[4]!.from, 6.5]] as const) {
+      const { w, mine, c } = mineCall();
+      goTo(w, 0, N1[0], N1[1] + 6);
+      w.typing.chain = chain;
+      const [gold, pile] = [w.gold, w.buildings.pile[mine]!];
+      type(w, wordOfCall(w, c), 60, true);
+      type(w, wordOfCall(w, c), 60, true);
+      expect(w.calls.used[c]).toBe(0);
+      expect(w.events.rare.find((event) => event.t === "callEnd")).toMatchObject({ perfect: true, finished: true });
+      expect((w.gold - gold - pile) / 1000).toBeCloseTo(2 + bonus, 9); // the pile hauled, 1 gold a word, the bonus
+      expect(w.buildings.pile[mine]).toBe(0);
+    }
+    const { w, mine, c } = mineCall();
+    goTo(w, 0, N1[0], N1[1] + 6);
+    w.typing.chain = 8;
+    const [gold, pile] = [w.gold, w.buildings.pile[mine]!];
+    const word = wordOfCall(w, c);
+    type(w, word[0] + "zzzz" + word.slice(1), 60, true); // sloppy: the chain halves, the word's gold ×0.6
+    expect(w.typing.chain).toBe(4);
+    type(w, wordOfCall(w, c), 60, true);
+    expect(w.typing.chain).toBe(5);
+    expect(w.events.rare.find((event) => event.t === "callEnd")).toMatchObject({ perfect: false });
+    expect((w.gold - gold - pile) / 1000).toBeCloseTo(0.6 + 1, 9);
+  });
+});
+
+describe("the chain (§5.4)", () => {
+  it("+1 for every word that is not sloppy (Ok included), ÷2 for a sloppy one, and nothing else moves it", () => {
+    const { w, c } = mineCall();
+    goTo(w, 0, N1[0], N1[1] + 6);
+    const word = wordOfCall(w, c);
+    type(w, word[0] + "z" + word.slice(1), 60, true); // one error on a 5-letter word: Ok
+    expect(w.typing.chain).toBe(1);
+    // The call dims, a new one is made and closed, a power call runs out: none of it moves the chain.
+    goTo(w, 0, 0, 30);
+    closeCall(w, makeCall(w, CALL_KIND.build, 3, -1, 0, -1, -1));
+    w.phase = "night";
+    makeCall(w, CALL_KIND.power, 1, -1, 0, -1, -1, T(6));
+    run(w, T(8));
+    expect(w.typing.chain).toBe(1);
+  });
+});
+
+describe("the AttentionDirector (§5.3)", () => {
+  /** Calls of the given kinds at the Bastion, made in that order on successive ticks (older first). */
+  function calls(w: World, kinds: readonly number[]): number[] {
+    return kinds.map((kind) => {
+      const c = makeCall(w, kind, 1, -1, 0, -1, -1);
+      w.tick += 1;
+      return c;
+    });
+  }
+  const open = (w: World, list: readonly number[]) => list.map((c) => (w.calls.used[c] === 1 ? w.calls.state[c] : -1));
+
+  it("opens at most the mode's cap, by priority: power, build, then harvest = chop = mine (older first), then quiz", () => {
+    const w = world({ deck });
+    const list = calls(w, [CALL_KIND.quiz, CALL_KIND.mine, CALL_KIND.harvest, CALL_KIND.build, CALL_KIND.power]);
+    step(w);
+    expect(open(w, list)).toEqual([0, 1, 0, 1, 1]);
+    closeCall(w, list[4]!);
+    step(w);
+    expect(open(w, list)).toEqual([0, 1, 1, 1, -1]);
+    closeCall(w, list[1]!);
+    closeCall(w, list[2]!);
+    step(w);
+    expect(open(w, list)).toEqual([1, -1, -1, 1, -1]);
+    for (const [mode, cap] of [["relax", 2], ["challenge", 4]] as const) {
+      const other = world({ deck, mode });
+      const many = calls(other, [CALL_KIND.mine, CALL_KIND.chop, CALL_KIND.mine, CALL_KIND.chop, CALL_KIND.mine]);
+      step(other);
+      expect(open(other, many).filter((state) => state === 1).length).toBe(cap);
+      expect(cap).toBe(MODES[mode].open);
+    }
+  });
+
+  it("counts a tick with a lock as typing; past the mode's 8 s in 20 s only power and build open", () => {
+    const w = world({ deck });
+    const c = makeCall(w, CALL_KIND.mine, 1, -1, 0, -1, -1);
+    step(w);
+    type(w, wordOfCall(w, c)[0]!);
+    run(w, T(2));
+    expect(w.typing.typedSum).toBe(T(2) + 1);
+    w.typing.typed.fill(1);
+    w.typing.typedSum = w.typing.typed.length;
+    const [mine, build] = calls(w, [CALL_KIND.mine, CALL_KIND.build]);
+    step(w);
+    expect(open(w, [mine!, build!])).toEqual([0, 1]);
+    w.typing.typed.fill(0);
+    w.typing.typedSum = 0;
+    step(w);
+    expect(open(w, [mine!])).toEqual([1]);
+  });
+
+  it("at night opens no quiz and one economy call at a time", () => {
+    const w = world({ deck, mode: "challenge" });
+    w.phase = "night";
+    const list = calls(w, [CALL_KIND.quiz, CALL_KIND.chop, CALL_KIND.harvest, CALL_KIND.build]);
+    step(w);
+    expect(open(w, list)).toEqual([0, 1, 0, 1]);
+    w.phase = "day";
+    step(w);
+    expect(open(w, list)).toEqual([1, 1, 1, 1]);
+  });
+});
+
+describe("work by hand and by typing (§5.1)", () => {
+  /** A world whose villagers chop the trees nearest the Bastion, the hero standing among them. */
+  function chopping() {
+    const w = world({ deck });
+    goTo(w, 0, 15, 34);
+    for (let k = 0; k < T(30) && w.calls.live().every((c) => w.calls.kind[c] !== CALL_KIND.chop || w.calls.word[c]! < 0); k += 1) step(w);
+    const c = w.calls.live().find((k) => w.calls.kind[k] === CALL_KIND.chop && w.calls.word[k]! >= 0)!;
+    return { w, c, tree: w.calls.tree[c]! };
+  }
+
+  it("self-work and typed words add up: one Perfect word of four takes a quarter off a 20 s chop; a call the work ends costs nothing, its Perfect words still earn the bonus", () => {
+    const { w, c, tree } = chopping();
+    const started = w.calls.born[c]!;
+    const [chain, wood] = [w.typing.chain, w.wood];
+    type(w, wordOfCall(w, c), 60, true);
+    expect(w.typing.chain).toBe(chain + 1);
+    let felled = -1;
+    for (let k = 0; k < T(25) && felled < 0; k += 1) {
+      step(w);
+      if (w.trees.standing[tree] === 0) felled = w.tick - 1;
+    }
+    expect(felled - started).toBeGreaterThanOrEqual(T(TREE.chopS) * 0.75 - 2);
+    expect(felled - started).toBeLessThanOrEqual(T(TREE.chopS) * 0.75 + 2);
+    expect(w.calls.used[c]).toBe(0); // closed with the tree, three words untyped
+    expect(w.wood).toBe(wood + TREE.wood + TREE.perfectWood);
+    expect(w.typing.chain).toBe(chain + 1);
+  });
+
+  it("a sloppy word pushes the work ×0.6", () => {
+    const { w, c, tree } = chopping();
+    const before = w.trees.progress[tree]!;
+    const word = wordOfCall(w, c);
+    type(w, word[0] + "zzzz" + word.slice(1), 60, true);
+    expect(w.trees.progress[tree]! - before).toBeCloseTo(0.6 / 4 + 1 / T(TREE.chopS), 9);
+  });
+
+  it("a harvest typed whole and Perfect brings 5 food and 3 more", () => {
+    const w = world({ deck, gold: 1000 });
+    const farm = built(w, "farm", -17, 40);
+    for (let p = 0; p < FARM.plots; p += 1) w.buildings.plot[farm * FARM.plots + p] = PLOT.ripe;
+    goTo(w, 0, -12, 40);
+    for (let k = 0; k < T(10) && w.calls.live().every((c) => w.calls.word[c]! < 0); k += 1) step(w);
+    const c = w.calls.live().find((k) => w.calls.kind[k] === CALL_KIND.harvest)!;
+    expect(w.calls.word[c]).toBeGreaterThanOrEqual(0);
+    const food = w.food;
+    for (let k = 0; k < 3; k += 1) type(w, wordOfCall(w, c), 60, true);
+    run(w, 1);
+    expect(w.food - food).toBe(FARM.food + FARM.perfectFood);
+    expect(w.events.rare.filter((event) => event.t === "harvested").length).toBe(1);
+  });
+});
+
+/** Random play on the real vocabulary: every invariant of §12 gate 6, every tick. */
+function randomPlay(seed: number, ticks: number, typing: boolean) {
+  const w = createWorld({ seed, deck: realDeck(), vocab: 3, expected: 40 });
+  const rng = createRng(seed * 7 + 1).ai;
+  const log: Command[] = [];
+  const problems: string[] = [];
+  const fail = (what: string) => problems.length < 10 && problems.push("tick " + w.tick + ": " + what);
+  const sendNow: CommandBody[] = [{ t: "sandbox", op: { op: "preset" } }];
+  const seen = { words: 0, bright: 0, maxOpen: 0, typedTicks: 0 };
+  const deckOf = w.typing.deck;
+  for (let tick = 0; tick < ticks; tick += 1) {
+    const C = w.calls;
+    if (tick % 90 === 0) {
+      const lit = C.live();
+      const pick = rng.int(0, 3);
+      if (pick === 0 && lit.length > 0) {
+        const c = lit[rng.int(0, lit.length - 1)]!;
+        sendNow.push({ t: "move", agent: rng.int(0, 2), qx: q(Math.round(C.x[c]!) + 3), qz: q(Math.round(C.z[c]!) + 2) });
+      } else if (pick === 1) sendNow.push({ t: "move", agent: 0, qx: q(rng.int(-40, 40)), qz: q(rng.int(-40, 40)) });
+      else if (pick === 2) sendNow.push({ t: "markTree", tree: rng.int(0, w.trees.count - 1) });
+      else if (w.phase === "day" && rng.chance(0.3)) sendNow.push({ t: "callNight" });
+    }
+    if (typing && tick % 9 === 0) {
+      const at = tick * (1000 / 60);
+      const lock = w.typing.router.lock;
+      if (rng.chance(0.03)) sendNow.push({ t: "unlock" });
+      else if (lock >= 0) {
+        const right = deckOf.letters[deckOf.start[w.words.word[lock]!]! + w.words.typed[lock]!]!;
+        sendNow.push({ t: "key", letter: rng.chance(0.06) ? rng.int(0, 25) : right, atMs: at });
+      } else {
+        const words = w.words.live();
+        if (words.length > 0) sendNow.push({ t: "key", letter: deckOf.letters[deckOf.start[w.words.word[words[rng.int(0, words.length - 1)]!]!]!]!, atMs: at });
+      }
+    }
+    const commands = sendNow.splice(0).map((body) => ({ ...body, tick: w.tick }) as Command);
+    log.push(...commands);
+    step(w, commands);
+    w.events.rare.length = 0;
+    // Gate 6: open ≤ cap; only bright calls hold a word, each its own; one lock, on a bright call; distinct first letters.
+    let opened = 0;
+    for (const c of C.live()) {
+      if (C.state[c] === CALL_STATE.open) opened += 1;
+      if (C.bright[c] === 1 && C.state[c] !== CALL_STATE.open) fail("a queued call is bright");
+      const s = C.word[c]!;
+      if (s >= 0 && (C.bright[c] !== 1 || w.words.used[s] !== 1 || w.words.call[s] !== c)) fail("call " + c + " holds a word it should not");
+      if (C.bright[c] === 1) seen.bright += 1;
+    }
+    if (opened > MODES[w.mode].open) fail(opened + " open calls");
+    seen.maxOpen = Math.max(seen.maxOpen, opened);
+    const firsts = new Set<number>();
+    for (const s of w.words.live()) {
+      const c = w.words.call[s]!;
+      if (C.used[c] !== 1 || C.word[c] !== s) fail("word " + textOf(w, s) + " without its call");
+      const first = deckOf.letters[deckOf.start[w.words.word[s]!]!]!;
+      if (firsts.has(first)) fail("two live words start with " + String.fromCharCode(97 + first));
+      if (w.typing.letters.owner[first] !== s) fail("letter " + first + " owner out of step");
+      firsts.add(first);
+    }
+    seen.words = Math.max(seen.words, firsts.size);
+    const lock = w.typing.router.lock;
+    if (lock >= 0) {
+      seen.typedTicks += 1;
+      if (w.words.used[lock] !== 1 || C.bright[w.words.call[lock]!] !== 1) fail("the lock is on a word of no bright call");
+    }
+  }
+  return { w, log, problems, seen };
+}
+
+describe("invariants (§12 gate 6) and replay", () => {
+  it("random play on the real vocabulary: open ≤ cap, one lock on a bright call, one word a bright call, distinct first letters; the log replays to the same hash", () => {
+    for (const seed of [1, 2, 3]) {
+      const { w, log, problems, seen } = randomPlay(seed, T(240), true);
+      expect(problems).toEqual([]);
+      expect(seen.maxOpen).toBe(MODES.balanced.open);
+      expect(seen.words).toBeGreaterThanOrEqual(2);
+      expect(seen.typedTicks).toBeGreaterThan(T(10));
+      expect(w.stats[STAT.callWords]).toBeGreaterThan(20);
+      expect(w.day).toBeGreaterThanOrEqual(2);
+      const replay = createWorld({ seed, deck: w.typing.deck, vocab: 3, expected: 40 });
+      runLog(replay, log, w.tick);
+      expect(hashHex(replay)).toBe(hashHex(w));
+    }
+  });
+
+  it("ignoring every call never lowers the chain and loses nothing: gold falls only by seeds bought, food only by soldiers' meals, wood never", () => {
+    const w = createWorld({ seed: 4, deck, expected: 40 });
+    send(w, { t: "sandbox", op: { op: "preset" } });
+    const rng = createRng(4).ai;
+    let [gold, wood, food, seeds, eaten] = [w.gold, w.wood, w.food, w.stats[STAT.seedsBought]!, w.stats[STAT.foodEaten]!];
+    let calls = 0;
+    for (let tick = 0; tick < T(300); tick += 1) {
+      const bodies: CommandBody[] = tick % 120 === 0 ? [{ t: "move", agent: 0, qx: q(rng.int(-30, 30)), qz: q(rng.int(-30, 40)) }] : [];
+      send(w, ...bodies);
+      calls = Math.max(calls, w.calls.count);
+      expect(w.typing.chain).toBe(0);
+      const bought = w.stats[STAT.seedsBought]! - seeds;
+      expect(w.gold - gold + bought * FARM.seedGold * 1000, "gold at tick " + w.tick).toBeGreaterThanOrEqual(0);
+      expect(w.wood - wood, "wood at tick " + w.tick).toBeGreaterThanOrEqual(0);
+      expect(w.food - food + (w.stats[STAT.foodEaten]! - eaten), "food at tick " + w.tick).toBeGreaterThanOrEqual(0);
+      [gold, wood, food, seeds, eaten] = [w.gold, w.wood, w.food, w.stats[STAT.seedsBought]!, w.stats[STAT.foodEaten]!];
+    }
+    expect(calls).toBeGreaterThan(2);
+    expect(w.stats[STAT.calls]).toBeGreaterThan(10);
+    expect(live(w).length).toBeLessThanOrEqual(MODES.balanced.open);
+  });
+});

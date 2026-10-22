@@ -44,6 +44,7 @@ export function validateContent(content: Content): string[] {
     if (building.barracks && building.barracks.levels.length !== 3) fail(where, "barracks needs 3 levels");
     if (building.mine && building.mine.levels.length !== 3) fail(where, "mine needs 3 levels");
     if (building.placement === "node" && building.mine === undefined) fail(where, "only producers stand on nodes");
+    if (building.attack && building.shot === undefined) fail(where, "a tower needs its power word's shot (BUILD_1A6 §4.5)");
   }
   const antiAir = content.buildings.filter((building) => building.attack?.hits.includes("low"));
   if (antiAir.length < 2) fail("buildings", "fewer than 2 can hit flyers (TK 10.4)");
@@ -80,8 +81,8 @@ export function validateContent(content: Content): string[] {
   for (const route of [...map.routes, map.flyRoute]) {
     if (route.length < 2 || !same(route[0], map.gate) || !same(route[route.length - 1], map.keep)) fail(map.id, "every route runs from the gate to the Bastion");
   }
-  for (const node of map.nodes) {
-    if (Math.abs(node.x) > map.buildHalfM || Math.abs(node.z) > map.buildHalfM) fail(map.id, "node (" + node.x + ", " + node.z + ") is outside the build area");
+  for (const point of [...map.nodes.map((node) => [node.x, node.z] as const), ...map.trees]) {
+    if (Math.abs(point[0]) > map.buildHalfM || Math.abs(point[1]) > map.buildHalfM) fail(map.id, "(" + point.join(", ") + ") is outside the build area");
   }
   return problems;
 }

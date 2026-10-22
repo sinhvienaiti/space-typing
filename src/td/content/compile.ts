@@ -52,10 +52,16 @@ export function compileAttack(spec: AttackSpec) {
 }
 
 function compileBuilding(def: BuildingDef, index: number) {
+  const wood = def.costs.map((total) => Math.round(total * RULES.ECONOMY.woodShare));
   return {
-    index, id: def.id, family: def.family, radius: RULES.BUILD.footprintR[def.footprint], placement: def.placement, costs: def.costs, hp: def.hp,
-    buildTicks: def.placement === "fixed" ? 0 : ticks(RULES.BUILD.buildTimeS[def.footprint]),
+    index, id: def.id, family: def.family, radius: RULES.BUILD.footprintR[def.footprint], placement: def.placement, hp: def.hp,
+    // BUILD_1A6 §3: the 1A price G (gold spent to reach each level, TK 12.2) is round(0.3 G) wood and the rest gold.
+    gold: def.costs.map((total, k) => total - wood[k]!), wood,
+    buildTicks: ticks(RULES.BUILD.buildTimeS[def.footprint]),
+    words: RULES.CALL.words.build[def.footprint],
     attack: def.attack ? compileAttack(def.attack) : null,
+    power: { dmg: def.power?.dmgMul ?? 1, targets: def.power?.targets ?? 0, area: def.power?.areaMul ?? 1 },
+    farm: def.farm === true,
     barracks: def.barracks
       ? {
           soldiers: def.barracks.soldiers,

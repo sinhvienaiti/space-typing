@@ -4,8 +4,8 @@ import { replayHashes, runBot } from "./td/bot";
 import { GOLDEN_EVERY, goldenSpec, readGolden, runGolden } from "./td/golden";
 
 /**
- * The golden run (docs/td/BUILD_NOW.md §6.1, §7 gate 4): the balanced bot plays
- * three waves from a fixed seed; the world hash every 60 ticks matches
+ * The golden run (docs/td/BUILD_NOW.md §6.1, §7 gate 4; BUILD_1A6 §12 gate 2): the balanced bot plays
+ * three days and nights from a fixed seed; the world hash every 60 ticks matches
  * tests/golden/td-1a.json, a second run matches the first, and the run's
  * command log replayed on a fresh world gives the same hashes. A content
  * change (rules or numbers) shows as a content hash first; remake the file
@@ -20,15 +20,16 @@ describe("golden run", () => {
     expect(createWorld({ seed: golden.seed }).c.hash, "rules or numbers changed: pnpm td:golden:update once the change is meant").toBe(golden.content);
   });
 
-  it("plays three waves through commands the world takes, every word invariant holding every tick", () => {
+  it("plays three days and nights through commands the world takes, every call invariant holding every tick", () => {
     expect(run.stats.wavesCleared).toBe(3);
     expect(run.rejected).toEqual([]);
     expect(run.problems).toEqual([]);
-    // It types, slips, takes back with Backspace, moves its hero, changes tempos, undoes a building, calls waves early.
+    // It types, slips, takes back with Backspace, moves its hero, sends a helper, marks trees, hires, undoes a building, calls nights early.
     const kinds = new Set(run.log.map((command) => command.t));
-    for (const kind of ["build", "sell", "assignUnit", "setTempo", "key", "backspace", "callWave", "sandbox"]) expect(kinds, kind).toContain(kind);
+    for (const kind of ["build", "sell", "assignUnit", "move", "markTree", "hire", "key", "backspace", "callNight", "sandbox"]) expect(kinds, kind).toContain(kind);
     expect(run.stats.keyErrors).toBeGreaterThan(0);
-    expect(run.stats.streamDone).toBeGreaterThan(20);
+    expect(run.stats.callWords).toBeGreaterThan(20);
+    expect(run.stats.callsPerfect).toBeGreaterThan(0);
   });
 
   it("hashes the world every 60 ticks as the golden file says", () => {

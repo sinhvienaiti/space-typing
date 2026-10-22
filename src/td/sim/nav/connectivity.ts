@@ -1,6 +1,6 @@
 /**
  * Breadth-first reach on the walking grid (TK 12.5 "lối đi"): after a
- * building goes down, every assist socket must still be reachable from the
+ * building goes down, every work socket must still be reachable from the
  * Bastion. Scratch arrays are allocated once per grid size.
  */
 import { STEPS, type WalkGrid } from "./grid";

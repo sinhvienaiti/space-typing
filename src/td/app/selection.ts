@@ -1,16 +1,16 @@
 /**
  * What the player has in hand (docs/td/TYPING_DEFENSE_DESIGN.md 25.7: app
  * state, never in the sim). Keys and buttons name the same actions, so every
- * task in a wave has a keyboard path (BUILD_NOW §5.4). The sim holds the order
- * grace (TK 6.14) while the build menu is open, or a card a click opened: a
- * mouse order takes the hand off the keys, while Tab only highlights.
+ * task has a keyboard path (BUILD_NOW §5.4, BUILD_1A6 §8). A click on a tree
+ * marks it, on a ripe plot asks its farmer to harvest it first.
  */
+import { FARM, TREE } from "../content/rules";
 import type { CommandBody } from "../sim/commands";
 import { canPlace, nextSpot, spotCandidates, type Point } from "../sim/placement";
+import { PLOT } from "../sim/stores/buildings";
 import { slotsOpen } from "../sim/systems/agents";
-import { densestFor } from "../sim/systems/stream";
+import { plotAt } from "../sim/systems/economy";
 import type { World } from "../sim/world";
-import { stepTempo } from "../typing/tempo";
 import { REASON } from "../ui/hud";
 import { sandboxOp } from "./sandbox";
 
@@ -29,26 +29,23 @@ export class Selection {
   spot = -1;
   paused = false;
   panel = true;
-  /** A click on the map came after the last Tab. */
-  private clicked = false;
-  private graced = false;
 
   constructor(private readonly w: World, private readonly send: (command: CommandBody) => void) {}
 
   private readonly actions: Record<string, (n: number) => unknown> = {
-    pick: (n) => (this.building ? this.choose(n, this.mouse) : this.actions.agent!(n - 1)), // Digit1–4; a build menu row
+    pick: (n) => (this.building ? this.choose(n, this.mouse) : this.actions.agent!(n - 1)), // Digit1–5; a build menu row
     agent: (n) => n >= 0 && n < slotsOpen(this.w) && (this.agent = n),
     cycle: () => (this.agent = (this.agent + 1) % slotsOpen(this.w)),
     recall: () => this.send({ t: "recall", agent: this.agent }),
     next: () => this.next(1),
     prev: () => this.next(-1),
     send: () => (this.building ? this.build(null) : this.focus >= 0 && this.send({ t: "assignUnit", agent: this.agent, building: this.focus })),
-    wave: () => this.send({ t: "callWave" }),
-    slower: () => this.stepTempo(-1),
-    denser: () => this.stepTempo(1),
-    tempo: (n) => this.setTempo(this.w.buildings.slotOf(this.focus), n),
-    stopAll: () => this.send({ t: "setAllTempo", stop: true }),
-    restore: () => this.send({ t: "setAllTempo", stop: false }),
+    night: () => this.send({ t: "callNight" }),
+    hire: () => this.send({ t: "hire" }),
+    seeds: () => this.send({ t: "buySeeds" }),
+    autoSeeds: () => this.send({ t: "autoSeeds", on: !this.w.autoSeeds }),
+    sellFood: () => this.send({ t: "sellFood" }),
+    upgrade: () => this.focus >= 0 && this.send({ t: "upgrade", building: this.focus }),
     build: () => this.choose(this.kind, null),
     undo: () => this.w.buildings.slotOf(this.focus) > 0 && this.send({ t: "sell", building: this.focus }), // the card's button; Delete
     close: () => this.close(),
@@ -65,33 +62,19 @@ export class Selection {
     this.update();
   }
 
-  /** After each action and frame: a card whose building is gone closes, an agent whose slot closed gives way to the hero, the grace follows the menus. */
+  /** After each action and frame: a card whose building is gone closes, an agent whose slot closed gives way to the hero. */
   update(): void {
     if (this.w.buildings.slotOf(this.focus) < 0) this.focus = -1;
     if (this.agent >= slotsOpen(this.w)) this.agent = 0;
-    const open = this.building || (this.focus >= 0 && this.clicked);
-    if (open !== this.graced) this.send({ t: "uiFocus", on: open });
-    this.graced = open;
   }
 
-  /** Sent only on a change: a new tempo restarts the building's schedule (TK 6.2). */
-  private setTempo(b: number, tempo: number): void {
-    if (b >= 0 && tempo !== this.w.buildings.tempo[b]) this.send({ t: "setTempo", building: this.w.buildings.id(b), idx: tempo });
-  }
-
-  private stepTempo(dir: 1 | -1): void {
-    const b = this.w.buildings.slotOf(this.focus);
-    if (b >= 0) this.setTempo(b, stepTempo(this.w.buildings.tempo[b]!, dir, densestFor(this.w, b), this.w.difficulty));
-  }
-
-  /** Tab: the build menu's next suggested spot, else the next building by distance from the agent (TK 8.3; 1A has no help signals). */
+  /** Tab: the build menu's next suggested spot, else the next building by distance from the agent (TK 8.3). */
   private next(dir: 1 | -1): void {
     if (this.building) {
       this.mouse = null;
       this.spot = nextSpot(this.w, this.kind, this.spots, (this.spot + dir + this.spots.length) % this.spots.length, dir);
       return;
     }
-    this.clicked = false;
     const B = this.w.buildings;
     const from = { x: this.w.agents.x[this.agent]!, z: this.w.agents.z[this.agent]! };
     const order = B.live().sort((p, r) => dist2(B.x[p]!, B.z[p]!, from) - dist2(B.x[r]!, B.z[r]!, from) || p - r);
@@ -130,16 +113,25 @@ export class Selection {
     if (this.building) this.mouse = p;
   }
 
-  /** TK 8.3: right sends the agent to a building or to stand at the point; left builds, opens a building's card or the build menu. */
+  /** The ripe plot of farm b under p, −1 none. */
+  private ripePlot(b: number, p: Point): number {
+    for (let k = 0; k < FARM.plots; k += 1) if (this.w.buildings.plot[b * FARM.plots + k] === PLOT.ripe && dist2(p.x, p.z, plotAt(this.w, b, k)) <= 1) return k;
+    return -1;
+  }
+
+  /** TK 8.3: right sends the agent to a building or to stand at the point; left builds, harvests a ripe plot, marks a tree, opens a card or the build menu. */
   click(p: Point, right: boolean): void {
-    this.clicked = true;
     const B = this.w.buildings;
     const hit = B.live().find((b) => dist2(B.x[b]!, B.z[b]!, p) <= (this.w.c.buildings[B.def[b]!]!.radius + 0.3) ** 2);
     const b = hit === undefined ? -1 : B.id(hit);
+    const plot = hit === undefined ? -1 : this.ripePlot(hit, p);
+    const tree = this.w.map.trees.findIndex(([x, z], t) => this.w.trees.standing[t] === 1 && dist2(x, z, p) <= (TREE.radiusM + 0.3) ** 2);
     const field = Math.abs(p.x) <= this.w.map.halfM && Math.abs(p.z) <= this.w.map.halfM;
     if (right && this.building) this.close();
     else if (right) this.send(b >= 0 ? { t: "assignUnit", agent: this.agent, building: b } : { t: "move", agent: this.agent, qx: q(p.x), qz: q(p.z) });
     else if (this.building) this.build(p);
+    else if (plot >= 0) this.send({ t: "harvestPlot", building: b, plot });
+    else if (tree >= 0 && b < 0) this.send({ t: "markTree", tree });
     else if (b >= 0 || this.focus >= 0 || !field) this.focus = b;
     else this.choose(this.kind, p);
     this.update();

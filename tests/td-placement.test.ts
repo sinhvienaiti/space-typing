@@ -7,7 +7,7 @@ import type { World } from "../src/td/sim/world";
 import { build, def, q, send, world } from "./td/fixtures";
 
 /** Spots that fill the caps: 6 attack towers, 3 barracks. */
-const ARCHERS = [[-18, -20], [-18, -8], [-8, -16], [-8, -8], [7, -25], [10, -8]] as const;
+const ARCHERS = [[-18, -14], [-18, -8], [-8, -16], [-8, -8], [7, -25], [10, -8]] as const;
 const BARRACKS = [[2, 18], [8, 12], [-10, 16]] as const;
 /** The 1A field with five more ore nodes, so that 16 buildings fit. */
 const MANY_NODES: Content = {
@@ -29,7 +29,7 @@ const reason = (w: World, id: string, x: number, z: number) => {
 };
 
 describe("placement (TK 12.5)", () => {
-  it("checks in the design's fixed order: of two failing checks, the earlier one is the reason (no slopes or scenery in 1A)", () => {
+  it("checks in the design's fixed order: of two failing checks, the earlier one is the reason (no slopes in 1A; trees are its scenery)", () => {
     const sixArchers = () => {
       const w = world({ gold: 5000 });
       for (const [x, z] of ARCHERS) build(w, "archer", x, z);
@@ -60,23 +60,27 @@ describe("placement (TK 12.5)", () => {
         build(w, "archer", -13.25, 40);
         return reason(w, "archer", -12.75, 39);
       },
-      "overlap>rally": () => {
-        const w = world();
-        build(w, "archer", -40, -40);
-        return reason(w, "barracks", -40, -36);
+      "overlap>tree": () => {
+        const w = world({ gold: 1000 });
+        build(w, "archer", 35, -33);
+        return reason(w, "archer", 35, -36.5);
       },
+      "tree>rally": () => reason(world(), "barracks", 40, -40),
       "rally>path": () => reason(bridgesShut(1000), "barracks", -20, 26),
       "path>gold": () => reason(bridgesShut(0), "cannon", -20, 26),
+      "gold>wood": () => reason(world({ gold: 0 }), "archer", -18, -10),
     };
-    expect(Object.keys(cases)).toEqual(PLACE_CHECKS.slice(1).map((check, index) => PLACE_CHECKS[index] + ">" + check));
+    expect(Object.keys(cases).sort()).toEqual(PLACE_CHECKS.slice(1).map((check, index) => PLACE_CHECKS[index] + ">" + check).sort());
     for (const [pair, run] of Object.entries(cases)) expect(run(), pair).toBe(pair.split(">")[0]);
     // And each later check does fail there on its own.
-    expect(reason(world({ gold: 0 }), "archer", -18, -10)).toBe("gold");
+    expect(reason(world({ gold: 0, wood: 1000 }), "archer", -18, -10)).toBe("gold");
+    expect(reason(world({ gold: 1000, wood: 0 }), "archer", -18, -10)).toBe("wood");
+    expect(reason(world(), "archer", 35, -36.5)).toBe("tree");
     expect(reason(bridgesShut(1000), "cannon", -20, 26)).toBe("path");
   });
 
   it("reports the first check that fails", () => {
-    const w = world({ gold: 0 });
+    const w = world({ gold: 0, wood: 1000 });
     expect(reason(w, "archer", -46, 0)).toBe("bounds"); // also off the map edge only
     expect(reason(w, "archer", -24, -14)).toBe("water"); // on a bridge
     expect(reason(w, "archer", -18, -10)).toBe("gold"); // a good spot, no money
@@ -152,16 +156,16 @@ describe("placement (TK 12.5)", () => {
 
   it("refuses water and bridges", () => {
     const w = world();
-    expect(reason(w, "archer", -21, -40)).toBe("water");
-    expect(reason(w, "archer", -20, -40)).toBe("ok");
+    expect(reason(w, "archer", -21, -10)).toBe("water");
+    expect(reason(w, "archer", -20, -10)).toBe("ok");
     expect(reason(w, "archer", -24, 26)).toBe("water");
   });
 
   it("keeps buildings rA + rB + 1 m apart", () => {
-    const w = world();
-    build(w, "archer", -18, -20);
-    expect(reason(w, "archer", -18, -15.25)).toBe("overlap");
-    expect(reason(w, "archer", -18, -15)).toBe("ok");
+    const w = world({ gold: 1000 });
+    build(w, "archer", -18, -8);
+    expect(reason(w, "archer", -18, -3.25)).toBe("overlap");
+    expect(reason(w, "archer", -18, -3)).toBe("ok");
   });
 
   it("refuses a building that cuts an assist socket off from the Bastion (BFS on the 1 m grid)", () => {
@@ -187,13 +191,13 @@ describe("placement (TK 12.5)", () => {
     expect(reason(w, "gold-mine", -12, 32)).toBe("ok");
   });
 
-  it("the build command uses the same check and spends only on success", () => {
+  it("the build command uses the same check and spends gold and wood only on success (BUILD_1A6 §3)", () => {
     const w = world();
-    const gold = w.gold;
+    const [gold, wood] = [w.gold, w.wood];
     expect(send(w, { t: "build", def: def(w, "archer"), qx: q(-11), qz: q(-10) }).find((event) => event.t === "rejected")).toMatchObject({ reason: "road" });
-    expect(w.gold).toBe(gold);
+    expect([w.gold, w.wood]).toEqual([gold, wood]);
     build(w, "archer", -18, -10);
-    expect(w.gold).toBe(gold - 70000);
+    expect([w.gold, w.wood]).toEqual([gold - 49000, wood - 21]);
     expect(send(w, { t: "build", def: 0, qx: q(-30), qz: q(-30) }).find((event) => event.t === "rejected")).toMatchObject({ reason: "capType" });
   });
 });

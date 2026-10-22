@@ -49,7 +49,7 @@ body.is-paused .td-words { filter: blur(6px); }
 .td-stat b { font-size: 1.5em; font-weight: 800; font-variant-numeric: tabular-nums; }
 .td-call { width: 100%; margin-top: 8px; background: var(--td-jade); color: #fff; }
 .td-hud .td-warn { color: #b86f00; font-weight: 700; }
-.td-load { padding: 2px 9px; border-radius: 999px; color: #fff; font-weight: 800; white-space: nowrap; }
+.td-load { padding: 2px 9px; border-radius: 999px; background: var(--td-jade); color: #fff; font-weight: 800; white-space: nowrap; }
 .td-agents { justify-content: space-between; margin-top: 8px; }
 .td-agent { position: relative; width: calc(54px * var(--hud, 1)); height: calc(54px * var(--hud, 1)); padding: 0; border: 2px solid var(--td-ink); border-radius: 50%; background: var(--c); box-shadow: 2px 2px 0 var(--td-ink); font-size: 1.7em; font-weight: 800; }
 .td-agent i, .td-agent em { position: absolute; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 4px; border: 1.5px solid var(--td-ink); border-radius: 10px; color: var(--td-ink); font: 800 11px/1 var(--td-font); }

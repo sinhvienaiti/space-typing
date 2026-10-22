@@ -2,7 +2,7 @@
  * The walking grid (docs/td/TYPING_DEFENSE_DESIGN.md 25.9): 1 m cells over
  * the 96 × 96 m field. A cell is blocked by any painted water not on a bridge
  * or by a building disc; Thư Đồng walk it, and placement checks that every
- * assist socket stays reachable from the Bastion on it.
+ * work socket stays reachable from the Bastion on it.
  */
 import type { MapDef } from "../../content/types";
 

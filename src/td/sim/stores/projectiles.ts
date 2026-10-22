@@ -17,7 +17,7 @@ export class ProjectileStore extends Slots {
   readonly target = new Int32Array(this.cap);
   /** Metres per tick. */
   readonly speed = new Float64Array(this.cap);
-  /** Base × aura × crit, before armour. */
+  /** Base × power × crit, before armour. */
   readonly power = new Float64Array(this.cap);
   readonly damageType = new Uint8Array(this.cap);
   readonly crit = new Uint8Array(this.cap);

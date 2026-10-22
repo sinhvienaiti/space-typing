@@ -1,62 +1,64 @@
 import { describe, expect, it } from "vitest";
 import { STAT } from "../src/td/sim/stats";
 import { lifeSeconds, lifeTicks, rawWpm, scoreWord, typeSeconds } from "../src/td/typing/scorer";
-import { tempoIndex } from "../src/td/typing/tempo";
-import { build, ready, run, send, world } from "./td/fixtures";
-import { smallDeck, type } from "./td/typing";
-import { expectedE, spawnWord } from "../src/td/sim/systems/words";
+import { run, send, world } from "./td/fixtures";
+import { callWord, smallDeck, type } from "./td/typing";
+import { expectedE, lengthBand } from "../src/td/sim/systems/calls";
 
-/** Scoring a word (docs/td/TYPING_DEFENSE_DESIGN.md 6.4, 6.6; BUILD_NOW §6.1 td-scorer). */
+/** Scoring a word (docs/td/TYPING_DEFENSE_DESIGN.md 6.4, 6.6; BUILD_NOW §6.1 td-scorer; BUILD_1A6 §2, §5.4). */
 const E = 35;
 
-describe("word life", () => {
-  it("L_w = clamp(1.2 + 12·(len + 1)/(E·d); 3; 6) × k_L: TK 6.4's examples", () => {
-    expect(lifeSeconds(5, 20, 1, "normal")).toBeCloseTo(4.8, 10);
-    expect(lifeSeconds(5, 35, 1, "normal")).toBeCloseTo(3.257, 3);
-    expect(lifeSeconds(5, 60, 1, "normal")).toBe(3);
-    expect(lifeSeconds(8, 12, 1, "easy")).toBe(7.5);
-    expect(lifeSeconds(3, 140, 1, "hard")).toBeCloseTo(2.7, 10);
-    expect(lifeTicks(5, 35, 1, "normal")).toBe(195);
+describe("word life, the clock a call's word is scored against", () => {
+  it("L_w = clamp(1.2 + 12·(len + 1)/(E·d); 3; 6) × k_L of the mode: TK 6.4's examples", () => {
+    expect(lifeSeconds(5, 20, 1, "balanced")).toBeCloseTo(4.8, 10);
+    expect(lifeSeconds(5, 35, 1, "balanced")).toBeCloseTo(3.257, 3);
+    expect(lifeSeconds(5, 60, 1, "balanced")).toBe(3);
+    expect(lifeSeconds(8, 12, 1, "relax")).toBe(7.5);
+    expect(lifeSeconds(8, 12, 1, "learn")).toBe(7.5);
+    expect(lifeSeconds(3, 140, 1, "challenge")).toBeCloseTo(2.7, 10);
+    expect(lifeTicks(5, 35, 1, "balanced")).toBe(195);
   });
 });
 
-describe("E = max(B, the difficulty's floor): easy 12, normal 20, hard 35 (TK 6.6)", () => {
+describe("E = max(B, the mode's floor): relax and learn 12, balanced 20, challenge 35 (TK 6.6, BUILD_1A6 §2)", () => {
   const deck = smallDeck(["apple", "bread", "cider", "garden"]);
-  const field = (difficulty: "easy" | "normal" | "hard", expected: number) => {
-    const w = world({ deck, difficulty, expected });
-    const archer = build(w, "archer", -16, -4);
-    ready(w);
-    spawnWord(w, archer, 0, 1);
-    return { w, archer, life: w.words.life[w.words.live()[0]!]! };
+  const field = (mode: "relax" | "balanced" | "challenge" | "learn", expected: number) => {
+    const w = world({ deck, mode, expected });
+    const s = callWord(w, 0);
+    return { w, life: w.words.life[s]! };
   };
 
-  it("lifts B under the floor: word life, the default tempo and scoring all read E", () => {
-    expect(expectedE(field("easy", 12).w)).toBe(12);
-    const normal = field("normal", 12);
-    expect(expectedE(normal.w)).toBe(20);
-    expect(normal.life).toBe(Math.round(4.8 * 60)); // a 5-letter word at E = 20, not 6.0 s at 12
-    expect(normal.w.buildings.tempo[normal.archer]).toBe(tempoIndex(6));
-    const hard = field("hard", 20);
-    expect(expectedE(hard.w)).toBe(35);
-    expect(hard.life).toBe(lifeTicks(5, 35, 1, "hard")); // 2.93 s, not 4.32 s at 20
-    expect(hard.w.buildings.tempo[hard.archer]).toBe(tempoIndex(4));
-    run(hard.w, 100);
-    const hit = type(hard.w, "apple", 50, true).find((event) => event.t === "wordHit");
-    expect(hit).toMatchObject({ quality: scoreWord(5, 0, hard.life, 100, 35, 1).quality });
+  it("lifts B under the floor: the scoring clock reads E", () => {
+    expect(expectedE(field("relax", 12).w)).toBe(12);
+    expect(expectedE(field("learn", 12).w)).toBe(12);
+    const balanced = field("balanced", 12);
+    expect(expectedE(balanced.w)).toBe(20);
+    expect(balanced.life).toBe(Math.round(4.8 * 60)); // a 5-letter word at E = 20, not 6.0 s at 12
+    const challenge = field("challenge", 20);
+    expect(expectedE(challenge.w)).toBe(35);
+    expect(challenge.life).toBe(lifeTicks(5, 35, 1, "challenge")); // 2.93 s, not 4.32 s at 20
+    run(challenge.w, 100);
+    const hit = type(challenge.w, "apple", 50, true).find((event) => event.t === "wordHit");
+    expect(hit).toMatchObject({ quality: scoreWord(5, 0, challenge.life, 100, 35, 1).quality });
   });
 
-  it("a sandbox difficulty change moves the floor, and the length band with it", () => {
+  it("word length follows E (TK 6.3); a power word takes the band's lower half; a sandbox mode change moves the floor and the band", () => {
+    expect(lengthBand(20)).toEqual([3, 5]);
+    expect(lengthBand(35)).toEqual([3, 6]);
+    expect(lengthBand(35, true)).toEqual([3, 4]);
+    expect(lengthBand(70)).toEqual([4, 8]);
+    expect(lengthBand(70, true)).toEqual([4, 6]);
     const w = world({ deck, expected: 20 });
-    expect(w.typing.meanLen).toBe(5); // E = 20: 3–5 letters
-    send(w, { t: "sandbox", op: { op: "difficulty", value: "hard" } });
-    expect(w.typing.meanLen).toBe(5.25); // E = 35: 3–6, "garden" joins
-    send(w, { t: "sandbox", op: { op: "difficulty", value: "easy" } });
-    expect(w.typing.meanLen).toBe(5);
+    expect(lengthBand(expectedE(w))).toEqual([3, 5]);
+    send(w, { t: "sandbox", op: { op: "mode", value: "challenge" } });
+    expect(lengthBand(expectedE(w))).toEqual([3, 6]); // E = 35: "garden" joins
+    send(w, { t: "sandbox", op: { op: "mode", value: "relax" } });
+    expect(lengthBand(expectedE(w))).toEqual([3, 5]);
   });
 });
 
 describe("scoring by errors, with slack for long words (TK 6.6)", () => {
-  const A = (len: number, errors: number) => scoreWord(len, errors, lifeTicks(len, E, 1, "normal"), 60, E, 1);
+  const A = (len: number, errors: number) => scoreWord(len, errors, lifeTicks(len, E, 1, "balanced"), 60, E, 1);
   it("matches TK 6.6's table of A_w and grade for lengths 3, 5, 8, 12", () => {
     const table: [number, number, number, string][] = [
       [3, 0, 1, "clean"], [3, 1, 0.6, "ok"], [3, 2, 0.2, "sloppy"], [3, 3, 0, "sloppy"],
@@ -74,7 +76,7 @@ describe("scoring by errors, with slack for long words (TK 6.6)", () => {
   });
 
   it("measures speed from the moment the word appeared: Flash at S_w ≥ 0.7, Perfect slower, 0 at the end of life", () => {
-    const life = lifeTicks(5, E, 1, "normal");
+    const life = lifeTicks(5, E, 1, "balanced");
     const fast = Math.floor((0.35 + 0.8 * typeSeconds(5, E, 1)) * 60);
     expect(scoreWord(5, 0, life, fast, E, 1).speed).toBe(1);
     expect(scoreWord(5, 0, life, fast, E, 1).grade).toBe("flash");
@@ -96,9 +98,7 @@ describe("scoring by errors, with slack for long words (TK 6.6)", () => {
     const deck = smallDeck(["apple"]);
     const scores = [true, false].map((sameTick) => {
       const w = world({ deck });
-      const archer = build(w, "archer", -16, -4);
-      ready(w);
-      spawnWord(w, archer, 0, 1);
+      callWord(w, 0);
       const born = w.tick;
       const keys = [..."apple"].map((ch, index) => ({ t: "key" as const, letter: ch.charCodeAt(0) - 97, atMs: index * 30 }));
       if (sameTick) {
@@ -108,7 +108,7 @@ describe("scoring by errors, with slack for long words (TK 6.6)", () => {
         while (w.tick < born + 60) send(w);
         for (const key of keys) send(w, key);
       }
-      expect(w.stats[STAT.streamDone]).toBe(1);
+      expect(w.stats[STAT.callWords]).toBe(1);
       return w.events.rare.find((event) => event.t === "wordHit");
     });
     expect(scores[0]).toEqual(scores[1]);

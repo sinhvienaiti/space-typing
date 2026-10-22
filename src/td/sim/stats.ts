@@ -1,13 +1,13 @@
 /**
  * Run counters as one number array (docs/td/TYPING_DEFENSE_DESIGN.md 25.13):
  * the bot report, the result screen and __td.stats() read the same numbers.
- * Gold counters are thousandths, like the treasury.
+ * Gold counters are thousandths, like the treasury; food and wood are whole.
  */
 export const STATS = [
   "spawned", "kills", "leaks", "livesLost", "shots", "hits", "blocks", "soldierDeaths", "wavesCleared",
   "goldKill", "goldProduce", "goldWave", "goldEarly", "goldWord",
   "damageTower", "damageCrossbow", "damageSoldier", "damageWordShot", "damageHero",
-  "streamSpawned", "streamDone", "streamPerfect", "streamSloppy", "streamMissed", "streamCancelled", "jams", "fullDrops",
+  "calls", "callWords", "callsPerfect", "wordsPerfect", "wordsSloppy", "jams", "food", "foodEaten", "wood", "seedsBought",
   "keys", "keyErrors", "strays", "wordShots", "fizzles", "rawWpmSum",
 ] as const;
 

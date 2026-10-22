@@ -1,5 +1,5 @@
 /**
- * The keyboard and the mouse (docs/td/BUILD_NOW.md §5.4, TK 6.15, 8.3, 23.6).
+ * The keyboard and the mouse (docs/td/BUILD_NOW.md §5.4, BUILD_1A6 §8, TK 6.15, 8.3, 23.6).
  * A letter is a `key` command, Backspace a `backspace`; any other key is read
  * by event.code into the action its button carries, so a letter is never a
  * command. Composing, held (arrows aside), Ctrl, Alt, Meta and synthetic
@@ -8,12 +8,11 @@
 import { isComposingKey, typedLetter, vietnameseInputSign } from "../../scene3d/keys";
 import type { CommandBody } from "../sim/commands";
 
-/** Command keys by event.code, "Shift" + code with Shift held; "" swallows the key. */
+/** Command keys by event.code, "Shift" + code with Shift held; "" swallows the key (BUILD_1A6 §8: no tempo keys). */
 export const KEY_ACTIONS: Readonly<Record<string, string>> = {
-  Digit1: "pick:1", Digit2: "pick:2", Digit3: "pick:3", Digit4: "pick:4", Digit0: "recall", Backquote: "cycle",
-  Tab: "next", ShiftTab: "prev", Enter: "send", NumpadEnter: "send", ShiftEnter: "wave",
-  Minus: "slower", Equal: "denser", NumpadSubtract: "slower", NumpadAdd: "denser", ShiftMinus: "stopAll", ShiftEqual: "restore",
-  Insert: "build", Backslash: "build", Delete: "undo", Escape: "escape", Pause: "pause", F9: "sandbox", Space: "",
+  Digit1: "pick:1", Digit2: "pick:2", Digit3: "pick:3", Digit4: "pick:4", Digit5: "pick:5", Digit0: "recall", Backquote: "cycle",
+  Tab: "next", ShiftTab: "prev", Enter: "send", NumpadEnter: "send", ShiftEnter: "night",
+  Insert: "build", Backslash: "build", ShiftInsert: "hire", ShiftBackslash: "hire", Delete: "undo", Escape: "escape", Pause: "pause", F9: "sandbox", Space: "",
   ArrowLeft: "pan:1:0", ArrowRight: "pan:-1:0", ArrowUp: "pan:0:1", ArrowDown: "pan:0:-1",
 };
 

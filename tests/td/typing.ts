@@ -1,15 +1,20 @@
 /**
  * Helpers for the Typing Defense typing tests: the real vocabulary read from
- * shared/vocabulary (BUILD_NOW §3.5), small decks of chosen words, worlds
- * with assisted buildings, and keys sent the way the input sends them.
+ * shared/vocabulary (BUILD_NOW §3.5), small decks of chosen words, a call
+ * made bright with a chosen word, and keys sent the way the input sends them.
  */
 import { readFileSync } from "node:fs";
 import { deckFromLevels, VOCAB_LEVELS } from "../../src/td/app/vocab";
+import { WORD_D } from "../../src/td/content/rules";
 import type { CommandBody } from "../../src/td/sim/commands";
 import type { RareEvent } from "../../src/td/sim/events";
-import { step, type World, type WorldOptions } from "../../src/td/sim/world";
+import { CALL_KIND, CALL_STATE } from "../../src/td/sim/stores/calls";
+import { expectedE, makeCall } from "../../src/td/sim/systems/calls";
+import { step, type World } from "../../src/td/sim/world";
 import { compileDeck, wordText, type Deck } from "../../src/td/typing/decks";
-import { arrive, build, ready, send, world } from "./fixtures";
+import { KIND } from "../../src/td/typing/letters";
+import { lifeTicks } from "../../src/td/typing/scorer";
+import { send } from "./fixtures";
 
 const levels = new Map<number, { id: string; en: string }[]>();
 const level = (n: number) => {
@@ -28,9 +33,27 @@ export const smallDeck = (words: readonly string[]): Deck => compileDeck(words.m
 
 export const letter = (ch: string): number => ch.charCodeAt(0) - 97;
 
-/** Live words: slot, text, building slot, typed. */
-export function live(w: World): { s: number; text: string; b: number; typed: number }[] {
-  return w.words.live().map((s) => ({ s, text: wordText(w.typing.deck, w.words.word[s]!), b: w.words.building[s]!, typed: w.words.typed[s]! }));
+/** Live words: slot, text, call slot, typed. */
+export function live(w: World): { s: number; text: string; c: number; typed: number }[] {
+  return w.words.live().map((s) => ({ s, text: wordText(w.typing.deck, w.words.word[s]!), c: w.words.call[s]!, typed: w.words.typed[s]! }));
+}
+
+export const wordOf = (deck: Deck, text: string): number => [...Array(deck.count).keys()].find((word) => wordText(deck, word) === text)!;
+
+/**
+ * Puts deck word `word` live (at `tier`) on a new call of `kind` (`words` long) at building b, opened and bright as
+ * the director would make it, with this word: returns the word slot. Its call is `w.words.call[slot]`.
+ */
+export function callWord(w: World, word: number, tier = 1, kind: number = CALL_KIND.mine, b = 0, words = 1): number {
+  const c = makeCall(w, kind, words, -1, b, -1, -1);
+  w.calls.state[c] = CALL_STATE.open;
+  w.calls.bright[c] = 1;
+  const s = w.words.add(word, c, KIND.call, tier, w.tick, lifeTicks(w.typing.deck.len[word]!, expectedE(w), WORD_D.known, w.mode));
+  const first = w.typing.deck.letters[w.typing.deck.start[word]!]!;
+  w.typing.letters.take(s, first, tier);
+  w.calls.word[c] = s;
+  w.calls.last[c] = first;
+  return s;
 }
 
 /** Sends `text` one key a tick (or all in one tick with `sameTick`), `ms` apart on the key clock; returns the rare events. */
@@ -42,22 +65,6 @@ export function type(w: World, text: string, ms = 150, sameTick = false): RareEv
   return w.events.rare.slice(from);
 }
 
-/**
- * A sandbox world with the given deck and buildings, assisted by agents 0, 1,
- * … in order: every construction done, every agent arrived (returns on the
- * tick after the last arrival). `init` runs on the new world first.
- */
-export function assisted(options: Partial<WorldOptions>, spots: readonly (readonly [string, number, number])[], keepLevel = 4, init?: (w: World) => void): { w: World; slots: number[] } {
-  const w = world({ gold: 5000, ...options });
-  init?.(w);
-  send(w, { t: "sandbox", op: { op: "keepLevel", value: keepLevel } });
-  const slots = spots.map(([id, x, z]) => (id === "keep" ? 0 : build(w, id, x, z)));
-  ready(w);
-  slots.forEach((b, agent) => send(w, { t: "assignUnit", agent, building: w.buildings.id(b) }));
-  arrive(w);
-  return { w, slots };
-}
-
 export function steps(w: World, ticks: number, each?: (w: World) => void): void {
   for (let index = 0; index < ticks; index += 1) {
     step(w);
@@ -65,5 +72,5 @@ export function steps(w: World, ticks: number, each?: (w: World) => void): void 
   }
 }
 
-/** Spots where the 1A buildings stand clear of roads, water and each other. */
-export const SPOTS = { archer: ["archer", -16, -4], archer2: ["archer", 10, -6], cannon: ["cannon", 10, -16], barracks: ["barracks", 2, 18], mine: ["gold-mine", 26, -30], keep: ["keep", 0, 40] } as const;
+/** Spots where the 1A buildings stand clear of roads, water, trees and each other. */
+export const SPOTS = { archer: ["archer", -16, -4], archer2: ["archer", 10, -6], cannon: ["cannon", 10, -16], barracks: ["barracks", 2, 18], mine: ["gold-mine", 26, -30], farm: ["farm", -17, 40], keep: ["keep", 0, 40] } as const;

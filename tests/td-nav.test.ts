@@ -5,6 +5,7 @@ import { clearLine, findPath, nearestOpen, pullPath } from "../src/td/sim/nav/as
 import { STEPS, WalkGrid } from "../src/td/sim/nav/grid";
 import { canPlace } from "../src/td/sim/placement";
 import { MODE, PATH_MAX } from "../src/td/sim/stores/agents";
+import { stand } from "../src/td/sim/systems/agents";
 import { createRng } from "../src/platform/rng";
 import { arrive, build, ready, run, send, world } from "./td/fixtures";
 
@@ -202,6 +203,12 @@ describe("A* on the walking grid (TK 25.9)", () => {
     return { w, mine, A: w.agents };
   }
 
+  /** Agent a stands where one stands to work at building b (it was sent there). */
+  const standsBy = (w: ReturnType<typeof world>, a: number, b: number): boolean => {
+    const spot = { ...stand(w, b) };
+    return w.agents.mode[a] === MODE.stand && w.agents.x[a] === spot.x && w.agents.z[a] === spot.z;
+  };
+
   /** Every leg left of agent a's path crosses open cells only. */
   function pathClear(w: ReturnType<typeof world>, a: number): void {
     const A = w.agents;
@@ -225,7 +232,7 @@ describe("A* on the walking grid (TK 25.9)", () => {
     expect(Array.from(A.path.subarray(PATH_MAX * 2, PATH_MAX * 2 + A.pathN[1]! * 2))).not.toEqual(before);
     pathClear(w, 1);
     arrive(w);
-    expect(A.at[1]).toBe(mine);
+    expect(standsBy(w, 1, mine)).toBe(true);
   });
 
   /**
@@ -255,7 +262,7 @@ describe("A* on the walking grid (TK 25.9)", () => {
     steppedOut(w, 1, x, z);
     pathClear(w, 1);
     arrive(w);
-    expect(A.at[1]).toBe(mine);
+    expect(standsBy(w, 1, mine)).toBe(true);
   });
 
   it("a helper built over beside the stream, by the bridge, never lands in the water and still reaches the mine", () => {
@@ -287,7 +294,7 @@ describe("A* on the walking grid (TK 25.9)", () => {
           build(fresh.w, "archer", bx, bz);
           steppedOut(fresh.w, 3, hx, hz);
           arrive(fresh.w);
-          expect(fresh.w.agents.at[3], "archer at " + bx + ", " + bz).toBe(fresh.mine);
+          expect(standsBy(fresh.w, 3, fresh.mine), "archer at " + bx + ", " + bz).toBe(true);
           cases += 1;
         }
       }
@@ -323,7 +330,7 @@ describe("A* on the walking grid (TK 25.9)", () => {
     send(w, { t: "assignUnit", agent: 3, building: w.buildings.id(mine) });
     expect(w.agents.mode[3]).toBe(MODE.walk);
     arrive(w);
-    expect(w.agents.at[3]).toBe(mine);
+    expect(standsBy(w, 3, mine)).toBe(true);
   });
 
   it("one search takes ≤ 0.5 ms (TK 25.12): the longest ways on the sandbox field, across the stream", () => {

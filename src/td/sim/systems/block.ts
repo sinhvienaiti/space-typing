@@ -3,7 +3,8 @@
  * 25.6 step 5). A free soldier takes the nearest ground enemy within 3 m of
  * its flag that is not yet held by enough soldiers; it lets go past the 5 m
  * leash, and at most 3 soldiers fight one enemy. Each soldier in contact
- * holds one blocking place; the move system reads the sum next tick.
+ * holds one blocking place; the move system reads the sum next tick. A
+ * fallen soldier's respawn eats 1 food, or waits twice as long (BUILD_1A6 §4.6).
  */
 import { ticks } from "../../content/compile";
 import { SOLDIER, TICK_HZ } from "../../content/rules";
@@ -27,14 +28,19 @@ export function soldiersStep(w: World): void {
   }
   for (let s = 0; s < U.top; s += 1) {
     if (U.used[s] === 0) continue;
-    if (U.temp[s] === 2 && w.tick >= U.expireAt[s]!) {
-      U.release(s);
-      continue;
-    }
     const b = U.barracks[s]!;
-    const level = w.c.buildings[B.def[b]!]!.barracks!.levels[B.level[b]! - 1]!;
+    const barracks = w.c.buildings[B.def[b]!]!.barracks!;
+    const level = barracks.levels[B.level[b]! - 1]!;
     if (U.hp[s]! <= 0) {
       if (U.respawnAt[s]! < 0 || w.tick < U.respawnAt[s]!) continue;
+      if (w.food >= SOLDIER.food) {
+        w.food -= SOLDIER.food;
+        bump(w.stats, STAT.foodEaten, SOLDIER.food);
+      } else if (U.hungry[s] === 0) {
+        U.hungry[s] = 1;
+        U.respawnAt[s] = U.respawnAt[s]! + barracks.respawn;
+        continue;
+      }
       U.stand(s, level.hp, B.x[b]!, B.z[b]!, w.tick);
     }
     const rx = B.rallyX[b]!;
@@ -84,23 +90,6 @@ export function soldiersStep(w: World): void {
       U.regen[s] = regen - whole;
     }
   }
-}
-
-/** A soldier beyond the squad at barracks b (TK 6.10, 6.11): kind 1 while Flow holds, kind 2 until `until`. */
-export function addTempSoldier(w: World, b: number, kind: number, until: number): void {
-  const B = w.buildings;
-  const s = w.units.add(b, POSTS.length + kind, w.c.buildings[B.def[b]!]!.barracks!.levels[B.level[b]! - 1]!.hp, B.x[b]!, B.z[b]!);
-  if (s < 0) return;
-  w.units.temp[s] = kind;
-  w.units.expireAt[s] = until;
-}
-
-/** The slot of barracks b's extra soldier of `kind` after skipping `skip` of them; −1 when there are not that many. */
-export function findTempSoldier(w: World, b: number, kind: number, skip = 0): number {
-  const U = w.units;
-  let left = skip;
-  for (let s = 0; s < U.top; s += 1) if (U.used[s] === 1 && U.barracks[s] === b && U.temp[s] === kind && left-- === 0) return s;
-  return -1;
 }
 
 const far = (dx: number, dz: number, limit: number) => dx * dx + dz * dz > limit * limit;
