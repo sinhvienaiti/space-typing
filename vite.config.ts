@@ -108,6 +108,8 @@ export default defineConfig({
         defense: resolve(projectRoot, "defense.html"),
         // Typing Defense, step 1A: the 2D sandbox (docs/td/BUILD_NOW.md).
         td: resolve(projectRoot, "td.html"),
+        // Sinh Tồn, stage S0 "Bản thử dọc" (docs/survival/BUILD_S0.md).
+        survival: resolve(projectRoot, "survival.html"),
         // Defense render bench: only when asked for (SPACE_BENCH=1), never in a normal build.
         ...(process.env.SPACE_BENCH === "1" ? { defenseBench: resolve(projectRoot, "defense-bench.html") } : {}),
       },

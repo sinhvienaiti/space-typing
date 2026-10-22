@@ -8,7 +8,9 @@ import { storageKeys } from "./td/source-scan";
  * (defense.html: src/defense), with their shared engine src/scene3d, are
  * separate modes: the 2D game must not load them, and they must not write the
  * 2D game's storage. Typing Defense (td.html: src/td) is a game of its own;
- * tests/td-boundary.test.ts holds the rest of its boundary. These checks fail
+ * tests/td-boundary.test.ts holds the rest of its boundary. Sinh Tồn
+ * (survival.html: src/survival) too; tests/survival-boundary.test.ts holds
+ * the rest of its own. These checks fail
  * as soon as an import or a storage write crosses that line, so the modes
  * cannot start to affect each other unnoticed.
  */
@@ -31,9 +33,9 @@ function importsOf(text: string): string[] {
 }
 
 describe("Campaign 3D stays apart from the 2D game", () => {
-  it("only the 3D modes, Typing Defense (its key filter) and the dev-only render bench load the 3D dragon engine (src/scene3d)", () => {
+  it("only the 3D modes, Typing Defense (its key filter), Sinh Tồn and the dev-only render bench load the 3D dragon engine (src/scene3d)", () => {
     const crossing = files
-      .filter((file) => !["campaign3d/", "defense/", "scene3d/", "bench/", "td/"].some((root) => file.path.startsWith(root)))
+      .filter((file) => !["campaign3d/", "defense/", "scene3d/", "bench/", "td/", "survival/"].some((root) => file.path.startsWith(root)))
       .filter((file) => importsOf(file.text).some((spec) => /(^|\/)scene3d\//.test(spec)))
       .map((file) => file.path);
     expect(crossing).toEqual([]);
@@ -66,7 +68,7 @@ describe("Campaign 3D stays apart from the 2D game", () => {
   it("the 3D engine does not reach into the 2D game's runtime, save or wallet", () => {
     const forbidden = /(^|\/)(Game|main)$|\/(persistence|economy|online|duel)\//;
     const crossing = files
-      .filter((file) => ["scene3d/", "campaign3d/", "defense/", "bench/"].some((root) => file.path.startsWith(root)))
+      .filter((file) => ["scene3d/", "campaign3d/", "defense/", "bench/", "survival/"].some((root) => file.path.startsWith(root)))
       .flatMap((file) => importsOf(file.text).filter((spec) => forbidden.test(spec)).map((spec) => file.path + " → " + spec));
     expect(crossing).toEqual([]);
   });
@@ -122,6 +124,32 @@ describe("Typing Defense stays apart", () => {
       [...file.text.matchAll(/\b(?:localStorage|sessionStorage)\s*[.[]|\bindexedDB\b|\bonlineRequest\b|["'`]spaceTyping\w*/g)].map((match) => file.path + ": " + match[0]),
     );
     expect(found).toEqual([]);
+  });
+});
+
+describe("Sinh Tồn stays apart", () => {
+  const own = files.filter((file) => file.path.startsWith("survival/"));
+
+  it("nothing outside Sinh Tồn loads its modules", () => {
+    expect(own.length).toBeGreaterThan(0);
+    const crossing = files
+      .filter((file) => !file.path.startsWith("survival/"))
+      .filter((file) => importsOf(file.text).some((spec) => /(^|\/)survival\//.test(spec)))
+      .map((file) => file.path);
+    expect(crossing).toEqual([]);
+  });
+
+  it("writes only survival.* keys and reads only those and the game's settings, through src/platform/safe-storage", () => {
+    const found = own.flatMap((file) =>
+      storageKeys(file.text)
+        .filter(({ method, key }) => key === null || !(key.startsWith("survival.") || (key === "spaceTypingSettingsV1" && /^(getItem|readItem|readJson)$/.test(method))))
+        .map(({ method, key }) => file.path + ": " + method + "(" + (key ?? "a key the scan cannot read") + ")"),
+    );
+    expect(found).toEqual([]);
+    const written = own.flatMap((file) => storageKeys(file.text).filter(({ method }) => /^(setItem|writeJson|commitItem|setItems|removeItem)$/.test(method)));
+    expect(written.length).toBeGreaterThan(0);
+    const direct = own.flatMap((file) => [...file.text.matchAll(/\b(?:localStorage|sessionStorage)\s*[.[]|\bindexedDB\b|\bonlineRequest\b/g)].map((match) => file.path + ": " + match[0]));
+    expect(direct).toEqual([]);
   });
 });
 
