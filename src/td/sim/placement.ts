@@ -1,0 +1,98 @@
+/**
+ * Free placement (docs/td/TYPING_DEFENSE_DESIGN.md 12.5–12.6), shared by the
+ * build menu's red ring and the `build` command. The checks run in the
+ * design's fixed order and the first failure is the reason shown; 1A has no
+ * slopes or scenery, so those two steps are absent.
+ */
+import { ASSIST, BUILD, RALLY } from "../content/rules";
+import { CELL } from "./nav/grid";
+import { reachesAll } from "./nav/connectivity";
+import type { World } from "./world";
+
+export const PLACE_CHECKS = ["phase", "capTotal", "capType", "bounds", "node", "water", "road", "keep", "overlap", "rally", "path", "gold"] as const;
+export type PlaceReason = (typeof PLACE_CHECKS)[number];
+export type Placement = { ok: true; x: number; z: number; node: number } | { ok: false; reason: PlaceReason };
+
+const no = (reason: PlaceReason): Placement => ({ ok: false, reason });
+
+/** The assist socket of a building: on its rim plus a step, facing the Bastion (TK 8.4). */
+export function socketCell(w: World, x: number, z: number, radius: number): number {
+  const dx = w.map.keep[0] - x;
+  const dz = w.map.keep[1] - z;
+  const norm = Math.sqrt(dx * dx + dz * dz) || 1;
+  const reach = radius + ASSIST.socketGapM;
+  return w.grid.cell(x + (dx / norm) * reach, z + (dz / norm) * reach);
+}
+
+export function canPlace(w: World, def: number, qx: number, qz: number): Placement {
+  const spec = w.c.buildings[def];
+  if (w.phase === "defeat") return no("phase");
+  if (spec === undefined || spec.placement === "fixed") return no("capType");
+  const B = w.buildings;
+  let total = 0;
+  let sameKind = 0;
+  for (let slot = 1; slot < B.top; slot += 1) {
+    if (B.used[slot] === 0) continue;
+    total += 1;
+    const other = w.c.buildings[B.def[slot]!]!;
+    if (spec.family === "attack" ? other.family === "attack" : other.index === def) sameKind += 1;
+  }
+  if (total >= BUILD.caps.total) return no("capTotal");
+  if ((spec.family === "attack" && sameKind >= BUILD.caps.attack) || (spec.barracks !== null && sameKind >= BUILD.caps.barracks)) return no("capType");
+
+  let x = qx * BUILD.snapM;
+  let z = qz * BUILD.snapM;
+  const r = spec.radius;
+  const half = w.map.buildHalfM;
+  if (Math.abs(x) + r > half || Math.abs(z) + r > half) return no("bounds");
+
+  let node = -1;
+  if (spec.placement === "node") {
+    node = w.map.nodes.findIndex((n) => (n.x - x) * (n.x - x) + (n.z - z) * (n.z - z) <= BUILD.nodeSnapM * BUILD.nodeSnapM);
+    if (node < 0) return no("node");
+    for (let slot = 1; slot < B.top; slot += 1) if (B.used[slot] === 1 && B.node[slot] === node) return no("node");
+    x = w.map.nodes[node]!.x;
+    z = w.map.nodes[node]!.z;
+  }
+
+  for (const rect of [...w.map.water, ...w.map.bridges]) {
+    const nx = Math.max(rect.x0, Math.min(rect.x1, x)) - x;
+    const nz = Math.max(rect.z0, Math.min(rect.z1, z)) - z;
+    if (nx * nx + nz * nz < r * r) return no("water");
+  }
+
+  const clear = BUILD.roadClearM + r;
+  for (let lane = 0; lane < w.lanes.length - 1; lane += 1) if (w.lanes[lane]!.gap2(x, z) < clear * clear) return no("road");
+
+  const kx = w.map.keep[0] - x;
+  const kz = w.map.keep[1] - z;
+  if (kx * kx + kz * kz < (BUILD.keepClearM + r) * (BUILD.keepClearM + r)) return no("keep");
+
+  for (let slot = 1; slot < B.top; slot += 1) {
+    if (B.used[slot] === 0) continue;
+    const gap = r + w.c.buildings[B.def[slot]!]!.radius + BUILD.gapM;
+    const dx = B.x[slot]! - x;
+    const dz = B.z[slot]! - z;
+    if (dx * dx + dz * dz < gap * gap) return no("overlap");
+  }
+
+  if (spec.barracks !== null && !w.lanes.slice(0, -1).some((lane) => lane.gap2(x, z) <= RALLY.radiusM * RALLY.radiusM)) return no("rally");
+
+  if (!socketsReachable(w, x, z, r)) return no("path");
+
+  if (w.gold < spec.costs[0] * 1000) return no("gold");
+  return { ok: true, x, z, node };
+}
+
+/** With a building at (x, z), can a walker still get from the Bastion to every socket? */
+function socketsReachable(w: World, x: number, z: number, r: number): boolean {
+  const B = w.buildings;
+  const sockets = [socketCell(w, x, z, r)];
+  for (let slot = 1; slot < B.top; slot += 1) {
+    if (B.used[slot] === 1) sockets.push(socketCell(w, B.x[slot]!, B.z[slot]!, w.c.buildings[B.def[slot]!]!.radius));
+  }
+  w.grid.stamp(x, z, r, CELL.probe, true);
+  const ok = reachesAll(w.grid, w.keepCell, sockets);
+  w.grid.stamp(x, z, r, CELL.probe, false);
+  return ok;
+}
