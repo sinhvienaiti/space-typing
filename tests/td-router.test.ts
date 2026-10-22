@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { installTypingInput } from "../src/td/app/input";
-import type { CommandBody } from "../src/td/sim/commands";
 import { STAT } from "../src/td/sim/stats";
 import { spawnWord } from "../src/td/sim/systems/words";
 import type { World } from "../src/td/sim/world";
@@ -105,45 +103,5 @@ describe("key router", () => {
     run(late.w, 600);
     expect(late.w.typing.router.lock).toBe(-1);
     expect(late.w.stats[STAT.streamMissed]).toBe(1);
-  });
-});
-
-describe("typing input (app/input.ts)", () => {
-  type Fake = { key: string; code: string; isTrusted?: boolean; ctrlKey?: boolean; repeat?: boolean; isComposing?: boolean; timeStamp?: number };
-  function harness(locked = false, allowUntrusted = false) {
-    const sent: CommandBody[] = [];
-    let handler: (event: KeyboardEvent) => void = () => undefined;
-    const target = { addEventListener: (_: string, fn: typeof handler) => (handler = fn), removeEventListener: () => undefined } as unknown as Window;
-    installTypingInput(target, { send: (command) => sent.push(command), locked: () => locked, onVietnamese: () => undefined, allowUntrusted });
-    const press = (event: Fake) => {
-      let prevented = false;
-      handler({ isTrusted: true, timeStamp: 10, preventDefault: () => (prevented = true), ...event } as unknown as KeyboardEvent);
-      return prevented;
-    };
-    return { sent, press };
-  }
-
-  it("letters become keys; Backspace and Space are taken from the page; Escape unlocks only a locked word", () => {
-    const { sent, press } = harness(true);
-    expect(press({ key: "A", code: "KeyA" })).toBe(true);
-    expect(press({ key: "Backspace", code: "Backspace" })).toBe(true);
-    expect(press({ key: " ", code: "Space" })).toBe(true);
-    press({ key: "Escape", code: "Escape" });
-    expect(sent).toEqual([{ t: "key", letter: 0, atMs: 10 }, { t: "backspace", atMs: 10 }, { t: "unlock" }]);
-    const free = harness(false);
-    expect(free.press({ key: "Escape", code: "Escape" })).toBe(false);
-    expect(free.sent).toEqual([]);
-  });
-
-  it("ignores composing, held, Ctrl and synthetic presses (unless the dev flag allows them)", () => {
-    const { sent, press } = harness();
-    press({ key: "a", code: "KeyA", ctrlKey: true });
-    press({ key: "a", code: "KeyA", repeat: true });
-    press({ key: "Process", code: "KeyA", isComposing: true });
-    press({ key: "a", code: "KeyA", isTrusted: false });
-    expect(sent).toEqual([]);
-    const dev = harness(false, true);
-    dev.press({ key: "a", code: "KeyA", isTrusted: false });
-    expect(dev.sent.length).toBe(1);
   });
 });

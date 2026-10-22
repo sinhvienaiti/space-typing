@@ -123,6 +123,8 @@ export const SLICE_1A: Content = {
     water: [{ x0: -25.5, x1: -22.5, z0: -48, z1: 48 }],
     bridges: [{ x0: -25.5, x1: -22.5, z0: -15.5, z1: -12.5 }, { x0: -25.5, x1: -22.5, z0: 24.5, z1: 27.5 }],
     nodes: [{ x: 26, z: -30, richness: 3 }, { x: -12, z: 32, richness: 1 }, { x: -34, z: 8, richness: 2 }],
+    // By the merge, the mine on N3 across the stream; Draconis to the cannon (affinity), each helper to its specialty.
+    preset: [["cannon", 7, 12, 0], ["archer", -8, 12, 1], ["barracks", 3, 18, 2], ["gold-mine", -34, 8, 3]],
   },
   waves: {
     list: [

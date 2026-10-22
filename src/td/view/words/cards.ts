@@ -4,7 +4,9 @@
  * classes change when a word's state does. A card rises over its building
  * as its clock, grows when locked with the typed part in jade, shakes on a
  * wrong key, and leaves by its result: into the building, to ash, or folded,
- * with the result's own name (TK 0.6) stamped where it was.
+ * with the result's own name (TK 0.6) stamped where it was. Columns part at
+ * once and ease back on the spring, so no frame shows two cards overlapping;
+ * a locked card's column counts it at its typing size from the first letter.
  */
 import type { Grade } from "../../content/types";
 import type { RareEvent } from "../../sim/events";
@@ -166,13 +168,13 @@ export class WordCards {
       const roof = this.project(B.x[b]!, B.z[b]! - w.c.buildings[B.def[b]!]!.radius - ROOF_M);
       const tallest = heights[heights.length - 1]! + Math.max(...cards.map((card) => card.height));
       const roofY = Math.min(height - SAFE.bottom, Math.max(roof.y, SAFE.top + tallest));
-      boxes.push({ x: roof.x, top: roofY - tallest, bottom: roofY, half: Math.max(...cards.map((card) => card.half)) + 9 });
+      boxes.push({ x: roof.x, top: roofY - tallest, bottom: roofY, half: Math.max(...cards.map((card) => (card.slot === lock ? card.half * 1.2 + 18 : card.half))) + 9 });
       columns.push({ b, cards, heights, roofY });
     }
     const target = spreadLanes(boxes, SAFE.side, width - SAFE.side, []);
     columns.forEach((column, index) => {
       const was = this.offsets.get(column.b) ?? target[index]!;
-      const offset = was + (target[index]! - was) * (1 - Math.exp(-dt / MS.spring));
+      const offset = Math.abs(target[index]!) >= Math.abs(was) ? target[index]! : was + (target[index]! - was) * (1 - Math.exp(-dt / MS.spring));
       this.offsets.set(column.b, offset);
       column.cards.forEach((card, k) => {
         const s = card.slot;

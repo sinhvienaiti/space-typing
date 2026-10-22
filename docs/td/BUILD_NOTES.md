@@ -31,15 +31,15 @@
 - Bù 174 dòng chỗ trùng thật: kiểu đã biên dịch suy ra từ hàm biên dịch (như `Typing`) thay vì khai lại từng trường; CSS trang một luật một dòng như CSS thẻ; bảng màu `debug-2d` và cờ tập kết; cột của vòng sự kiện là trường; kiểu dữ liệu thuần (`AttackSpec`, `HeroDef`, `MapDef`, quái đã biên dịch) gộp dòng.
 - Còn vượt phần của 1A.2: 4.582 − 4.459 = 123 dòng. Không cắt thêm chú thích luật (chúng giữ tham chiếu TK). Phần này trừ vào phần của 1A.3–1A.5, ước lượng lại bằng số thật ở 1.2.
 
-### 1.2 Phần cho từng mốc còn lại (ước lượng lại sau review 1A.3)
+### 1.2 Phần cho từng mốc còn lại (ước lượng lại sau review 1A.3; 1A.4 ghi số thật)
 
-Mốc đang làm: **1A.3**. Test `td-boundary` đọc dòng này và cột "Cộng dồn tối đa" của mốc đó, rồi hỏng khi tổng vượt (ngoài trần cứng 5.500). Bắt đầu mốc mới thì đổi dòng trên trước khi viết mã.
+Mốc đang làm: **1A.4**. Test `td-boundary` đọc dòng này và cột "Cộng dồn tối đa" của mốc đó, rồi hỏng khi tổng vượt (ngoài trần cứng 5.500). Bắt đầu mốc mới thì đổi dòng trên trước khi viết mã.
 
 | Mốc | Phần mới (ước lượng theo mã thật đã có) | Tối đa | Cộng dồn tối đa |
 |---|---|---|---|
 | 1A.2 Gõ lõi (xong, gồm sửa review) | 1.703 thật | — | 4.582 |
 | 1A.3 Người và ô (xong, gồm sửa review) | 378 thật: 337 của mốc (mục 1.4: `nav/astar` 107, kho `agents` 36, hệ `agents` 174, `stream` −29, nối `commands` `world` `placement` `compile` `events` `main` +13, vẽ người, đường A*, dây +36) và 41 của bản sửa review 1A.3 (mục 1.6: `nav` +18, hệ `agents` +4, `debug-2d` +17, `cards` +2) | 340 + 41 | 4.960 |
-| 1A.4 Điều khiển, HUD | 535 trước khi cắt, 500 sau khi cắt (bảng dưới) | 500 | 5.460 |
+| 1A.4 Điều khiển, HUD (xong) | 499 thật (mục 1.7): bản đầu đủ mục 5.3–5.4 dài 822, cắt UI theo mục 1.8 | 500 | 5.460 |
 | 1A.5 Bot, báo cáo | Bot, chính sách, báo cáo nằm ở `tests/` và `scripts/`; `src/` chỉ thêm móc đo | 40 | 5.500 |
 
 Ước lượng lại 1A.4 (review 1A.3, mục 5), tính cả `move` và đốm sáng dọc dây trợ lực mà 1A.3 dời sang, cùng 41 dòng của bản sửa review 1A.3. Bản sửa đó dùng hết 38 dòng dự phòng dưới trần, nên phần của 1A.4 giữ 500 mà phải chứa thêm hai việc. Cắt theo BUILD_NOW §10 (cắt UI trước, không cắt luật, test) trước khi viết mã 1A.4:
@@ -141,6 +141,56 @@ Bản sửa đầu bị ngắt trước khi commit. Bản này giữ phần đú
 6. **Test bỏ sót (thấp).** Test mới: mỏ có người tới lại trong 5 s sau lần gom thì đống về kho ngay lúc tới, rồi mỗi 5 s; Tướng không bắn lúc cất cánh, bay, hạ cánh; `clearLine` gặp tường dày 1 ô ở 400 độ dài, độ dốc, vị trí; A* so với A* mẫu trên 300 sân (240 sân dày, nơi các đường bằng chi phí gặp nhau); cùng các test của mục 1–3. Đột biến (bản sao worktree, 12 file test TD): 36 đột biến, 30 của review và 6 cho bản sửa, cả 36 bị bắt, gồm 4 đột biến sống của review. Đột biến "hòa về ô lớn hơn" làm A* lặp mãi nên bị bắt bằng cách treo. Giới hạn 0,5 ms một lần A* (TK 25.12) vẫn chặn theo trung vị: chạy riêng `td-nav`, trung vị 0,14 ms, p95 0,48–0,50 ms; chạy cả bộ, p95 1,6–2,3 ms là do các luồng Vitest khác chiếm CPU, không phải do A*, nên chặn p95 chỉ làm test chập chờn.
 7. **Chưa kịch bản nào thấy cặp tầng 2 (thấp).** `td-1a-slots` thêm pha tầng 2 và cổng `tier2PairOnScreen` (mục 2). Khi nhìn cặp, thẻ của từ cũ chỉ gạch một chữ: sửa ở view (mục 1.5).
 
+### 1.7 Sau 1A.4
+
+| Nhóm | Sau sửa review 1A.3 | Sau 1A.4 | Đổi |
+|---|---|---|---|
+| Trang, Platform | 87 | 87 | 0 (`td.html`: lớp HUD dưới lớp thẻ, dòng "đang tải") |
+| Nội dung | 572 | 576 | +4 (`preset` của bản đồ) |
+| Gõ thuần | 453 | 453 | 0 |
+| Sim lõi (`sim/*.ts`) | 786 | 824 | +38 (`move`, op `preset`, `freeSpots`, `canPlace(…, free)`) |
+| Kho, Đường, Hệ chiến đấu | 1.185 | 1.185 | 0 |
+| Hệ gõ (gồm `agents`) | 778 | 786 | +8 (`moveAgent`) |
+| App | 330 | 521 | +191 (`selection` 156, `input` +38, `sandbox` 28, `main` +12, `dev-handle` −43) |
+| View, UI | 769 | 1.027 | +258 (`hud` 79, `build-menu` 48, `team-bar` 36, `td.css` +51, `debug-2d` +42, `cards` +2) |
+| **Tổng** | **4.960** | **5.459** | **+499 / 500** |
+
+`dev-handle.ts` thôi khai lại từng trường của `window.__td` (kiểu `TdState`, `TdWord`, `TdDevHandle`): `main.ts` dựng đối tượng đó, nên kiểu là cái `main.ts` trả về (cùng cách 1A.2 suy kiểu đã biên dịch từ hàm biên dịch). Ghi chú cần cho kịch bản (đơn vị tick, `mode`, `path`) nằm cạnh chỗ dựng.
+
+### 1.8 Cắt UI ở 1A.4 (BUILD_NOW §10)
+
+Bản đầu làm đủ mục 5.3–5.4 dài 822 dòng, vượt phần 500. Theo luật ở 1.2 (bù trong mốc, cắt UI trước, không cắt luật, test), ngoài hai cắt đã ghi trước (kéo chân dung, Shift + phải, lăn chuột trên huy hiệu nhịp) đã cắt thêm, theo thứ tự ít giá trị trước:
+
+1. **Chọn điểm tập kết trên thẻ Trại Lính.** Điểm tập kết vẫn tự đặt ở chỗ gần đường nhất khi xây (1A.1); lệnh `rally` vẫn có trong sim.
+2. **Nút "Giảm tải" trên chip Tải.** Chip vẫn đổi màu theo ngưỡng; rê chuột thấy danh sách nhà và nhịp (`title`).
+3. **Rê chuột để chọn nhà cho `−` / `=`.** Phím nhịp tác động lên nhà đang mở thẻ (Tab hoặc bấm trái).
+4. **Bấm trái lên người trên bản đồ để chọn.** Chọn bằng chân dung, `Digit1`–`Digit4`, `Backquote`.
+5. **"Mỗi từ: ~N" trên thẻ nhà.** `rewardValue` vẫn là hàm thuần dùng chung với phần thưởng.
+6. **ETA (giây) và dòng trạng thái của người đang chọn.** Huy hiệu trên chân dung vẫn cho biết nhà người đó trợ lực (viền liền) hay đang đi tới (viền nét đứt); dòng trên thanh còn tên người đang chọn.
+
+Không cắt: bàn phím đủ đường, chuột (chọn nhà, xây, gửi, `move`, zoom, kéo), menu xây có nhà mờ đỏ kèm lý do, thẻ nhà có núm nhịp, gửi, hoàn tác, cấp hộp cát, gợi ý nhịp; thanh 4 chân dung; chip Tải; Chuỗi và bậc; Dải Chữ gọn; ân hạn ra lệnh; bảng hộp cát đủ mục; `move`; đốm sáng dọc dây; Dừng tất cả, tạm dừng, tắt tiếng.
+
+Cách làm rẻ hơn, giữ chức năng: E đổi bằng nút −5 / −1 / +1 / +5 thay thanh kéo (không phải giữ và trả tiêu điểm); thẻ chữ nằm trên lớp HUD thay vì bị đẩy ngang ra khỏi bảng (mục 1.9); đốm sáng là một đốm theo phần đã gõ thay vì một đốm mỗi phím (mục 1.9).
+
+Có dòng trống thì trả lại theo thứ tự: 6, 5, 3, 4, 2, 1.
+
+### 1.9 Lệch so với BUILD_NOW, TK ở 1A.4 (có lý do)
+
+- **Vòng menu nhà thành thẻ cố định** ở góc dưới phải, trên nút Xây (BUILD_NOW §10 "vòng menu thành thanh đơn giản"; mục 1.2). Menu xây dùng chung chỗ đó. `ui/ring-menu.ts` và `ui/tempo-control.ts` của BUILD_NOW §2 gộp vào `ui/build-menu.ts`: núm nhịp chỉ là một hàng nút trên thẻ. Nhà đang mở thẻ có vòng xanh ngọc trên bản đồ.
+- **Cột thẻ tách ngay, về chậm** (TK 23.4 "lò xo 150 ms"): cột phải tránh nhau thì nhảy ngay tới chỗ mới, chỉ lúc về gần nhà mình mới đi theo lò xo 150 ms; đi dần về một chỗ không chồng thì không bao giờ chồng. Thẻ đang khóa được tính cỡ lúc gõ (×1,2, lệch phải 18 px) ngay từ chữ đầu, nên cột bên cạnh tránh trước khi thẻ lớn lên. Trước đó `td-1a-slots` ở 1920 × 1080 bắt được thẻ chồng 3 lần trong 3 lần chạy, lúc hai cột đang trượt hoặc thẻ đang gõ lấn sang cột bên phải (1A.4 cho bản đồ nhỏ đi 7 % để chừa Dải Chữ, nhà gần nhau hơn trên màn hình).
+- **Thẻ chữ nằm trên HUD** (TK 23.4 kẹp thẻ trong vùng an toàn trừ HUD). Ở 16 : 9, HUD nằm ở lề hai bên bản đồ và dải dưới, nên ở zoom 1 thẻ hầu như không chạm HUD; khi zoom thì thẻ đè lên bảng chứ không bị bảng che, lớp thẻ cho mọi cú bấm đi qua. Bản đầu đẩy cột ngang ra khỏi bảng tốn 18 dòng.
+- **Đốm sáng dọc dây trợ lực** (TK 23.7 "mỗi phím đúng một đốm sáng") vẽ một đốm ở vị trí bằng phần đã gõ của từ đang khóa: mỗi phím đúng đẩy đốm tới, tới nhà khi từ xong. Bản đọc sự kiện `wordKey` từng phím tốn 19 dòng.
+- **Bản đồ vừa khung trên dải 60 px** (×`--hud`) dành cho Dải Chữ, để Dải Chữ không che Lũy ở giữa dưới. Zoom 1–2,5× quanh điểm dưới con trỏ, kéo trái hoặc giữa, mũi tên 60 px; tâm sân không ra quá nửa cỡ sân khỏi giữa. Đổi cỡ cửa sổ thì camera về zoom 1.
+- **Chỗ trống gợi ý** (`freeSpots`, sim thuần): mỏ là node trống; nhà khác là điểm lưới 2 m trong 2 m ngoài khoảng cách đường mà `canPlace` cho (không xét vàng), gần khúc cua nhất trước. Tính khi bấm Insert hoặc đổi loại nhà (~40 ms), không tính mỗi tick.
+- **"Đặt sẵn 4 ô" là op hộp cát trong sim** (`sandbox: preset`), bố cục là dữ liệu bản đồ (`map.preset`, như kịch bản `td-1a-slots`): Lũy cấp 4, bốn nhà đặt miễn phí (hoàn tác trả 0), mỗi nhà một người. Một lệnh, chạy lại khớp. Bấm lần hai không đổi gì (chỗ đã có nhà).
+- **`move`:** Tướng bay tới mọi ô trong sân; Thư Đồng cần ô trống (không nước, không nhà), ngoài sân hay ô chặn bị từ chối `blocked`. Người được `move` không trợ lực ai (đã có từ 1A.3: ra quá 4,5 m hoặc dừng thì ngắt).
+- **Esc bước 4 bật / tắt tạm dừng** (1A chưa có menu dừng). Tạm dừng thì phím chữ không gửi đi và thẻ mờ 6 px (TK 23.4); lệnh khác vẫn xếp hàng, chạy khi chơi tiếp.
+- **Tab** xếp nhà theo khoảng cách tới người đang chọn (1A chưa có tín hiệu cần giúp, TK 8.9), gồm cả Lũy.
+- **Ân hạn ra lệnh** bật khi thẻ nhà hoặc menu xây mở, kể cả mở bằng phím (Tab, Insert): TK 6.14 nói "khi … đang mở", không phân biệt cách mở. Trần 2 s và hồi 3 s vẫn ở sim.
+- **Phím đọc theo `event.code`, chữ cái theo `event.key`** (`typedLetter`, như 1A.2): bàn phím khác kiểu (AZERTY) vẫn gõ đúng chữ, và chữ cái không bao giờ thành lệnh. Mũi tên được giữ lặp (camera chạy tiếp); mọi phím khác giữ lặp bị bỏ.
+- **Hai lần bấm trong cùng một khung** (dưới 16 ms) đọc trạng thái trước tick: `−` hai lần liền chỉ lùi một nấc. Người bấm tay không chạm; test bấm từng khung.
+- **Nút HUD chạy khi nhấn xuống** (`pointerdown`, không lấy tiêu điểm): HUD viết lại khi đổi, nên `click` có thể rơi vào nút vừa thay; Enter và Space vẫn là của game.
+
 ## 2. Chạy cổng trong worktree
 
 Worktree `games/.wt-*` có `node_modules` là liên kết tượng trưng tới bản checkout chính (`games/space-typing`). Với lệnh thường `npx vite --host 127.0.0.1 --port 3110 --strictPort`:
@@ -171,6 +221,9 @@ URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-ru
 URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-combat.mjs --width=1280 --height=720
 URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-stream.mjs --width=1280 --height=720
 URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-slots.mjs --width=1280 --height=720
+URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-keyboard-only.mjs --width=1280 --height=720
+URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-words-dense.mjs --width=1280 --height=720
+URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-ime.mjs --width=1280 --height=720
 MAPS=halo-garden ISLANDS=0 URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/defense.mjs
 ```
 
@@ -179,6 +232,12 @@ Chạy thêm một lần mỗi kịch bản `td-1a-*` với `--width=1920 --heig
 `td-1a-stream.mjs` gõ đợt 1 ở nhịp 4 s (mỗi lúc một từ), rồi cho tháp sang nhịp 1 s trong 12 s: đòi ≥ 2 từ sống cùng lúc và một lần đổi khóa mềm cố ý, chụp thêm `td-1a-stream-dense`. Tầng 2 cần 3–4 nhà bận nên để `td-1a-slots` (1A.3) kiểm.
 
 `td-1a-slots.mjs` (1A.3) làm "Đặt sẵn 4 ô" bằng lệnh: Lũy cấp 4, 1.000 Vàng hộp cát, Tháp Pháo (7, 12), Tháp Cung (−8, 12), Trại Lính (3, 18) ở khúc nhập, Mỏ trên N3 (−34, 8); Draconis tới Pháo (ái lực), Chấm tới Cung, Phẩy tới Trại Lính, Gạch tới Mỏ (đúng sở trường). Chụp `td-1a-route` khi Gạch đang đi (đường A* nét đứt qua cầu nam), gõ 70 WPM, gọi đợt 1 khi Gạch tới mỏ, gọi đợt 2 ngay khi được, rồi cả bốn nhà nhịp 1 s trong 10 s; chụp `td-1a-four-slots` khi bốn nhà cùng có từ. Cặp tầng 2 cần ≤ 5 chữ đầu trống, tức 12 từ giữ chữ và 5 chữ đang nghỉ: bốn nhà nhịp 1 s chỉ chạm lúc đỉnh. Nên nếu chưa thấy cặp nào, pha cuối đặt E = 45 trong hộp cát và gõ 45 WPM, chờ tới khi có cặp, tối đa 120 s (Node, 60 seed: lúc này có khoảng 4 cặp mỗi phút, cặp đầu trong 60 s ở cả 60 seed); chụp `td-1a-tier2` và chặn bằng cổng `tier2PairOnScreen`: cả hai thẻ của cặp đều gạch chân hai chữ đầu (review 1A.3, mục 7). Mỗi lần nhìn đều kiểm thẻ: không chồng, chữ ≥ 18 px, trong vùng an toàn và không dưới chip HUD, chữ đầu không mơ hồ. Đường của Gạch chỉ qua suối ở cầu. Với lệnh Vite thường, kịch bản này vẫn đạt (bằng từ dự phòng); `td-1a-boot` hỏng hai cổng phông như mục trên.
+
+`td-1a-keyboard-only.mjs` (1A.4) chơi ba đợt chỉ bằng phím thật qua CDP, không một sự kiện chuột: Insert + Enter, Insert + Tab + Enter (hai Tháp Cung ở chỗ gợi ý), Insert + 3 + Enter (Trại Lính); Tab tới Tháp Cung đầu, Enter gửi Draconis, `=` nhịp dày hơn, Esc đóng thẻ, Shift+Enter gọi đợt; gõ 45 WPM; giữa hai đợt (sân trống, đợt kế đang đếm) Tab + Enter đưa Draconis sang Tháp Cung kia rồi gọi đợt kế. `__td` chỉ được đọc, nên mọi lệnh trong nhật ký đến từ phím; cổng `onlyKeyCommands` kiểm điều đó, cổng `nodeReplaysToBrowserHash` chạy lại nhật ký trên Node. Ảnh `td-1a-keyboard`.
+
+`td-1a-words-dense.mjs` (1A.4) đặt bốn nhà trong 20 m (ba nhà của bố cục 4 ô và một Tháp Cung ở điểm trống gần giữa chúng nhất), mỗi nhà một người, nhịp 1 s; hai pha 20 s: E = 12 Dễ (từ 5 chữ sống 7,5 s) rồi E = 35 Thường; cứ ba lần nhìn thì gõ một phím, để có thẻ đang khóa (×1,2). Mỗi lần nhìn đo thẻ: không chồng, cột ≤ 240 px, tổng diện tích thẻ ≤ 6 % màn hình, chữ ≥ 18 px, trong màn hình. Ảnh `td-1a-dense-easy`, `td-1a-dense-normal`.
+
+`td-1a-ime.mjs` (1A.4, theo `campaign3d-ime.mjs`): kiểu UniKey / EVKey (chữ đầu, Backspace, chữ có dấu không mã phím: Telex "aa", "dd", "ee", VNI "a1", "o6", số của VNI không tới trang) và kiểu bộ gõ hệ điều hành (phím "Process", keyCode 229, có cả số); rồi `Digit2`, `Digit4`, `Digit1`, `Backquote` hai lần ngay sau một chữ có dấu, Tab hai lần, `=`, `-`, Enter. Cổng: phím tiếng Việt chỉ ra lệnh `key` và `backspace`, không đổi người đang chọn, thẻ hay menu; HUD nhắc tắt bộ gõ; số chọn người; Backquote bước sang người kế và không gõ gì; Tab, `=` / `-`, Enter ra đúng lệnh. Đây là phím giả qua CDP: không thay được kiểm tra UniKey và EVKey thật (BUILD_NOW §8). Ảnh `td-1a-ime`.
 
 `td-1a-combat.mjs`, `td-1a-stream.mjs` và `td-1a-slots.mjs` ghi `td-1a-<tên>-replay-<cỡ>.json` (seed, mã nội dung, mã bộ từ, nguồn từ, tick, mã băm, nhật ký lệnh) vào `OUT_DIR` rồi tự chạy `scripts/td/replay.ts` trên Node. `td-1a-stream` gõ phím thật qua CDP (`WPM=40` mặc định, đổi được bằng biến môi trường), nên nhật ký của nó có lệnh `key` và chạy lại kiểm cả phần gõ. Cổng `nodeReplaysToBrowserHash` đạt khi Node ra đúng mã băm của Chrome (BUILD_NOW §7 cổng 4). Chạy lại bằng tay:
 

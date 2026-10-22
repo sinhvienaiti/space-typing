@@ -93,6 +93,8 @@ export type MapDef = {
   /** Ground routes from the gate to the Bastion; packs take turns. */
   routes: readonly (readonly Point[])[];
   flyRoute: readonly Point[]; flyHeightM: number; water: readonly Rect[]; bridges: readonly Rect[]; nodes: readonly OreNode[];
+  /** The sandbox's "Đặt sẵn 4 ô": building id, x, z and the agent sent there (0 the hero, 1–3 the helpers). */
+  preset?: readonly (readonly [string, number, number, number])[];
 };
 
 export type WaveEntry = { enemy: string; count: number };

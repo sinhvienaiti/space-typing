@@ -4,8 +4,9 @@
  * nodes, buildings as discs of their true radius, enemies as ink-purple dots
  * sized by tier, soldiers, shots and short-lived hit marks read from the
  * combat ring; each building's heat lanterns and tempo badge; the hero and
- * the helpers with their paths and assist lines; and Word Shots with a jade
- * head trailing their word. It reads the world and never changes it.
+ * the helpers with their paths and assist lines; Word Shots with a jade head
+ * trailing their word; the player's hand. The camera zooms and pans. It reads
+ * the world and never changes it.
  */
 import { BUILD, TEMPO, TICK_HZ } from "../content/rules";
 import { FX } from "../sim/events";
@@ -27,6 +28,8 @@ const MARK_TICKS = 24;
 const DRAGON = new Path2D("M0 -1.15L0.35 -0.15L1.3 0.7L0.27 0.4L0 0.85L-0.27 0.4L-1.3 0.7L-0.35 -0.15Z");
 
 type Mark = { kind: number; x: number; z: number; value: number; tick: number };
+/** The player's hand (app/selection.ts): the selected agent, the building in focus by id, the build menu's kind and ghost. */
+export type Hand = { agent: number; focus: number; kind: number; ghost(): { x: number; z: number; reason: string } | null };
 
 export class DebugView {
   private readonly ctx: CanvasRenderingContext2D;
@@ -34,6 +37,8 @@ export class DebugView {
   private ox = 0;
   private oy = 0;
   private ratio = 1;
+  /** The scale at zoom 1, and the middle of the area the field fits in (canvas px): zoom and pan stay around them. */
+  private readonly fit = { scale: 1, x: 0, y: 0 };
   private readCursor = 0;
   private readonly marks: Mark[] = [];
 
@@ -43,14 +48,30 @@ export class DebugView {
     this.ctx = ctx;
   }
 
-  /** Fits the field (with a margin) into the canvas. */
-  resize(cssWidth: number, cssHeight: number, ratio: number, halfM: number): void {
+  /** Fits the field (with a margin) into the canvas above the `bottom` px the word strip keeps. */
+  resize(cssWidth: number, cssHeight: number, ratio: number, halfM: number, bottom: number): void {
     this.ratio = ratio;
     this.canvas.width = Math.round(cssWidth * ratio);
     this.canvas.height = Math.round(cssHeight * ratio);
-    this.scale = (Math.min(cssWidth, cssHeight) / (halfM * 2 + 4)) * ratio;
-    this.ox = this.canvas.width / 2;
-    this.oy = this.canvas.height / 2;
+    this.fit.scale = this.scale = (Math.min(cssWidth, cssHeight - bottom) / (halfM * 2 + 4)) * ratio;
+    this.fit.x = this.ox = this.canvas.width / 2;
+    this.fit.y = this.oy = ((cssHeight - bottom) / 2) * ratio;
+  }
+
+  /** Moves the field `dx`, `dy` CSS px; its centre stays within half its size of the middle. */
+  panBy(dx: number, dy: number): void {
+    const room = this.scale * 50;
+    this.ox = Math.max(this.fit.x - room, Math.min(this.fit.x + room, this.ox + dx * this.ratio));
+    this.oy = Math.max(this.fit.y - room, Math.min(this.fit.y + room, this.oy + dy * this.ratio));
+  }
+
+  /** Zooms 1–2.5× (BUILD_NOW §5.4) about the point under (px, py). */
+  zoomAt(px: number, py: number, factor: number): void {
+    const k = Math.max(this.fit.scale, Math.min(2.5 * this.fit.scale, this.scale * factor)) / this.scale;
+    this.scale *= k;
+    this.ox = px * this.ratio - k * (px * this.ratio - this.ox);
+    this.oy = py * this.ratio - k * (py * this.ratio - this.oy);
+    this.panBy(0, 0);
   }
 
   /** Screen point (CSS px) of a world point. */
@@ -58,17 +79,22 @@ export class DebugView {
     return { x: (this.ox + x * this.scale) / this.ratio, y: (this.oy + z * this.scale) / this.ratio };
   }
 
-  draw(w: World): void {
+  unproject(px: number, py: number): { x: number; z: number } {
+    return { x: (px * this.ratio - this.ox) / this.scale, z: (py * this.ratio - this.oy) / this.scale };
+  }
+
+  draw(w: World, hand: Hand): void {
     const { ctx } = this;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = COLOR.grass;
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.setTransform(this.scale, 0, 0, this.scale, this.ox, this.oy);
     this.ground(w);
-    this.buildings(w);
+    this.buildings(w, hand);
+    this.ghost(w, hand);
     this.soldiers(w);
     this.enemies(w);
-    this.agents(w);
+    this.agents(w, hand);
     this.shots(w);
     this.readMarks(w);
     this.drawMarks(w);
@@ -172,7 +198,7 @@ export class DebugView {
     });
   }
 
-  private buildings(w: World): void {
+  private buildings(w: World, hand: Hand): void {
     const B = w.buildings;
     for (let b = 0; b < B.top; b += 1) {
       if (B.used[b] === 0) continue;
@@ -182,6 +208,7 @@ export class DebugView {
       const r = spec.radius;
       const level = B.level[b]!;
       const building = w.tick < B.readyTick[b]!;
+      if (B.id(b) === hand.focus) this.disc(x, z, r + 0.7, "rgba(127, 245, 224, 0.35)", COLOR.jade, 3);
       if (spec.attack !== null && !building) {
         const reach = spec.attack.levels[level - 1]!.range;
         this.disc(x, z, reach, null, "rgba(43, 33, 24, 0.22)", 1);
@@ -207,6 +234,16 @@ export class DebugView {
       if (spec.barracks !== null) this.flag(B.rallyX[b]!, B.rallyZ[b]!);
       if (spec.mine !== null && B.pile[b]! > 0) this.text("+" + Math.floor(B.pile[b]! / 1000), x + r + 1.2, z, 11, "#7a4f12");
     }
+  }
+
+  /** The build ghost (TK 12.5): the kind's disc and reach; a red ring with the reason under it where it may not stand. */
+  private ghost(w: World, hand: Hand): void {
+    const g = hand.ghost();
+    const spec = w.c.buildings[hand.kind]!;
+    if (g === null) return;
+    if (spec.attack !== null) this.disc(g.x, g.z, spec.attack.levels[0]!.range, null, "rgba(43, 33, 24, 0.35)", 1);
+    this.disc(g.x, g.z, spec.radius, spec.def.view.color + "99", g.reason === "" ? COLOR.ink : COLOR.enemyHp, 3);
+    if (g.reason !== "") this.text(g.reason, g.x, g.z + spec.radius + this.px(14), 14, COLOR.ink);
   }
 
   /** The rally flag: a pole from the point, a pennant at its top. */
@@ -258,7 +295,7 @@ export class DebugView {
   }
 
   /** The assist line; a walker's path ahead, dashed; Thư Đồng as lettered discs, Draconis a winged triangle over its shadow. */
-  private agents(w: World): void {
+  private agents(w: World, hand: Hand): void {
     const { ctx } = this;
     const A = w.agents;
     const B = w.buildings;
@@ -286,6 +323,11 @@ export class DebugView {
       const tz = at >= 0 ? B.z[at]! - z : 0;
       const reach = at >= 0 ? 1 - (0.7 * w.c.buildings[B.def[at]!]!.radius) / Math.sqrt(tx * tx + tz * tz) : 0;
       if (reach > 0) this.polyline([x, z, x + tx * reach, z + tz * reach], view.color, 0);
+      // The locked word's light runs down the line a step a right key and reaches the building as the word is done (TK 23.7).
+      const lock = w.typing.router.lock;
+      const f = lock >= 0 && reach > 0 && w.words.building[lock] === at ? (reach * w.words.typed[lock]!) / w.typing.deck.len[w.words.word[lock]!]! : 0;
+      if (f > 0) this.disc(x + tx * f, z + tz * f, 0.5, "#e6fffa", COLOR.jade, 1.5);
+      if (a === hand.agent) this.disc(x, z, a === 0 ? 1.6 : 1.3, null, COLOR.jade, 3);
       if (A.mode[a] === MODE.walk) this.polyline([x, z, ...A.path.subarray((a * PATH_MAX + A.next[a]!) * 2, (a * PATH_MAX + A.pathN[a]!) * 2)], view.color, 7);
       if (a > 0) {
         this.disc(x, z, 0.85, view.color, COLOR.ink, 1.5);

@@ -52,6 +52,14 @@ function go(w: World, a: number, goal: number, point: Point): void {
 /** Agent a goes home (Digit0; its building gone; its slot closed). */
 export const recallAgent = (w: World, a: number): void => go(w, a, -1, home(w, a));
 
+/** move (TK 8.3, a right click on the ground): agent a goes to stand at (x, z) on the field; a helper needs an open cell there. */
+export function moveAgent(w: World, a: number, x: number, z: number): boolean {
+  const cell = w.grid.cell(x, z);
+  if (cell < 0 || (a > 0 && w.grid.cells[cell] !== 0)) return false;
+  go(w, a, -1, { x, z });
+  return true;
+}
+
 /** assignUnit (TK 5.1, 25.9): agent a goes to assist building b; an agent already sent there swaps: to a's old building, or home. */
 export function orderAgent(w: World, a: number, b: number): void {
   const A = w.agents;

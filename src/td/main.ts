@@ -2,21 +2,28 @@
  * Typing Defense (td.html), step 1A "Cổng vui" (docs/td/BUILD_NOW.md): a
  * top-down 2D test field. The vocabulary loads first; then the world steps
  * at 60 Hz in a session, the debug view draws it, word cards float over it,
- * typing sounds follow its events, and window.__td lets the browser
- * scenarios drive it through commands.
+ * the keys, the mouse and the HUD act through the selection, typing sounds
+ * follow its events, and window.__td lets the browser scenarios drive it
+ * through commands.
  */
 import "./ui/td.css";
 import { runFrameLoop } from "../platform/frame-loop";
 import { installDevHandle } from "./app/dev-handle";
-import { installTypingInput } from "./app/input";
+import { installKeys, installPointer } from "./app/input";
+import { sandboxHtml } from "./app/sandbox";
+import { Selection } from "./app/selection";
 import { Session } from "./app/session";
 import { loadDeck } from "./app/vocab";
+import type { CommandBody } from "./sim/commands";
 import type { RareEvent } from "./sim/events";
 import { hashHex } from "./sim/hash";
 import { canPlace } from "./sim/placement";
 import { statsObject } from "./sim/stats";
 import { PATH_MAX } from "./sim/stores/agents";
 import { wordText } from "./typing/decks";
+import { dockHtml } from "./ui/build-menu";
+import { actionsHtml, Hud, REASON, statusHtml, stripHtml } from "./ui/hud";
+import { teamHtml } from "./ui/team-bar";
 import { TypingAudio } from "./view/audio-min";
 import { DebugView } from "./view/debug-2d";
 import { WordCards } from "./view/words/cards";
@@ -31,98 +38,101 @@ const params = new URLSearchParams(window.location.search);
 // 1A is the sandbox build: on unless ?sandbox=0.
 const sandbox = params.get("sandbox") !== "0";
 const seed = Number(params.get("seed") ?? "1") >>> 0 || 1;
-const view = new DebugView(byId<HTMLCanvasElement>("tdCanvas"));
+const canvas = byId<HTMLCanvasElement>("tdCanvas");
+const view = new DebugView(canvas);
 let painted = false;
 
-const title = document.createElement("div");
-title.className = "td-chip";
-title.textContent = "Typing Defense";
-if (sandbox) title.insertAdjacentHTML("beforeend", "<small>Hộp cát · bản thử 1A</small>");
-const status = document.createElement("div");
-status.className = "td-status";
-status.textContent = "Đang tải từ vựng…";
-const mute = document.createElement("button");
-mute.className = "td-mute";
-mute.type = "button";
-mute.textContent = "Tắt tiếng";
-title.append(status, mute);
-byId("tdHud").append(title);
-
 const { deck, source } = await loadDeck();
+byId("tdHud").replaceChildren(); // the loading note
 const session = new Session({ seed, sandbox, deck });
 const world = session.world;
+const selection = new Selection(world, (command) => session.send(command));
 const cards = new WordCards(byId("tdWords"), (x, z) => view.project(x, z));
 const audio = new TypingAudio();
 let imeWarning = false;
 
-mute.addEventListener("click", () => {
-  audio.resume();
-  audio.muted = !audio.muted;
-  mute.textContent = audio.muted ? "Bật tiếng" : "Tắt tiếng";
-});
-window.addEventListener("pointerdown", () => audio.resume());
-window.addEventListener("keydown", () => audio.resume());
-installTypingInput(window, {
-  send: (command) => session.send(command),
-  locked: () => world.typing.router.lock >= 0 || world.typing.router.group >= 0,
+/** Buttons and keys: the camera's and the sound's own, the rest the selection's. */
+function act(action: string): void {
+  const [name, dx, dy] = action.split(":");
+  if (name === "pan") view.panBy(Number(dx) * 60, Number(dy) * 60);
+  else if (name === "mute") audio.muted = !audio.muted;
+  else selection.act(action);
+}
+
+const hud = new Hud(byId("tdHud"), act);
+for (const type of ["pointerdown", "keydown"]) window.addEventListener(type, () => audio.resume());
+installKeys(window, {
+  // Paused, nothing is typed: words wait behind the blur.
+  send: (command) => {
+    if (!selection.paused) session.send(command);
+  },
+  act,
   onVietnamese: () => (imeWarning = true),
   allowUntrusted: params.get("untrusted") === "1",
 });
+installPointer(canvas, view, selection);
 
-const waveCount = world.c.content.waves.list.length;
-let shown = "";
-function showStatus(): void {
-  const wave = world.wave === 0 ? "Chuẩn bị" : "Đợt " + world.wave + "/" + waveCount;
-  const parts = ["Mạng " + world.lives, "Vàng " + Math.floor(world.gold / 1000), wave, "Chuỗi " + world.typing.chain];
-  if (world.phase === "defeat") parts.push("Thua");
-  if (imeWarning) parts.push("Tắt bộ gõ tiếng Việt để gõ");
-  if (source === "fallback") parts.push("Từ dự phòng");
-  const text = parts.join(" · ");
-  if (text !== shown) status.textContent = shown = text;
+function showHud(): void {
+  const refused = [...recent].reverse().find((event) => event.t === "rejected" && world.tick - event.tick < 150);
+  const notices = [imeWarning ? "Tắt bộ gõ tiếng Việt để gõ" : "", source === "fallback" ? "Từ dự phòng (máy chủ không có từ vựng)" : ""];
+  hud.update([
+    statusHtml(world, sandbox, selection.paused, audio.muted, notices.filter((notice) => notice !== "")),
+    sandbox && selection.panel ? sandboxHtml(world) : "",
+    teamHtml(world, selection.agent),
+    stripHtml(world, refused?.t === "rejected" ? (REASON[refused.reason] ?? refused.reason) : ""),
+    dockHtml(world, selection),
+    actionsHtml(world),
+  ]);
+  document.body.classList.toggle("is-paused", selection.paused);
 }
 
 const resize = (): void => {
   const ui = Math.max(0.8, Math.min(1.2, Math.min(window.innerWidth / 1600, window.innerHeight / 900)));
   document.documentElement.style.setProperty("--ui", ui.toFixed(3));
-  view.resize(window.innerWidth, window.innerHeight, Math.min(2, window.devicePixelRatio || 1), world.map.halfM);
-  view.draw(world);
+  document.documentElement.style.setProperty("--hud", Math.max(1, ui).toFixed(3));
+  view.resize(window.innerWidth, window.innerHeight, Math.min(2, window.devicePixelRatio || 1), world.map.halfM, 60 * Math.max(1, ui));
+  view.draw(world, selection);
   painted = true;
 };
 window.addEventListener("resize", resize);
-resize();
-showStatus();
-
 const recent: RareEvent[] = [];
+resize();
+showHud();
+
 runFrameLoop({
   update(now) {
+    selection.update();
+    session.paused = selection.paused;
     session.frame(now);
     const fresh = world.events.rare.splice(0);
     cards.read(fresh, world, now);
     audio.read(fresh, world, now);
     recent.push(...fresh);
     if (recent.length > 400) recent.splice(0, recent.length - 400);
-    showStatus();
+    showHud();
   },
   draw(now) {
-    view.draw(world);
+    view.draw(world, selection);
     cards.draw(world, now, window.innerWidth, window.innerHeight);
     painted = true;
   },
   onError() {
-    session.paused = true;
+    selection.paused = true;
   },
 });
 
 installDevHandle({
   ready: () => painted,
+  // What a Node replay of log() needs besides the log (scripts/td/replay.ts).
   flags: () => ({ sandbox, seed: world.seed, content: world.c.hash, deck: deck.hash, vocabulary: source }),
-  send: (command) => session.send(command),
+  send: (command: CommandBody) => session.send(command),
   stats: () => statsObject(world.stats),
   hash: () => hashHex(world),
   defs: () => world.c.buildings.map((building) => building.id),
-  canPlace: (id, x, z) => canPlace(world, world.c.buildingIndex(id), Math.round(x * 4), Math.round(z * 4)),
+  canPlace: (id: string, x: number, z: number) => canPlace(world, world.c.buildingIndex(id), Math.round(x * 4), Math.round(z * 4)),
   events: () => recent.slice(),
   log: () => session.log.slice(),
+  // Ages and times left in ticks.
   liveWords: () => {
     const W = world.words;
     return W.live().map((s) => ({
@@ -131,6 +141,8 @@ installDevHandle({
     }));
   },
   typing: () => ({ chain: world.typing.chain, cap: world.typing.cap, a: world.typing.a, lock: world.typing.router.lock, allStopped: world.typing.allStopped }),
+  ui: () => ({ agent: selection.agent, focus: selection.focus, building: selection.building, kind: selection.kind, paused: selection.paused, panel: selection.panel, grace: world.tick < world.typing.graceUntil }),
+  // Agents: hero first; mode as MODE in sim/stores/agents.ts; goal and at are building ids (−1 none); path: x, z, x, z… ahead.
   state: () => {
     const { buildings: B, units: U, agents: A } = world;
     return {

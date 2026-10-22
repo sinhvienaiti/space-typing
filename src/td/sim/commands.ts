@@ -11,7 +11,7 @@ import { routeBackspace } from "../typing/router";
 import { tempoOpen } from "../typing/tempo";
 import { CELL } from "./nav/grid";
 import { canPlace } from "./placement";
-import { orderAgent, recallAgent, releaseBuilding, rerouteAgents, slotsOpen } from "./systems/agents";
+import { moveAgent, orderAgent, recallAgent, releaseBuilding, rerouteAgents, slotsOpen } from "./systems/agents";
 import { configureDeck, densestFor, orderGrace, recheckTempos, setTempo, startTempo, stopAll } from "./systems/stream";
 import { callWave, startWave } from "./systems/waves";
 import { cancelWords, typeKey } from "./systems/words";
@@ -25,7 +25,8 @@ export type SandboxOp =
   | { op: "expected"; value: number }
   | { op: "vocab"; value: number }
   | { op: "speed"; value: number }
-  | { op: "wave" };
+  | { op: "wave" }
+  | { op: "preset" };
 
 export type CommandBody =
   | { t: "build"; def: number; qx: number; qz: number }
@@ -33,6 +34,7 @@ export type CommandBody =
   | { t: "rally"; building: number; qx: number; qz: number }
   | { t: "callWave" }
   | { t: "assignUnit"; agent: number; building: number }
+  | { t: "move"; agent: number; qx: number; qz: number }
   | { t: "recall"; agent: number }
   | { t: "setTempo"; building: number; idx: number }
   | { t: "setAllTempo"; stop: boolean }
@@ -47,6 +49,9 @@ export type Command = CommandBody & { tick: number };
 const SPEEDS = [0.75, 1, 2];
 const VOCAB_LEVELS = [1, 3, 5];
 const DIFFICULTIES: readonly Difficulty[] = ["easy", "normal", "hard"];
+
+/** An agent whose slot the Bastion's level has opened. */
+const agentOpen = (w: World, agent: number): boolean => Number.isInteger(agent) && agent >= 0 && agent < slotsOpen(w);
 
 export function applyCommand(w: World, command: Command): void {
   const reason = run(w, command);
@@ -93,12 +98,16 @@ function run(w: World, command: Command): string | null {
     case "assignUnit": {
       const slot = w.buildings.slotOf(command.building);
       if (slot < 0) return "noBuilding";
-      if (!(Number.isInteger(command.agent) && command.agent >= 0 && command.agent < slotsOpen(w))) return "noSlot";
+      if (!agentOpen(w, command.agent)) return "noSlot";
       orderAgent(w, command.agent, slot);
       return null;
     }
+    case "move":
+      if (!agentOpen(w, command.agent)) return "noSlot";
+      if (!Number.isInteger(command.qx) || !Number.isInteger(command.qz)) return "bounds";
+      return moveAgent(w, command.agent, command.qx * BUILD.snapM, command.qz * BUILD.snapM) ? null : "blocked";
     case "recall":
-      if (!(Number.isInteger(command.agent) && command.agent >= 0 && command.agent < slotsOpen(w))) return "noSlot";
+      if (!agentOpen(w, command.agent)) return "noSlot";
       recallAgent(w, command.agent);
       return null;
     case "setTempo": {
@@ -162,6 +171,16 @@ function sandbox(w: World, op: SandboxOp): string | null {
       return null;
     case "wave":
       startWave(w);
+      return null;
+    case "preset":
+      // "Đặt sẵn 4 ô" (BUILD_NOW §5.3): the Bastion at level 4, the map's preset buildings put down free, an agent sent to each.
+      setLevel(w, 0, 4, 4);
+      for (const [id, x, z, agent] of w.map.preset ?? []) {
+        const def = w.c.buildingIndex(id);
+        const placed = canPlace(w, def, Math.round(x / BUILD.snapM), Math.round(z / BUILD.snapM), true);
+        const slot = placed.ok ? placeBuilding(w, def, placed.x, placed.z, placed.node, 0) : -1;
+        if (slot >= 0) orderAgent(w, agent, slot);
+      }
       return null;
   }
 }

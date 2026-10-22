@@ -20,6 +20,7 @@ Mỗi bản cập nhật có một file trong thư mục này. File ghi rõ đã
 
 | Ngày | Bản cập nhật | Mục review đã xử lý |
 |---|---|---|
+| 2026-10-22 | [Typing Defense 1A.4: điều khiển, HUD, hộp cát (bàn phím đủ đường, chuột, camera, thẻ nhà, 4 chân dung, Tải, Chuỗi, ân hạn, `move`, Đặt sẵn 4 ô)](./2026-10-22-td-1a4-controls.md) | (mã mới TD) |
 | 2026-10-22 | [Typing Defense 1A.3: sửa sau review (kẹt cạnh suối, ngắt trợ lực, cầu, dây, ngân sách 1A.4, test, tầng 2)](./2026-10-22-td-1a3-review.md) | (review mốc 1A.3, mục 1–7) |
 | 2026-10-22 | [Typing Defense 1A.3: người và ô (A*, Draconis, Thư Đồng, đổi chỗ, ô theo Lũy)](./2026-10-22-td-1a3-agents.md) | (mã mới TD) |
 | 2026-10-22 | [Thiết kế Typing Defense (TD)](./2026-10-22-td-design.md) | (thiết kế; thay một phần V5) |

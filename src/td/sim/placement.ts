@@ -28,7 +28,8 @@ export function socketCell(w: World, x: number, z: number, reach: number, out = 
   return w.grid.cell(out.x, out.z);
 }
 
-export function canPlace(w: World, def: number, qx: number, qz: number): Placement {
+/** `free`: the gold check is left out (the sandbox preset; the spots the keyboard offers). */
+export function canPlace(w: World, def: number, qx: number, qz: number, free = false): Placement {
   const spec = Number.isInteger(def) ? w.c.buildings[def] : undefined;
   if (w.phase === "defeat") return no("phase");
   const B = w.buildings;
@@ -87,6 +88,24 @@ export function canPlace(w: World, def: number, qx: number, qz: number): Placeme
   w.grid.stamp(x, z, r, CELL.probe, false);
   if (!reachable) return no("path");
 
-  if (w.gold < spec.costs[0] * 1000) return no("gold");
+  if (!free && w.gold < spec.costs[0] * 1000) return no("gold");
   return { ok: true, x, z, node };
+}
+
+/**
+ * Where Insert offers to build `def` (BUILD_NOW §5.4): a mine's free nodes; else the points of a 2 m grid within
+ * 2 m of the road's clearance that canPlace allows (gold aside), nearest a bend of the road first.
+ */
+export function freeSpots(w: World, def: number): Point[] {
+  const spec = w.c.buildings[def]!;
+  const fits = (p: Point): boolean => canPlace(w, def, Math.round(p.x / BUILD.snapM), Math.round(p.z / BUILD.snapM), true).ok;
+  if (spec.placement === "node") return w.map.nodes.map((node) => ({ x: node.x, z: node.z })).filter(fits);
+  const reach = BUILD.roadClearM + spec.radius + 2;
+  const spots: Point[] = [];
+  for (let x = -w.map.buildHalfM; x <= w.map.buildHalfM; x += 2) {
+    for (let z = -w.map.buildHalfM; z <= w.map.buildHalfM; z += 2) if (w.lanes.slice(0, -1).some((lane) => lane.gap2(x, z) <= reach * reach)) spots.push({ x, z });
+  }
+  const bends = w.map.routes.flatMap((route) => route.slice(1, -1));
+  const bend = (p: Point): number => Math.min(...bends.map(([x, z]) => (x - p.x) * (x - p.x) + (z - p.z) * (z - p.z)));
+  return spots.filter(fits).sort((p, q) => bend(p) - bend(q) || p.x - q.x || p.z - q.z);
 }
