@@ -20,6 +20,7 @@ Mỗi bản cập nhật có một file trong thư mục này. File ghi rõ đã
 
 | Ngày | Bản cập nhật | Mục review đã xử lý |
 |---|---|---|
+| 2026-10-22 | [Typing Defense bước 1A: bản chơi được đầu tiên (tổng hợp, cổng §7)](./2026-10-22-td-1a.md) | (mã mới TD) |
 | 2026-10-22 | [Bộ prompt asset Typing Defense](./2026-10-22-td-asset-prompts.md) | (tài liệu) |
 | 2026-10-22 | [Typing Defense 1A.5: sửa sau review (luật bot riêng mỗi lượt, file vàng so đủ trường, luồng chính của Chrome trong cổng 5, test người đọc và gợi ý nhịp, Nhanh ẩu ở cùng tải, tải đầy TK 25.12)](./2026-10-22-td-1a5-review.md) | (review mốc 1A.5, mục 1–7) |
 | 2026-10-22 | [Typing Defense 1A.5: bot, báo cáo `td:balance`, test vàng, đo hiệu năng, cổng cứng §7, bộ ảnh cho chủ dự án](./2026-10-22-td-1a5-bot.md) | (mã mới TD) |
