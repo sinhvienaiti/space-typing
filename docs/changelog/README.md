@@ -20,6 +20,7 @@ Mỗi bản cập nhật có một file trong thư mục này. File ghi rõ đã
 
 | Ngày | Bản cập nhật | Mục review đã xử lý |
 |---|---|---|
+| 2026-10-22 | [Typing Defense 1A.6 "Lời Gọi", đợt R1: lời gọi, Ngày và Đêm, Ruộng, cây, dân, công trường, lượt mạnh](./2026-10-22-td-1a6-r1.md) | (mã mới TD) |
 | 2026-10-22 | [Kế hoạch V3.1 "Lời Gọi": gõ theo lời gọi của NPC, Ngày và Đêm, kinh tế trồng và chặt](../td/CALLS_V3_1_PLAN.md) | (kế hoạch; chưa code) |
 | 2026-10-22 | [Typing Defense bước 1A: bản chơi được đầu tiên (tổng hợp, cổng §7)](./2026-10-22-td-1a.md) | (mã mới TD) |
 | 2026-10-22 | [Bộ prompt asset Typing Defense](./2026-10-22-td-asset-prompts.md) | (tài liệu) |
