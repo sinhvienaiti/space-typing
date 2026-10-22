@@ -264,13 +264,24 @@ describe("Typing Defense boundary (TK 25.3)", () => {
     expect(crossing).toEqual([]);
   });
 
+  /** Lines of the 1A code (td.html, src/platform/rng.ts, src/td), counted as `wc -l` does. */
+  const codeLines = (): number =>
+    [readFileSync(join(ROOT, "td.html"), "utf8"), readFileSync(join(ROOT, "src/platform/rng.ts"), "utf8"), ...td.map((source) => source.text)].reduce((sum, text) => sum + (text.match(/\n/g) ?? []).length, 0);
+
   it("the 1A code (td.html, src/platform/rng.ts, src/td) stays under BUILD_NOW §2's hard ceiling", () => {
     const ceiling = /Trần cứng (\d+)\.(\d{3})/.exec(readFileSync(join(ROOT, "docs/td/BUILD_NOW.md"), "utf8"));
     expect(ceiling, "BUILD_NOW §2 names the hard ceiling").not.toBeNull();
-    const lines = (text: string) => (text.match(/\n/g) ?? []).length;
-    const files = [readFileSync(join(ROOT, "td.html"), "utf8"), readFileSync(join(ROOT, "src/platform/rng.ts"), "utf8"), ...td.map((source) => source.text)];
-    // docs/td/BUILD_NOTES.md §1 keeps the count per group and what each milestone may still spend.
-    expect(files.reduce((sum, text) => sum + lines(text), 0)).toBeLessThanOrEqual(Number(ceiling![1]! + ceiling![2]!));
+    expect(codeLines()).toBeLessThanOrEqual(Number(ceiling![1]! + ceiling![2]!));
+  });
+
+  it("the 1A code stays inside the running total its milestone may reach (docs/td/BUILD_NOTES.md §1.2)", () => {
+    const notes = readFileSync(join(ROOT, "docs/td/BUILD_NOTES.md"), "utf8");
+    const milestone = /Mốc đang làm: \*\*(1A\.\d)\*\*/.exec(notes)?.[1];
+    expect(milestone, "BUILD_NOTES §1.2 names the milestone being built").toBeDefined();
+    // Its row: | 1A.n … | new lines | share | running total |
+    const row = new RegExp("^\\| " + milestone!.replace(".", "\\.") + " [^|]*\\|[^|]*\\|[^|]*\\| (\\d+)\\.(\\d{3}) \\|", "m").exec(notes);
+    expect(row, "BUILD_NOTES §1.2 has a row for " + milestone).not.toBeNull();
+    expect(codeLines(), milestone + " may reach " + row![1] + row![2] + " lines in all").toBeLessThanOrEqual(Number(row![1]! + row![2]!));
   });
 });
 

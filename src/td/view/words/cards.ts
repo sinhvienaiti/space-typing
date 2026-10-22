@@ -11,7 +11,7 @@ import type { RareEvent } from "../../sim/events";
 import type { World } from "../../sim/world";
 import { wordText } from "../../typing/decks";
 import { KEY } from "../../typing/router";
-import { columnHeights, spreadLanes, type LaneBox } from "./lanes";
+import { COLUMN, columnHeights, spreadLanes, type LaneBox } from "./lanes";
 
 export const GRADE_NAME: Readonly<Record<Grade, string>> = { flash: "Chớp", perfect: "Hoàn hảo", good: "Tốt", ok: "Vừa", sloppy: "Ẩu", expired: "Tan", cancelled: "Hủy" };
 
@@ -90,15 +90,16 @@ export class WordCards {
   private bind(card: Card, w: World, s: number, id: number): void {
     const W = w.words;
     const agent = W.agent[s]!;
-    Object.assign(card, { id, b: W.building[s]!, word: wordText(w.typing.deck, W.word[s]!), tier: W.tier[s]!, typed: -1, late: false, lockedAt: -1, leave: "", shakeUntil: 0, pinkUntil: 0 });
+    Object.assign(card, { id, b: W.building[s]!, word: wordText(w.typing.deck, W.word[s]!), typed: -1, late: false, lockedAt: -1, leave: "", shakeUntil: 0, pinkUntil: 0 });
     card.el.style.setProperty("--fam", w.c.buildings[w.buildings.def[card.b]!]!.def.view.color);
     card.el.style.setProperty("--agent", agent < 0 ? "transparent" : agent === 0 ? w.c.content.hero.view.color : w.c.content.helpers[agent - 1]!.view.color);
     card.el.className = "td-card";
     this.byId.set(id, card);
   }
 
-  /** Letters as spans: typed (t), the first one or two (l), the next after a wrong key (p). */
-  private render(card: Card, typed: number, pink: boolean): void {
+  /** Letters as spans: typed (t), the first one or two by tier (l), the next after a wrong key (p). */
+  private render(card: Card, typed: number, pink: boolean, tier: number): void {
+    card.tier = tier;
     card.text.innerHTML = [...card.word]
       .map((ch, k) => {
         const kind = (k < typed ? " t" : "") + (k < card.tier ? " l" : "") + (pink && k === typed ? " p" : "");
@@ -126,7 +127,7 @@ export class WordCards {
       card.slot = s;
       card.seen = this.frame;
       const pink = now < card.pinkUntil;
-      if (W.typed[s] !== card.typed || pink !== card.pink) this.render(card, W.typed[s]!, pink);
+      if (W.typed[s] !== card.typed || pink !== card.pink || W.tier[s] !== card.tier) this.render(card, W.typed[s]!, pink, W.tier[s]!);
       card.lockedAt = lock !== s ? -1 : card.lockedAt < 0 ? w.tick : card.lockedAt;
       const late = W.expire[s]! - w.tick < 0.6 * 60;
       if (late !== card.late) card.el.classList.toggle("is-late", (card.late = late));
@@ -157,7 +158,9 @@ export class WordCards {
       // Newest at the bottom; a locked word rises at 30 % of its pace from the moment it was locked (a picture only).
       cards.sort((p, q) => W.born[q.slot]! - W.born[p.slot]!);
       const ages = cards.map((card) => (card.lockedAt < 0 ? w.tick - W.born[card.slot]! : card.lockedAt - W.born[card.slot]! + (w.tick - card.lockedAt) * 0.3) / 60);
-      const heights = columnHeights(ages, cards.map((card) => W.life[card.slot]! / 60), []);
+      // The gap fits the tallest card at its typing scale (×1.2, grown upward), so it never reaches the card above.
+      const gap = Math.max(COLUMN.gap, Math.ceil(1.2 * Math.max(...cards.map((card) => card.height))) + 4);
+      const heights = columnHeights(ages, cards.map((card) => W.life[card.slot]! / 60), [], gap);
       const roof = this.project(B.x[b]!, B.z[b]! - w.c.buildings[B.def[b]!]!.radius - ROOF_M);
       const tallest = heights[heights.length - 1]! + Math.max(...cards.map((card) => card.height));
       const roofY = Math.min(height - SAFE.bottom, Math.max(roof.y, SAFE.top + tallest));

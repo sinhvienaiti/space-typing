@@ -9,12 +9,12 @@
  */
 export const COLUMN = { rise: 120, gap: 40, max: 240, push: 160, clear: 10 } as const;
 
-/** Heights (px above the roof) of a column's cards, newest first: `ages` and `lives` in seconds. */
-export function columnHeights(ages: readonly number[], lives: readonly number[], out: number[]): number[] {
+/** Heights (px above the roof) of a column's cards, newest first: `ages` and `lives` in seconds; `gap` at least 40 px. */
+export function columnHeights(ages: readonly number[], lives: readonly number[], out: number[], gap: number = COLUMN.gap): number[] {
   out.length = ages.length;
   for (let k = 0; k < ages.length; k += 1) {
     const clock = Math.min(COLUMN.rise, (COLUMN.rise * Math.max(0, ages[k]!)) / lives[k]!);
-    out[k] = Math.min(COLUMN.max, k === 0 ? clock : Math.max(clock, out[k - 1]! + COLUMN.gap));
+    out[k] = Math.min(COLUMN.max, k === 0 ? clock : Math.max(clock, out[k - 1]! + gap));
   }
   return out;
 }

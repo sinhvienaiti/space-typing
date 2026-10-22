@@ -12,7 +12,7 @@ import { routeBackspace } from "../typing/router";
 import { tempoOpen } from "../typing/tempo";
 import { CELL } from "./nav/grid";
 import { canPlace } from "./placement";
-import { assignAgent, configureDeck, densestFor, orderGrace, setAssist, setTempo, slotsOpen, startTempo, stopAll } from "./systems/stream";
+import { assignAgent, configureDeck, densestFor, orderGrace, recheckTempos, setAssist, setTempo, slotsOpen, startTempo, stopAll } from "./systems/stream";
 import { callWave, startWave } from "./systems/waves";
 import { cancelWords, typeKey } from "./systems/words";
 import type { World } from "./world";
@@ -143,6 +143,8 @@ function sandbox(w: World, op: SandboxOp): string | null {
     case "difficulty":
       if (!DIFFICULTIES.includes(op.value)) return "badValue";
       w.difficulty = op.value;
+      configureDeck(w); // E's floor follows the difficulty
+      recheckTempos(w);
       return null;
     case "expected":
       if (!(op.value >= EXPECTED.min && op.value <= EXPECTED.max)) return "badValue";
@@ -176,6 +178,7 @@ function setLevel(w: World, slot: number, level: number, max: number): string | 
     for (const s of w.units.live()) if (w.units.barracks[s] === slot && w.units.hp[s]! > 0) w.units.hp[s] = hp;
   }
   w.events.rare.push({ t: "levelSet", tick: w.tick, building: B.id(slot), level });
+  recheckTempos(w);
   return null;
 }
 
@@ -202,7 +205,7 @@ export function placeBuilding(w: World, def: number, x: number, z: number, node:
     }
   }
   w.events.rare.push({ t: "built", tick: w.tick, building: w.buildings.id(slot), def });
-  if (spec.placement !== "fixed") setTempo(w, slot, startTempo(w, def), false);
+  startTempo(w, slot);
   return slot;
 }
 

@@ -6,59 +6,18 @@
  * slice, `view` blocks left out (docs/td/TYPING_DEFENSE_DESIGN.md 25.4).
  */
 import * as RULES from "./rules";
-import type { AttackSpec, BuildingDef, Content, EnemyDef, EnemyTier, Family, PerLevel } from "./types";
+import type { AttackSpec, BuildingDef, Content, EnemyDef } from "./types";
 
 export const DAMAGE_TYPES = ["physical", "magic", "true"] as const;
 export const ALTITUDES = ["ground", "low", "high"] as const;
 
 export const ticks = (seconds: number): number => Math.round(seconds * RULES.TICK_HZ);
 
-export type CompiledAttackLevel = { min: number; max: number; period: number; range: number; range2: number; splash: number; targets: number };
-export type CompiledAttack = {
-  damageType: number;
-  crit: number;
-  /** Damage fraction at the rim of a blast. */
-  edge: number;
-  /** Indexed by altitude: ground, low, high. */
-  hits: readonly boolean[];
-  /** Metres per tick. */
-  speed: number;
-  levels: readonly CompiledAttackLevel[];
-};
-
-export type CompiledBuilding = {
-  index: number;
-  id: string;
-  family: Family;
-  radius: number;
-  placement: BuildingDef["placement"];
-  costs: PerLevel;
-  hp: PerLevel;
-  buildTicks: number;
-  attack: CompiledAttack | null;
-  barracks: { soldiers: number; respawn: number; levels: readonly { hp: number; min: number; max: number; period: number; armor: number }[] } | null;
-  mine: { levels: readonly { amount: number; every: number; pile: number }[] } | null;
-  def: BuildingDef;
-};
-
-export type CompiledEnemy = {
-  index: number;
-  id: string;
-  tier: EnemyTier;
-  hp: number;
-  armor: number;
-  resist: number;
-  speed: number;
-  altitude: number;
-  leak: number;
-  gold: number;
-  weight: number;
-  radius: number;
-  packSize: number;
-  splashMul: number;
-  melee: { min: number; max: number; period: number } | null;
-  def: EnemyDef;
-};
+// The compiled shapes are what the compile functions below return.
+export type CompiledAttack = ReturnType<typeof compileAttack>;
+export type CompiledAttackLevel = CompiledAttack["levels"][number];
+export type CompiledBuilding = ReturnType<typeof compileBuilding>;
+export type CompiledEnemy = ReturnType<typeof compileEnemy>;
 
 export type Compiled = {
   content: Content;
@@ -72,13 +31,13 @@ export type Compiled = {
 /** One spawn of a wave: `at` ticks after the wave starts; `lane` counts ground packs (−1: flying). */
 export type ScheduledSpawn = { at: number; enemy: number; lane: number };
 
-export function compileAttack(spec: AttackSpec): CompiledAttack {
+export function compileAttack(spec: AttackSpec) {
   return {
     damageType: DAMAGE_TYPES.indexOf(spec.damageType),
     crit: spec.critPct / 100,
-    edge: (spec.edgePct ?? 100) / 100,
-    hits: ALTITUDES.map((altitude) => spec.hits.includes(altitude)),
-    speed: spec.projectileSpeed / RULES.TICK_HZ,
+    edge: (spec.edgePct ?? 100) / 100, // damage left at a blast's rim
+    hits: ALTITUDES.map((altitude) => spec.hits.includes(altitude)) as readonly boolean[], // by altitude: ground, low, high
+    speed: spec.projectileSpeed / RULES.TICK_HZ, // metres per tick
     levels: spec.levels.map((level) => ({
       min: level.damage[0],
       max: level.damage[1],
@@ -91,15 +50,9 @@ export function compileAttack(spec: AttackSpec): CompiledAttack {
   };
 }
 
-function compileBuilding(def: BuildingDef, index: number): CompiledBuilding {
+function compileBuilding(def: BuildingDef, index: number) {
   return {
-    index,
-    id: def.id,
-    family: def.family,
-    radius: RULES.BUILD.footprintR[def.footprint],
-    placement: def.placement,
-    costs: def.costs,
-    hp: def.hp,
+    index, id: def.id, family: def.family, radius: RULES.BUILD.footprintR[def.footprint], placement: def.placement, costs: def.costs, hp: def.hp,
     buildTicks: def.placement === "fixed" ? 0 : ticks(RULES.BUILD.buildTimeS[def.footprint]),
     attack: def.attack ? compileAttack(def.attack) : null,
     barracks: def.barracks
@@ -114,22 +67,11 @@ function compileBuilding(def: BuildingDef, index: number): CompiledBuilding {
   };
 }
 
-function compileEnemy(def: EnemyDef, index: number): CompiledEnemy {
+function compileEnemy(def: EnemyDef, index: number) {
   return {
-    index,
-    id: def.id,
-    tier: def.tier,
-    hp: def.hp,
-    armor: def.armorPct / 100,
-    resist: def.resistPct / 100,
-    speed: def.speed / RULES.TICK_HZ,
-    altitude: ALTITUDES.indexOf(def.altitude),
-    leak: def.leak,
-    gold: def.gold,
-    weight: def.blockWeight,
-    radius: def.radiusM,
-    packSize: def.packSize,
-    splashMul: def.splashTakenMul ?? 1,
+    index, id: def.id, tier: def.tier, hp: def.hp, armor: def.armorPct / 100, resist: def.resistPct / 100,
+    speed: def.speed / RULES.TICK_HZ, altitude: ALTITUDES.indexOf(def.altitude), leak: def.leak, gold: def.gold,
+    weight: def.blockWeight, radius: def.radiusM, packSize: def.packSize, splashMul: def.splashTakenMul ?? 1,
     melee: def.melee ? { min: def.melee.damage[0], max: def.melee.damage[1], period: ticks(def.melee.periodS) } : null,
     def,
   };

@@ -59,6 +59,21 @@ describe("key router", () => {
     expect([miss.w.typing.router.lock, miss.w.words.typed[miss.slot("fish")], miss.w.words.errors[miss.slot("fish")]]).toEqual([miss.slot("fish"), 1, 1]);
   });
 
+  it("when a pair's first word ends, the other one is told by its first letter alone (tier 1)", () => {
+    const { w, slot } = withWords("fish", "frog");
+    const frog = slot("frog");
+    type(w, "fish");
+    expect(w.words.tier[frog]).toBe(1);
+    expect(results(type(w, "f"))).toEqual([KEY.lock]);
+    expect(w.typing.router.lock).toBe(frog);
+  });
+
+  it("errors stop at 255: a flood of wrong keys in one tick never wraps a word back to clean", () => {
+    const { w } = withWords("cat");
+    const hit = type(w, "c" + "x".repeat(300) + "at", 1, true).find((event) => event.t === "wordHit");
+    expect(hit).toMatchObject({ grade: "sloppy", errors: 255 });
+  });
+
   it("Backspace takes a letter back (errors stay) and at 0 lets go; it never touches buildings", () => {
     const { w, slot } = withWords("bird");
     type(w, "bix");

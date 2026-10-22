@@ -6,6 +6,7 @@ import { evenness } from "../src/td/sim/systems/heat";
 import { spawnWord } from "../src/td/sim/systems/words";
 import type { World } from "../src/td/sim/world";
 import { compileDeck, wordText } from "../src/td/typing/decks";
+import { tempoIndex } from "../src/td/typing/tempo";
 import { build, ready, run, send, world } from "./td/fixtures";
 import { smallDeck, type } from "./td/typing";
 
@@ -99,6 +100,20 @@ describe("heat (TK 6.7)", () => {
     w.waveEnded[1] = 0;
     run(w, 600);
     expect(w.buildings.heat[archer]).toBeLessThan(2000);
+  });
+
+  it("a building put down under stop all waits at Dừng with its tempo put aside: the freeze holds", () => {
+    const { w, archer } = field();
+    w.phase = "prep";
+    send(w, { t: "assignUnit", agent: 0, building: w.buildings.id(archer) });
+    w.buildings.heat[archer] = 2000;
+    send(w, { t: "setAllTempo", stop: true });
+    const tower = build(w, "archer", 10, -6);
+    expect([w.typing.allStopped, w.buildings.tempo[tower]]).toEqual([true, 0]);
+    run(w, 12 * 60);
+    expect(w.buildings.heat[archer]).toBe(2000);
+    send(w, { t: "setAllTempo", stop: false });
+    expect(w.buildings.tempo[tower]).toBe(tempoIndex(4)); // E = 35: the default 4 s, given back with the rest
   });
 });
 

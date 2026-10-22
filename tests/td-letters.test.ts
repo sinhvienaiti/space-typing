@@ -4,7 +4,7 @@ import { CAP, LETTERS } from "../src/td/content/rules";
 import type { CommandBody } from "../src/td/sim/commands";
 import { STAT } from "../src/td/sim/stats";
 import { step, type World } from "../src/td/sim/world";
-import { bandWords, compileDeck, wordText } from "../src/td/typing/decks";
+import { bandWords, compileDeck, wordText, type Deck } from "../src/td/typing/decks";
 import { withinOneEdit } from "../src/td/typing/distance";
 import { KIND, Letters, type LiveWords } from "../src/td/typing/letters";
 import { createBag, pickWord } from "../src/td/typing/picker";
@@ -14,7 +14,7 @@ import { assisted, letter, realDeck, smallDeck, SPOTS } from "./td/typing";
 
 /** First letters (docs/td/TYPING_DEFENSE_DESIGN.md 6.5, 25.8; BUILD_NOW §6.1 td-letters). */
 
-/** A typist at ~60 WPM: finishes the most urgent word, one key every 12 ticks, a wrong key now and then. */
+/** A typist at ~60 WPM: finishes the most urgent stream word, one key every 12 ticks, a wrong key now and then. */
 function typist(w: World, rng: ReturnType<typeof createRng>["ai"]): CommandBody[] {
   if (w.tick % 12 !== 0) return [];
   const { router } = w.typing;
@@ -26,38 +26,62 @@ function typist(w: World, rng: ReturnType<typeof createRng>["ai"]): CommandBody[
     return [{ t: "key", letter: w.typing.deck.letters[w.typing.deck.start[word]! + W.typed[router.lock]!]!, atMs }];
   }
   let urgent = -1;
-  for (const s of W.live()) if (urgent < 0 || W.expire[s]! < W.expire[urgent]!) urgent = s;
+  for (const s of W.live()) if (W.kind[s] === KIND.stream && (urgent < 0 || W.expire[s]! < W.expire[urgent]!)) urgent = s;
   if (urgent < 0) return [];
   const start = w.typing.deck.start[W.word[urgent]!]!;
   return [{ t: "key", letter: w.typing.deck.letters[start + (router.group >= 0 ? 1 : 0)]!, atMs }];
 }
 
-type Run = { spawned: number; jams: number; tier2: number; tier2MaxFree: number; done: number; maxLive: number; minFree: number; reserveTaken: number; problems: string[] };
+type Run = {
+  spawned: number; jams: number; tier2: number; tier2MaxFree: number; done: number; maxLive: number; minFree: number;
+  /** Stream deals (or jams) asked for with ≤ 3 free letters; tier-1 stream words taken then (must be none); tier-2 ones dealt then. */
+  atReserve: number; reserveTaken: number; tier2AtFloor: number; problems: string[];
+};
 
 /**
- * A higher kind (direct words, 1B) dealt by the test through the same letters
- * every 1.5 s, at most 2 live, held by an unassisted barracks: it takes
- * letters the stream may not (the reserve) and pushes the stream to tier 2.
+ * A higher kind (direct words, 1B) dealt by the test through the same letters,
+ * held by an unassisted barracks and never typed: whenever a word may go live
+ * and more than the reserve is free, it takes a letter of its own (tier 1)
+ * with a word of levels 1–5, rare first letters included, up to 8 live for
+ * 6 s each. That is far above the real cap of 2 (TK Phụ lục A,
+ * CAP.liveDirect), on purpose: it keeps the stream asking at the reserve.
+ * Without it, early tier 2 and rarely used letters (u, y, i start 1–2 words
+ * of the 3–5 band up to level 3) keep 4 or more letters free.
  */
-function dealDirect(w: World, host: number, bag: ReturnType<typeof createBag>, vocab: number): void {
+function dealDirect(w: World, host: number, words: Int32Array, vocab: number): void {
   const W = w.words;
+  const { deck, letters } = w.typing;
   let direct = 0;
   for (const s of W.live()) if (W.kind[s] === KIND.direct) direct += 1;
-  if (w.tick % 90 !== 0 || direct >= 2 || W.count >= CAP.liveWords) return; // TK Phụ lục A: CAP.liveDirect = 2
-  const pick = pickWord(bag, w.typing.deck, w.typing.letters, W, KIND.direct, w.tick, vocab, -1, w.rng.ai);
-  if (pick < 0) return;
-  const s = W.add(pick >> 2, host, KIND.direct, pick & 3, -1, 3, w.tick, 240);
-  w.typing.letters.take(s, w.typing.deck.letters[w.typing.deck.start[pick >> 2]!]!, pick & 3);
-  w.buildings.liveWords[host] = w.buildings.liveWords[host]! + 1;
-  w.events.rare.push({ t: "wordSpawn", tick: w.tick, word: W.id(s), building: -1 });
+  const free = letters.free(w.tick, vocab);
+  if (direct >= 8 || W.count >= CAP.liveWords || free <= LETTERS.reserve) return;
+  const from = w.rng.ai.int(0, words.length - 1);
+  for (let k = 0; k < words.length; k += 1) {
+    const word = words[(from + k) % words.length]!;
+    if (letters.claim(deck, W, word, KIND.direct, w.tick, vocab, -1, free) !== 1) continue;
+    const s = W.add(word, host, KIND.direct, 1, -1, 3, w.tick, 360);
+    letters.take(s, deck.letters[deck.start[word]!]!, 1);
+    w.buildings.liveWords[host] = w.buildings.liveWords[host]! + 1;
+    w.events.rare.push({ t: "wordSpawn", tick: w.tick, word: W.id(s), building: -1 });
+    return;
+  }
+}
+
+/** The reserve broken on purpose: the stream asks for letters as if it were a higher kind. The property run must catch it. */
+class StreamAsHigherKind extends Letters {
+  override tierOf(deck: Deck, live: LiveWords, c: number, second: number, kind: number, tick: number, vocab: number, free: number): number {
+    return super.tierOf(deck, live, c, second, kind === KIND.stream ? KIND.rare : kind, tick, vocab, free);
+  }
 }
 
 /** BUILD_NOW §6.1: 4 slots at 1 s for 10,000 ticks on the real vocabulary, every invariant checked every tick. */
-function propertyRun(vocab: number, ticks = 10000): Run {
+function propertyRun(vocab: number, ticks = 10000, letters?: Letters): Run {
   const { w, slots } = assisted({ deck: realDeck(), vocab, expected: 35 }, [SPOTS.keep, SPOTS.archer, SPOTS.cannon, SPOTS.mine]);
+  expect(w.words.count).toBe(0); // no letter is held yet, so another Letters can take over
+  if (letters !== undefined) w.typing.letters = letters;
   for (const b of slots) send(w, { t: "setTempo", building: w.buildings.id(b), idx: tempoIndex(1) });
   const host = build(w, SPOTS.barracks[0], SPOTS.barracks[1], SPOTS.barracks[2]);
-  const directBag = createBag(bandWords(w.typing.deck, vocab, 3, 6));
+  const directWords = bandWords(w.typing.deck, 5, 3, 8);
   const rng = createRng(vocab).ai;
   const L = w.typing.letters;
   const W = w.words;
@@ -66,11 +90,12 @@ function propertyRun(vocab: number, ticks = 10000): Run {
   const texts = new Map<number, string>();
   const released = new Int32Array(26).fill(-1e6);
   const lastAt = new Map<number, number>();
-  const out: Run = { spawned: 0, jams: 0, tier2: 0, tier2MaxFree: 0, done: 0, maxLive: 0, minFree: 26, reserveTaken: 0, problems };
+  const out: Run = { spawned: 0, jams: 0, tier2: 0, tier2MaxFree: 0, done: 0, maxLive: 0, minFree: 26, atReserve: 0, reserveTaken: 0, tier2AtFloor: 0, problems };
   for (let tick = 0; tick < ticks; tick += 1) {
     const from = w.events.rare.length;
-    dealDirect(w, host, directBag, vocab);
+    // Free letters at the start of the tick; every tier-1 deal in it (the higher kind's first) takes one.
     const freeBefore = L.free(w.tick, vocab);
+    dealDirect(w, host, directWords, vocab);
     let taken = 0;
     step(w, typist(w, rng).map((body) => ({ ...body, tick: w.tick }) as never));
     for (const event of w.events.rare.slice(from)) {
@@ -79,7 +104,11 @@ function propertyRun(vocab: number, ticks = 10000): Run {
         // Free letters when this word was dealt: the tick's count less the tier-1 deals before it.
         const free = freeBefore - taken;
         if (W.tier[s] === 1) taken += 1;
-        if (event.building >= 0 && W.tier[s] === 1 && free <= LETTERS.reserve) out.reserveTaken += 1;
+        if (event.building >= 0 && free <= LETTERS.reserve) {
+          out.atReserve += 1;
+          if (W.tier[s] === 1) out.reserveTaken += 1;
+          else out.tier2AtFloor += 1;
+        }
         const text = wordText(w.typing.deck, W.word[s]!);
         texts.set(event.word, text);
         const c = letter(text[0]!);
@@ -95,7 +124,10 @@ function propertyRun(vocab: number, ticks = 10000): Run {
       } else if (event.t === "wordHit" || event.t === "wordMiss" || event.t === "wordCancel") {
         released[letter(texts.get(event.word)![0]!)] = event.tick;
         if (event.t === "wordHit") out.done += 1;
-      } else if (event.t === "streamDeferred" && event.reason === "jam") out.jams += 1;
+      } else if (event.t === "streamDeferred" && event.reason === "jam") {
+        out.jams += 1;
+        if (freeBefore - taken <= LETTERS.reserve) out.atReserve += 1;
+      }
     }
     // Every tick: unambiguous first letters, no repeat, no pair one edit apart, every cap.
     const words = W.live();
@@ -137,15 +169,27 @@ describe("first letters on the real vocabulary (property, 10,000 ticks, 4 slots 
     it("vocabulary 1–" + vocab + ": unambiguous, no repeat, no OSA ≤ 1 pair, caps kept, letters rest 1 s, the reserve kept", () => {
       const run = propertyRun(vocab);
       const jam = run.jams / (run.jams + run.spawned);
-      console.log("td letters, vocabulary 1–" + vocab + ": " + run.spawned + " stream words, " + run.done + " typed, " + run.tier2 + " tier 2, letter jams " + (jam * 100).toFixed(1) + " %, most live " + run.maxLive + ", fewest free letters " + run.minFree);
+      console.log(
+        "td letters, vocabulary 1–" + vocab + ": " + run.spawned + " stream words, " + run.done + " typed, " + run.tier2 + " tier 2 (" + run.tier2AtFloor + " at the reserve), letter jams " + (jam * 100).toFixed(1) +
+          " %, most live " + run.maxLive + ", fewest free letters " + run.minFree + ", " + run.atReserve + " deals asked at ≤ " + LETTERS.reserve + " free",
+      );
       expect(run.problems).toEqual([]);
+      // The run reached the reserve (else "none taken" proves nothing), took none of it, and paired up there instead.
+      expect(run.minFree).toBeLessThanOrEqual(LETTERS.reserve);
+      expect(run.atReserve).toBeGreaterThanOrEqual(20);
       expect(run.reserveTaken).toBe(0);
-      expect(run.spawned).toBeGreaterThan(400);
+      expect(run.tier2AtFloor).toBeGreaterThanOrEqual(20);
+      expect(run.spawned).toBeGreaterThan(300);
       expect(run.done).toBeGreaterThan(100);
       // Tier 2 starts early (≤ 5 free letters) only up to level 3; from level 4 only at the stream's own floor.
-      if (run.tier2 > 0) expect(run.tier2MaxFree).toBeLessThanOrEqual(vocab <= LETTERS.tier2EarlyMaxLevel ? LETTERS.tier2EarlyFree : LETTERS.reserve);
+      expect(run.tier2MaxFree).toBeLessThanOrEqual(vocab <= LETTERS.tier2EarlyMaxLevel ? LETTERS.tier2EarlyFree : LETTERS.reserve);
     });
   }
+
+  it("catches a broken reserve: a stream that asks like a higher kind takes reserved letters", () => {
+    const run = propertyRun(5, 4000, new StreamAsHigherKind());
+    expect(run.reserveTaken).toBeGreaterThan(0);
+  });
 });
 
 /** A live-words view over plain arrays, for the letters on their own. */
@@ -253,5 +297,21 @@ describe("letters (TK 6.5)", () => {
     expect(seen.size).toBe(deck4.count);
     holdAll(letters, live, "qxzj");
     expect(pickWord(bag, deck4, letters, live, KIND.stream, 1e6, 1, -1, rng)).toBe(-1);
+  });
+
+  it("a round's rest that fits nowhere now opens the next round: it comes before any other word repeats (TK 25.8)", () => {
+    const deck4 = compileDeck("apple bread cider dream eagle fable grape house ivory lemon".split(" ").map((text, index) => ({ id: "x" + index, text, level: 1 })));
+    const bag = createBag(Int32Array.from(deck4.ids.keys()));
+    const letters = new Letters();
+    const rng = createRng(7).words;
+    const live: LiveWords = { top: 0, used: new Uint8Array(0), word: new Int32Array(0), touched: new Uint8Array(0) };
+    const pick = () => pickWord(bag, deck4, letters, live, KIND.stream, 1e6, 1, -1, rng) >> 2;
+    const dealt = Array.from({ length: 7 }, pick);
+    const rest = [...deck4.ids.keys()].filter((word) => !dealt.includes(word));
+    const hold = (on: boolean) => rest.forEach((word) => (letters.owner[deck4.letters[deck4.start[word]!]!] = letters.partner[deck4.letters[deck4.start[word]!]!] = on ? 99 : -1));
+    hold(true); // the rest's letters are all taken: this deal can only repeat a word
+    expect(dealt).toContain(pick());
+    hold(false);
+    expect(Array.from({ length: rest.length }, pick).sort()).toEqual(rest);
   });
 });

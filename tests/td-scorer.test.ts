@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { STAT } from "../src/td/sim/stats";
 import { lifeSeconds, lifeTicks, rawWpm, scoreWord, typeSeconds } from "../src/td/typing/scorer";
-import { build, ready, send, world } from "./td/fixtures";
-import { smallDeck } from "./td/typing";
-import { spawnWord } from "../src/td/sim/systems/words";
+import { tempoIndex } from "../src/td/typing/tempo";
+import { build, ready, run, send, world } from "./td/fixtures";
+import { smallDeck, type } from "./td/typing";
+import { expectedE, spawnWord } from "../src/td/sim/systems/words";
 
 /** Scoring a word (docs/td/TYPING_DEFENSE_DESIGN.md 6.4, 6.6; BUILD_NOW §6.1 td-scorer). */
 const E = 35;
@@ -16,6 +17,41 @@ describe("word life", () => {
     expect(lifeSeconds(8, 12, 1, "easy")).toBe(7.5);
     expect(lifeSeconds(3, 140, 1, "hard")).toBeCloseTo(2.7, 10);
     expect(lifeTicks(5, 35, 1, "normal")).toBe(195);
+  });
+});
+
+describe("E = max(B, the difficulty's floor): easy 12, normal 20, hard 35 (TK 6.6)", () => {
+  const deck = smallDeck(["apple", "bread", "cider", "garden"]);
+  const field = (difficulty: "easy" | "normal" | "hard", expected: number) => {
+    const w = world({ deck, difficulty, expected });
+    const archer = build(w, "archer", -16, -4);
+    ready(w);
+    spawnWord(w, archer, 0, 1);
+    return { w, archer, life: w.words.life[w.words.live()[0]!]! };
+  };
+
+  it("lifts B under the floor: word life, the default tempo and scoring all read E", () => {
+    expect(expectedE(field("easy", 12).w)).toBe(12);
+    const normal = field("normal", 12);
+    expect(expectedE(normal.w)).toBe(20);
+    expect(normal.life).toBe(Math.round(4.8 * 60)); // a 5-letter word at E = 20, not 6.0 s at 12
+    expect(normal.w.buildings.tempo[normal.archer]).toBe(tempoIndex(6));
+    const hard = field("hard", 20);
+    expect(expectedE(hard.w)).toBe(35);
+    expect(hard.life).toBe(lifeTicks(5, 35, 1, "hard")); // 2.93 s, not 4.32 s at 20
+    expect(hard.w.buildings.tempo[hard.archer]).toBe(tempoIndex(4));
+    run(hard.w, 100);
+    const hit = type(hard.w, "apple", 50, true).find((event) => event.t === "wordHit");
+    expect(hit).toMatchObject({ quality: scoreWord(5, 0, hard.life, 100, 35, 1).quality });
+  });
+
+  it("a sandbox difficulty change moves the floor, and the length band with it", () => {
+    const w = world({ deck, expected: 20 });
+    expect(w.typing.meanLen).toBe(5); // E = 20: 3–5 letters
+    send(w, { t: "sandbox", op: { op: "difficulty", value: "hard" } });
+    expect(w.typing.meanLen).toBe(5.25); // E = 35: 3–6, "garden" joins
+    send(w, { t: "sandbox", op: { op: "difficulty", value: "easy" } });
+    expect(w.typing.meanLen).toBe(5);
   });
 });
 

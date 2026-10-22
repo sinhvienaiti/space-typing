@@ -24,15 +24,8 @@ export type ViewBlock = { name: string; short: string; color: string };
 
 export type AttackLevel = { damage: Range; periodS: number; rangeM: number; splashM?: number; targets?: number };
 
-export type AttackSpec = {
-  damageType: DamageType;
-  critPct: number;
-  /** Damage left at the rim of a blast (TK 11.3: 50 %). */
-  edgePct?: number;
-  hits: readonly Altitude[];
-  projectileSpeed: number;
-  levels: readonly AttackLevel[];
-};
+/** `edgePct`: damage left at the rim of a blast (TK 11.3: 50 %). */
+export type AttackSpec = { damageType: DamageType; critPct: number; edgePct?: number; hits: readonly Altitude[]; projectileSpeed: number; levels: readonly AttackLevel[] };
 
 export type WordReward =
   | { kind: "shot"; dBar: PerLevel; pierce: number; splashMul?: number }
@@ -87,17 +80,8 @@ export type EnemyDef = {
   view: ViewBlock;
 };
 
-export type HeroDef = {
-  id: string;
-  flySpeed: number;
-  takeoffS: number;
-  landS: number;
-  attack: AttackSpec;
-  /** Building ids where the hero's passive applies: its Word Shots set enemies burning. */
-  affinity: readonly string[];
-  burn: { dps: number; durationS: number };
-  view: ViewBlock;
-};
+/** `affinity`: building ids where the hero's passive applies (its Word Shots set enemies burning). */
+export type HeroDef = { id: string; flySpeed: number; takeoffS: number; landS: number; attack: AttackSpec; affinity: readonly string[]; burn: { dps: number; durationS: number }; view: ViewBlock };
 
 export type HelperDef = { id: string; specialty: Specialty; speed: number; presence: number; specialtyPct: number; settleS: number; view: ViewBlock };
 
@@ -105,19 +89,10 @@ export type Rect = { x0: number; x1: number; z0: number; z1: number };
 export type OreNode = { x: number; z: number; richness: 1 | 2 | 3 };
 
 export type MapDef = {
-  id: string;
-  halfM: number;
-  buildHalfM: number;
-  gate: Point;
-  keep: Point;
-  roadHalfM: number;
+  id: string; halfM: number; buildHalfM: number; gate: Point; keep: Point; roadHalfM: number;
   /** Ground routes from the gate to the Bastion; packs take turns. */
   routes: readonly (readonly Point[])[];
-  flyRoute: readonly Point[];
-  flyHeightM: number;
-  water: readonly Rect[];
-  bridges: readonly Rect[];
-  nodes: readonly OreNode[];
+  flyRoute: readonly Point[]; flyHeightM: number; water: readonly Rect[]; bridges: readonly Rect[]; nodes: readonly OreNode[];
 };
 
 export type WaveEntry = { enemy: string; count: number };

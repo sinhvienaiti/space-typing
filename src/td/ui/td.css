@@ -1,95 +1,36 @@
 /*
  * Typing Defense 1A: a top-down 2D test field. Paper and ink on a bright
  * map (docs/td/TYPING_DEFENSE_DESIGN.md 23.3–23.5); word cards sit above
- * every drawing, the HUD above the cards.
+ * every drawing, the HUD above the cards. One rule a line.
  */
 @import "@fontsource/be-vietnam-pro/500.css";
 @import "@fontsource/be-vietnam-pro/700.css";
 @import "@fontsource/be-vietnam-pro/800.css";
 
-:root {
-  --td-grass: #7dba5a;
-  --td-paper: #fff4d6;
-  --td-ink: #2b2118;
-  --td-jade: #0b8a78;
-  --td-font: "Be Vietnam Pro", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
-  color-scheme: light;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-html,
-body {
-  margin: 0;
-  height: 100%;
-  overflow: hidden;
-  background: var(--td-grass);
-  color: var(--td-ink);
-  font: 500 14px/1.4 var(--td-font);
-}
-
-#tdCanvas {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.td-words,
-.td-hud {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-}
-
-.td-hud > * {
-  pointer-events: auto;
-}
-
-.td-chip {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  padding: 6px 12px;
-  border: 2px solid var(--td-ink);
-  border-radius: 8px;
-  background: var(--td-paper);
-  box-shadow: 3px 3px 0 var(--td-ink);
-  font-weight: 700;
-}
-
-.td-chip small {
-  margin-left: 8px;
-  color: var(--td-jade);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.td-status {
-  margin-top: 2px;
-  font-size: 13px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
+:root { --td-grass: #7dba5a; --td-paper: #fff4d6; --td-ink: #2b2118; --td-jade: #0b8a78; --td-font: "Be Vietnam Pro", ui-sans-serif, system-ui, "Segoe UI", sans-serif; color-scheme: light; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--td-grass); color: var(--td-ink); font: 500 14px/1.4 var(--td-font); }
+#tdCanvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.td-words, .td-hud { position: fixed; inset: 0; pointer-events: none; }
+.td-hud > * { pointer-events: auto; }
+.td-chip { position: absolute; top: 12px; left: 12px; padding: 6px 12px; border: 2px solid var(--td-ink); border-radius: 8px; background: var(--td-paper); box-shadow: 3px 3px 0 var(--td-ink); font-weight: 700; }
+.td-chip small { margin-left: 8px; color: var(--td-jade); font-size: 12px; font-weight: 800; }
+.td-status { margin-top: 2px; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .td-mute { margin-top: 4px; padding: 1px 8px; border: 1.5px solid var(--td-ink); border-radius: 6px; background: #fff; color: var(--td-ink); font: 700 11px/1.4 var(--td-font); cursor: pointer; }
 
 /*
  * Word cards (TK 23.4): paper lanterns in ink, one rule a line. Only
- * transform and opacity move per frame; a card stays under 40 px tall (the
- * column gap) at every --ui.
+ * transform and opacity move per frame; a card is ~32 px tall (35 at --ui 1.2)
+ * and the one being typed draws over its column.
  */
 .td-card, .td-stamp { position: absolute; top: 0; left: 0; will-change: transform, opacity; white-space: nowrap; }
-.td-card { padding: 3px 9px 4px; border: 2px solid var(--td-ink); border-radius: 7px; background: var(--td-paper); box-shadow: 2px 2px 0 var(--td-ink); font: 700 clamp(18px, calc(22px * var(--ui, 1)), 24px) / 1.2 var(--td-font); transform-origin: 50% 100%; }
+.td-card { padding: 2px 9px 4px; border: 2px solid var(--td-ink); border-radius: 7px; background: var(--td-paper); box-shadow: 2px 2px 0 var(--td-ink); font: 700 clamp(18px, calc(22px * var(--ui, 1)), 24px) / 1.05 var(--td-font); transform-origin: 50% 100%; }
 .td-card .l { font-weight: 800; text-decoration: underline 2px var(--fam); text-underline-offset: 3px; }
 .td-card .t { color: var(--td-jade); }
 .td-card .p { background: #ffd3d3; }
 .td-card-dot { position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; border: 1.5px solid var(--td-ink); border-radius: 50%; background: var(--agent); }
 .td-card-bar { position: absolute; left: 6px; right: 6px; bottom: 1px; height: 3px; border-radius: 2px; background: rgba(43, 33, 24, 0.35); transform-origin: 0 50%; }
-.td-card.is-locked { border-color: var(--td-jade); box-shadow: 2px 2px 0 var(--td-jade); }
+.td-card.is-locked { z-index: 1; border-color: var(--td-jade); box-shadow: 2px 2px 0 var(--td-jade); }
 .td-card.is-late { border-color: #ffb020; }
 .td-card.is-late .td-card-bar { background: #ffb020; }
 .td-card.is-ash { background: #d8d2c4; color: #8a8172; }

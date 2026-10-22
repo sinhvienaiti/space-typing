@@ -35,7 +35,7 @@ import { heatStep } from "./systems/heat";
 import { projectilesStep } from "./systems/projectile";
 import { fireWordShots } from "./systems/rewards";
 import { spawnEnemies } from "./systems/spawn";
-import { configureDeck, setTempo, startTempo, streamStep } from "./systems/stream";
+import { configureDeck, streamStep } from "./systems/stream";
 import { wavesStep } from "./systems/waves";
 
 export type Phase = "prep" | "battle" | "defeat";
@@ -74,7 +74,7 @@ export type World = {
   gold: number;
   lives: number;
   difficulty: Difficulty;
-  /** Expected speed E in WPM (TK 6.6), set by the sandbox in 1A. */
+  /** The typist's base speed B in WPM, set by the sandbox in 1A; E lifts it to the difficulty's floor (expectedE, TK 6.6). */
   expected: number;
   /** Vocabulary levels 1..vocab feed the decks. */
   vocab: number;
@@ -145,7 +145,6 @@ export function createWorld(options: WorldOptions): World {
   };
   configureDeck(w);
   placeBuilding(w, 0, map.keep[0], map.keep[1], -1, 0);
-  setTempo(w, 0, startTempo(w, 0), false);
   return w;
 }
 

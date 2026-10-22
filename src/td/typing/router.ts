@@ -23,6 +23,11 @@ function lockOn(router: Router, live: TypedWords, slot: number, typed: number): 
   live.touched[slot] = 1;
 }
 
+/** One more error on `slot`, held at 255: a macro's flood in one tick must not wrap back to a clean word. */
+const miss = (live: TypedWords, slot: number): void => {
+  live.errors[slot] = Math.min(255, live.errors[slot]! + 1);
+};
+
 /** Routes letter `c` (0–25); returns a KEY code. The word it acted on is then `router.lock` (or the one just done). */
 export function routeKey(router: Router, deck: Deck, letters: Letters, live: TypedWords, c: number): number {
   const lock = router.lock;
@@ -41,7 +46,7 @@ export function routeKey(router: Router, deck: Deck, letters: Letters, live: Typ
       lockOn(router, live, other, 1);
       return KEY.switch;
     }
-    live.errors[lock] = live.errors[lock]! + 1;
+    miss(live, lock);
     return KEY.wrong;
   }
   if (router.group >= 0) {
@@ -57,7 +62,7 @@ export function routeKey(router: Router, deck: Deck, letters: Letters, live: Typ
     if (owner < 0) return KEY.stray;
     // No second letter matched: an error on the older word, which keeps its first letter.
     lockOn(router, live, owner, 1);
-    live.errors[owner] = live.errors[owner]! + 1;
+    miss(live, owner);
     return KEY.wrong;
   }
   const owner = letters.owner[c]!;

@@ -13,10 +13,10 @@ import { ASSIST, CAP, EMIT, LIFE, ORDER_GRACE, TEMPO } from "../../content/rules
 import { availableLetters, bandWords, streamCap } from "../../typing/decks";
 import { KIND } from "../../typing/letters";
 import { createBag, pickWord, type Bag } from "../../typing/picker";
-import { defaultTempo, densestPeriod, lengthBand, STOP } from "../../typing/tempo";
+import { defaultTempo, densestPeriod, lengthBand, stepTempo, STOP, tempoOpen } from "../../typing/tempo";
 import { STAT, bump } from "../stats";
 import type { World } from "../world";
-import { expireWord, spawnWord } from "./words";
+import { expectedE, expireWord, spawnWord } from "./words";
 
 const STAGGER = ticks(EMIT.staggerS);
 const STAGGER_MAX = ticks(EMIT.staggerMaxS);
@@ -25,7 +25,7 @@ const period = (tempo: number): number => ticks(TEMPO[tempo]!.periodS);
 /** Band, stream cap and fresh bags for the current E and vocabulary: at the start, and when the sandbox changes them. */
 export function configureDeck(w: World): void {
   const T = w.typing;
-  const [lo, hi] = lengthBand(w.expected, STOP);
+  const [lo, hi] = lengthBand(expectedE(w), STOP);
   const words = bandWords(T.deck, w.vocab, lo, hi);
   T.a = availableLetters(T.deck, words);
   T.cap = streamCap(T.a);
@@ -35,7 +35,7 @@ export function configureDeck(w: World): void {
 
 /** The bag of the band cut at `hi` letters (a dense tempo's top), made on first use. */
 function bagFor(w: World, hi: number): Bag {
-  return (w.typing.bags[hi] ??= createBag(bandWords(w.typing.deck, w.vocab, lengthBand(w.expected, STOP)[0], hi)));
+  return (w.typing.bags[hi] ??= createBag(bandWords(w.typing.deck, w.vocab, lengthBand(expectedE(w), STOP)[0], hi)));
 }
 
 /** The first deal `delay` ticks from now, then one every period. */
@@ -53,21 +53,46 @@ export function densestFor(w: World, b: number): number {
   return Math.min(densestPeriod(1, false), ...unlocks);
 }
 
-/** A tempo takes effect from the next deal: the count restarts at the new period, no word at once. */
+/**
+ * A tempo takes effect from the next deal, no word at once. The player's own
+ * choice (`remember`) is kept for its kind and clears what "stop all" put aside; a running one ends "stop all".
+ */
 export function setTempo(w: World, b: number, tempo: number, remember = true): void {
   const B = w.buildings;
   B.tempo[b] = tempo;
   B.waiting[b] = B.resolved[b] = B.hits[b] = 0;
-  if (tempo !== STOP) {
-    restart(w, b, period(tempo));
+  if (remember) B.tempoPrev[b] = 0;
+  if (tempo !== STOP) restart(w, b, period(tempo));
+  if (remember && tempo !== STOP) {
+    w.typing.tempoByDef[B.def[b]!] = tempo;
     w.typing.allStopped = false;
-    if (remember) w.typing.tempoByDef[B.def[b]!] = tempo;
   }
   w.events.rare.push({ t: "tempoChanged", tick: w.tick, building: B.id(b), tempo });
 }
 
-/** A new building takes the tempo last chosen for its kind, else 6 s below 30 WPM and 4 s above. */
-export const startTempo = (w: World, def: number): number => (w.typing.tempoByDef[def]! > 0 ? w.typing.tempoByDef[def]! : defaultTempo(w.expected));
+/** `tempo` when building b may pick it, else the nearest open one: slower when it is too dense, denser when it closed (8 s off easy). */
+function nearestOpen(w: World, b: number, tempo: number): number {
+  const densest = densestFor(w, b);
+  if (tempoOpen(tempo, densest, w.difficulty)) return tempo;
+  return stepTempo(tempo, TEMPO[tempo]!.periodS < densest ? -1 : 1, densest, w.difficulty);
+}
+
+/** After a difficulty or level change, a tempo that closed (or one "stop all" put aside) moves to the nearest open one. */
+export function recheckTempos(w: World): void {
+  const B = w.buildings;
+  for (const b of B.live()) {
+    if (B.tempoPrev[b]! > 0) B.tempoPrev[b] = nearestOpen(w, b, B.tempoPrev[b]!);
+    if (!tempoOpen(B.tempo[b]!, densestFor(w, b), w.difficulty)) setTempo(w, b, nearestOpen(w, b, B.tempo[b]!), false);
+  }
+}
+
+/** A new building's tempo: its kind's last, else 6 s below 30 WPM and 4 s above; under "stop all" put aside, at Dừng. */
+export function startTempo(w: World, b: number): void {
+  const chosen = w.typing.tempoByDef[w.buildings.def[b]!]!;
+  const tempo = nearestOpen(w, b, chosen > 0 ? chosen : defaultTempo(expectedE(w)));
+  setTempo(w, b, w.typing.allStopped ? STOP : tempo, false);
+  if (w.typing.allStopped) w.buildings.tempoPrev[b] = tempo;
+}
 
 /** "Stop all" (Shift+Minus) and back (Shift+Equal): every building to Dừng, or to the tempo it had. */
 export function stopAll(w: World, stop: boolean): void {
@@ -145,6 +170,7 @@ export function streamStep(w: World): void {
       if (w.tick >= B.anchor[b]! + (B.anchorK[b]! + 1) * every) {
         B.anchorK[b] = B.anchorK[b]! + 1;
         B.nextEmit[b] = B.anchor[b]! + B.anchorK[b]! * every;
+        B.shift[b] = 0; // the next deal has not been put back yet
         bump(w.stats, STAT.fullDrops);
         w.events.rare.push({ t: "streamDeferred", tick: w.tick, building: B.id(b), reason: "full" });
       }
@@ -156,7 +182,7 @@ export function streamStep(w: World): void {
       B.nextEmit[b] = w.tick + STAGGER;
       continue;
     }
-    const pick = pickWord(bagFor(w, lengthBand(w.expected, B.tempo[b]!)[1]), T.deck, T.letters, W, KIND.stream, w.tick, w.vocab, B.lastLetter[b]!, w.rng.words);
+    const pick = pickWord(bagFor(w, lengthBand(expectedE(w), B.tempo[b]!)[1]), T.deck, T.letters, W, KIND.stream, w.tick, w.vocab, B.lastLetter[b]!, w.rng.words);
     if (pick >= 0) {
       spawnWord(w, b, pick >> 2, pick & 3);
       T.lastSpawn = w.tick;

@@ -5,7 +5,7 @@
  * last five, the reward. An expired word costs its building 1 heat and the
  * chain 2, or half when it was touched; a cancelled one costs nothing.
  */
-import { HEAT, WORD_D } from "../../content/rules";
+import { EXPECTED, HEAT, WORD_D } from "../../content/rules";
 import { KIND } from "../../typing/letters";
 import { KEY, routeKey } from "../../typing/router";
 import { lifeTicks, rawWpm, scoreWord } from "../../typing/scorer";
@@ -17,10 +17,13 @@ import { payWord } from "./rewards";
 
 const firstLetter = (w: World, s: number): number => w.typing.deck.letters[w.typing.deck.start[w.words.word[s]!]!]!;
 
+/** E = max(B, the difficulty's floor) (TK 6.6): what life, scoring, length and the default tempo read. */
+export const expectedE = (w: World): number => Math.max(w.expected, EXPECTED.floor[w.difficulty]);
+
 export function spawnWord(w: World, b: number, word: number, tier: number): void {
   const T = w.typing;
   const B = w.buildings;
-  const life = lifeTicks(T.deck.len[word]!, w.expected, WORD_D.known, w.difficulty);
+  const life = lifeTicks(T.deck.len[word]!, expectedE(w), WORD_D.known, w.difficulty);
   const s = w.words.add(word, b, KIND.stream, tier, B.assist[b]!, B.tempo[b]!, w.tick, life);
   if (s < 0) return;
   T.letters.take(s, firstLetter(w, s), tier);
@@ -31,10 +34,12 @@ export function spawnWord(w: World, b: number, word: number, tier: number): void
   w.events.rare.push({ t: "wordSpawn", tick: w.tick, word: w.words.id(s), building: B.id(b) });
 }
 
-/** Frees word `s`: its letter, the lock, its building's count. */
+/** Frees word `s`: its letter (a tier-2 partner it leaves is told by one key now), the lock, its building's count. */
 function endWord(w: World, s: number): void {
   const T = w.typing;
-  T.letters.release(s, firstLetter(w, s), w.tick);
+  const c = firstLetter(w, s);
+  T.letters.release(s, c, w.tick);
+  if (T.letters.owner[c]! >= 0) w.words.tier[T.letters.owner[c]!] = 1;
   if (T.router.lock === s) T.router.lock = -1;
   const b = w.words.building[s]!;
   w.buildings.liveWords[b] = w.buildings.liveWords[b]! - 1;
@@ -70,7 +75,7 @@ function finishWord(w: World, s: number): void {
   const B = w.buildings;
   const b = W.building[s]!;
   const len = w.typing.deck.len[W.word[s]!]!;
-  const score = scoreWord(len, W.errors[s]!, W.life[s]!, w.tick - W.born[s]!, w.expected, WORD_D.known);
+  const score = scoreWord(len, W.errors[s]!, W.life[s]!, w.tick - W.born[s]!, expectedE(w), WORD_D.known);
   addHeat(w, b, GRADE_HEAT[score.grade]);
   chainStep(w, score.grade);
   pushRecent(w, b, score.speed, score.accuracy);

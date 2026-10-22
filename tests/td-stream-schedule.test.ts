@@ -59,8 +59,8 @@ describe("stream schedule", () => {
   });
 
   it("waits while full and gives the deal up at the next mark, with no miss for it", () => {
-    // E = 12 makes every word live 6 s: four words fill the building at 1 s.
-    const { w, slots } = assisted({ deck, expected: 12, vocab: 3 }, [SPOTS.archer]);
+    // E = 12 on easy (its floor) makes every word live at least 6.5 s: four words fill the building at 1 s.
+    const { w, slots } = assisted({ deck, expected: 12, difficulty: "easy", vocab: 3 }, [SPOTS.archer]);
     send(w, { t: "setTempo", building: w.buildings.id(slots[0]!), idx: tempoIndex(1) });
     let waited = false;
     steps(w, T(12), () => (waited ||= w.buildings.waiting[slots[0]!] === 1));
@@ -68,6 +68,24 @@ describe("stream schedule", () => {
     expect(w.stats[STAT.fullDrops]).toBeGreaterThan(0);
     expect(w.buildings.liveWords[slots[0]!]).toBeLessThanOrEqual(4);
     expect(w.stats[STAT.streamMissed]).toBe(w.stats[STAT.streamSpawned]! - w.words.count);
+  });
+
+  it("a deal given up while full starts its next mark unshifted, so the 0.2 s spacing can still put it back", () => {
+    const { w, slots } = assisted({ deck, vocab: 3 }, [SPOTS.archer]);
+    const archer = slots[0]!;
+    const B = w.buildings;
+    steps(w, T(2));
+    const cap = w.typing.cap;
+    w.typing.cap = 0; // full from now on
+    B.shift[archer] = T(EMIT.staggerMaxS); // left over from a deal put back the full 0.6 s before it filled up
+    for (let tick = 0; tick < T(10) && w.stats[STAT.fullDrops] === 0; tick += 1) step(w);
+    expect(w.stats[STAT.fullDrops]).toBe(1);
+    expect(B.shift[archer]).toBe(0);
+    // Room again, and another building dealt a tick ago: this deal is put back 0.2 s, not forced through.
+    w.typing.cap = cap;
+    w.typing.lastSpawn = w.tick - 1;
+    expect(send(w).some((event) => event.t === "wordSpawn")).toBe(false);
+    expect(B.shift[archer]).toBe(T(EMIT.staggerS));
   });
 
   it("a tempo change restarts the count at the new period: no word at once", () => {
@@ -95,6 +113,30 @@ describe("stream schedule", () => {
     const plain = assisted({ deck, sandbox: false }, [SPOTS.archer], 1);
     const refused = send(plain.w, { t: "setTempo", building: plain.w.buildings.id(plain.slots[0]!), idx: tempoIndex(2) }, { t: "setTempo", building: plain.w.buildings.id(plain.slots[0]!), idx: tempoIndex(8) });
     expect(refused.filter((event) => event.t === "rejected").length).toBe(2);
+  });
+
+  it("a tempo the player picks drops what stop all put aside; a tempo that closes moves to the nearest open one", () => {
+    const { w, slots } = assisted({ deck, vocab: 3, difficulty: "easy" }, [SPOTS.archer, SPOTS.cannon]);
+    const [archer, cannon] = slots.map((b) => w.buildings.id(b)) as [number, number];
+    const tempo = () => [w.buildings.tempo[slots[0]!], w.buildings.tempo[slots[1]!]];
+    send(w, { t: "setTempo", building: archer, idx: tempoIndex(3) });
+    send(w, { t: "setAllTempo", stop: true });
+    send(w, { t: "setTempo", building: archer, idx: tempoIndex(6) });
+    send(w, { t: "setTempo", building: archer, idx: 0 });
+    send(w, { t: "setAllTempo", stop: false });
+    expect(tempo()[0]).toBe(0); // the player's Dừng stands; the 3 s from before stop all is gone
+    // Easy → normal closes 8 s: a running 8 s and an 8 s put aside both go to 6 s, and stay there after "back".
+    send(w, { t: "setTempo", building: cannon, idx: tempoIndex(8) });
+    send(w, { t: "setAllTempo", stop: true });
+    send(w, { t: "setTempo", building: archer, idx: tempoIndex(8) });
+    send(w, { t: "sandbox", op: { op: "difficulty", value: "normal" } });
+    expect(tempo()).toEqual([tempoIndex(6), 0]);
+    send(w, { t: "setAllTempo", stop: false });
+    expect(tempo()).toEqual([tempoIndex(6), tempoIndex(6)]);
+    // The Bastion back at level 1 cannot keep 2 s: it goes to its densest, 3 s.
+    send(w, { t: "setTempo", building: w.buildings.id(0), idx: tempoIndex(2) });
+    send(w, { t: "sandbox", op: { op: "keepLevel", value: 1 } });
+    expect(w.buildings.tempo[0]).toBe(tempoIndex(3));
   });
 
   it("deals all through the wait between waves and the preparation, where heat stops at 2.5", () => {

@@ -2,10 +2,14 @@
 // with Draconis, and wave 1 typed for real at 40 WPM through CDP
 // Input.dispatchKeyEvent (trusted key events, read by the page's own input).
 // The typist reads the live words from __td.liveWords(), finishes the locked
-// word, else starts the most urgent one. Pictures: the stream mid-wave and a
-// word locked half typed. Checks: words finished, first letters of live words
-// never ambiguous, Word Shots fired, no console error or page exception, and
-// a Node replay of the run's log reaches the browser's hash (§7 gate 4).
+// word, else starts the most urgent one. At 4 s one word is up at a time, so
+// after the wave the tower goes to 1 s for 12 s: several words live at once,
+// and one soft switch on purpose (first letter of one word, then of another).
+// Pictures: the stream mid-wave, a word locked half typed, the 1 s column.
+// Checks: words finished, ≥ 2 words live at once with first letters never
+// ambiguous, the soft switch, Word Shots fired, no console error or page
+// exception, and a Node replay of the run's log reaches the browser's hash
+// (§7 gate 4). Tier 2 needs 3–4 busy buildings: td-1a-slots (1A.3) covers it.
 //   URL=http://127.0.0.1:3110/ OUT_DIR=… node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-stream.mjs --width=1280 --height=720
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
@@ -57,11 +61,14 @@ export default async function (page) {
   const problems = [];
   let lockShot = null;
   let streamShot = null;
+  let denseShot = null;
   let keys = 0;
   let maxLive = 0;
+  let switchTried = false;
   const started = Date.now();
   let ended = false;
-  while (!ended && Date.now() - started < 150000) {
+  let denseUntil = 0;
+  while ((!ended || Date.now() < denseUntil) && Date.now() - started < 180000) {
     const tickAt = Date.now();
     const words = (await page.eval(td("return t.liveWords();"))) ?? [];
     maxLive = Math.max(maxLive, words.length);
@@ -71,8 +78,20 @@ export default async function (page) {
     if (streamShot === null && words.length >= 1 && !words.some((word) => word.locked || word.typed > 0) && Date.now() - started > 9000) {
       streamShot = await page.shot(out("td-1a-stream-" + size + ".png"));
     }
+    if (denseUntil > 0 && denseShot === null && words.length >= 3) denseShot = await page.shot(out("td-1a-stream-dense-" + size + ".png"));
     const locked = words.find((word) => word.locked);
-    const target = locked ?? words.slice().sort((a, b) => a.left - b.left)[0];
+    // The soft switch: one letter into the most urgent word, then a key that starts another (and is not the first one's next letter).
+    const [first, ...others] = words.slice().sort((a, b) => a.left - b.left);
+    const other = others.find((word) => word.text[0] !== first?.text[0] && word.text[0] !== first?.text[1] && !others.some((pair) => pair !== word && pair.text[0] === word.text[0]));
+    if (denseUntil > 0 && !switchTried && !locked && other !== undefined && !others.some((word) => word.text[0] === first.text[0])) {
+      switchTried = true;
+      await press(page, first.text[0]);
+      await page.sleep(KEY_MS);
+      await press(page, other.text[0]);
+      keys += 2;
+      continue;
+    }
+    const target = locked ?? first;
     if (target !== undefined) {
       const pair = !locked && words.some((word) => word !== target && word.text[0] === target.text[0]);
       const next = locked ? target.text[target.typed] : target.text[0];
@@ -89,12 +108,18 @@ export default async function (page) {
       }
     }
     const state = await page.eval(td("return { ended: t.events().some((e) => e.t === 'waveEnd' && e.wave === 1), phase: t.state().phase };"));
-    ended = state?.ended === true || state?.phase === "defeat";
+    ended ||= state?.ended === true || state?.phase === "defeat"; // latched: the dense phase pushes the wave's end out of the recent events
+    if (ended && denseUntil === 0 && state?.phase !== "defeat") {
+      await page.eval(td(`const archer = t.state().buildings.find((b) => b.def === "archer"); t.send({ t: "setTempo", building: archer.id, idx: 6 }); return true;`));
+      denseUntil = Date.now() + 12000;
+    }
     await page.sleep(Math.max(0, KEY_MS - (Date.now() - tickAt)));
   }
   if (streamShot === null) streamShot = await page.shot(out("td-1a-stream-" + size + ".png"));
 
-  const final = await page.eval(td("return { flags: t.flags(), state: t.state(), stats: t.stats(), typing: t.typing(), hash: t.hash(), log: t.log(), hits: t.events().filter((e) => e.t === 'wordHit').map((e) => e.grade) };"));
+  const final = await page.eval(
+    td("return { flags: t.flags(), state: t.state(), stats: t.stats(), typing: t.typing(), hash: t.hash(), log: t.log(), hits: t.events().filter((e) => e.t === 'wordHit').map((e) => e.grade), switches: t.events().filter((e) => e.t === 'wordKey' && e.result === 5).length };"),
+  );
   const replayFile = out("td-1a-stream-replay-" + size + ".json");
   writeFileSync(replayFile, JSON.stringify({ ...final?.flags, tick: final?.state?.tick, hash: final?.hash, log: final?.log ?? [] }));
   let replay = null;
@@ -109,9 +134,12 @@ export default async function (page) {
     archerPlaced: Array.isArray(spot),
     wave1Ended: ended,
     streamDone: (stats.streamDone ?? 0) > 0,
+    severalWordsLive: maxLive >= 2,
     firstLettersDistinct: problems.length === 0,
+    softSwitch: (final?.switches ?? 0) > 0,
     wordShotsFired: (stats.wordShots ?? 0) > 0,
     lockPicture: lockShot !== null,
+    densePicture: denseShot !== null,
     realKeysReachedTheGame: (stats.keys ?? 0) >= keys * 0.95,
     nodeReplaysToBrowserHash: replay?.match === true,
     noConsoleErrors: page.logs.filter((line) => line.startsWith("error")).length === 0,
@@ -134,6 +162,6 @@ export default async function (page) {
     lives: final?.state?.lives,
     problems,
     replay: { file: replayFile, ...replay },
-    shots: [streamShot, lockShot].filter(Boolean),
+    shots: [streamShot, lockShot, denseShot].filter(Boolean),
   };
 }

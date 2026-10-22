@@ -14,21 +14,8 @@ import type { World } from "../sim/world";
 import { wordText } from "../typing/decks";
 
 const COLOR = {
-  grass: "#7dba5a",
-  edge: "#6aa64b",
-  road: "#c9a66b",
-  roadEdge: "#8f6f3f",
-  water: "#5da9e9",
-  bridge: "#8b5a2b",
-  ink: "#2b2118",
-  paper: "#fff4d6",
-  ore: "#c98a2e",
-  soldier: "#3b7ddd",
-  enemyHp: "#ff4a4a",
-  buildingHp: "#ffb020",
-  jade: "#0b8a78",
-  lamp: "#ffb84d",
-  gold: "#c98a2e",
+  grass: "#7dba5a", edge: "#6aa64b", road: "#c9a66b", roadEdge: "#8f6f3f", water: "#5da9e9", bridge: "#8b5a2b",
+  ink: "#2b2118", paper: "#fff4d6", ore: "#c98a2e", soldier: "#3b7ddd", enemyHp: "#ff4a4a", buildingHp: "#ffb020", jade: "#0b8a78", lamp: "#ffb84d",
 } as const;
 
 const FONT = '"Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif';
@@ -223,20 +210,15 @@ export class DebugView {
     }
   }
 
+  /** The rally flag: a pole from the point, a pennant at its top. */
   private flag(x: number, z: number): void {
     const { ctx } = this;
+    const flag = new Path2D("M" + x + " " + (z - 1.6) + "L" + (x + 1.1) + " " + (z - 1.25) + "L" + x + " " + (z - 0.9) + "Z");
+    ctx.fillStyle = COLOR.soldier;
+    ctx.fill(flag);
     ctx.strokeStyle = COLOR.ink;
     ctx.lineWidth = this.px(1.5);
-    ctx.beginPath();
-    ctx.moveTo(x, z);
-    ctx.lineTo(x, z - 1.6);
-    ctx.stroke();
-    ctx.fillStyle = COLOR.soldier;
-    ctx.beginPath();
-    ctx.moveTo(x, z - 1.6);
-    ctx.lineTo(x + 1.1, z - 1.25);
-    ctx.lineTo(x, z - 0.9);
-    ctx.fill();
+    ctx.stroke(new Path2D("M" + x + " " + z + "V" + (z - 1.6)));
   }
 
   private soldiers(w: World): void {
