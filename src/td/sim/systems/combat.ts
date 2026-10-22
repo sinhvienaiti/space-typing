@@ -1,14 +1,14 @@
 /**
  * Damage, targeting, and the attacks of towers, the Bastion's crossbow,
  * soldiers and enemies (docs/td/TYPING_DEFENSE_DESIGN.md 10, 11.3, 12.4, 13;
- * 25.6 steps 6–7).
+ * 25.6 steps 6–7; BUILD_1A6 §4.5).
  *
- *   dmg = round(base × aura × (1 − armour) × crit), at least 1
+ *   dmg = round(base × power × (1 − armour) × crit), at least 1
  *
  * `base` is uniform in [min, max] on the "combat" stream, a crit is drawn on
  * the "crit" stream, and rounding happens once, on impact. A tower aims at
  * the enemy furthest along its route (least distance left); ties go to the
- * lower id. Aura columns are last tick's (step 12 runs after combat).
+ * lower id. A tower with a power charge fires a powered volley and spends it.
  */
 import { ticks, type CompiledAttack, type CompiledAttackLevel } from "../../content/compile";
 import { COMBAT, TICK_HZ } from "../../content/rules";
@@ -62,7 +62,7 @@ export function selectTargets(w: World, x: number, z: number, attack: CompiledAt
 }
 
 /** Sends a shot of `attack` at enemy e: `power` before armour, the crit already decided. Returns its slot (−1: none free). */
-export function launch(w: World, kind: number, x: number, z: number, attack: CompiledAttack, level: CompiledAttackLevel, e: number, source: number, power: number, crit: boolean, areaMul: number, edgeAdd: number): number {
+export function launch(w: World, kind: number, x: number, z: number, attack: CompiledAttack, level: CompiledAttackLevel, e: number, source: number, power: number, crit: boolean, areaMul: number): number {
   const E = w.enemies;
   const P = w.projectiles;
   const slot = P.add(kind, x, z, E.id(e), E.x[e]!, E.z[e]!, attack.speed, source);
@@ -71,18 +71,17 @@ export function launch(w: World, kind: number, x: number, z: number, attack: Com
   P.crit[slot] = crit ? 1 : 0;
   P.damageType[slot] = attack.damageType;
   P.splash[slot] = level.splash * areaMul;
-  P.edge[slot] = Math.min(1, attack.edge + edgeAdd);
+  P.edge[slot] = attack.edge;
   bump(w.stats, STAT.shots);
   w.events.ring.push(FX.fire, x, z, kind, w.tick);
   return slot;
 }
 
 /** Rolls a shot of `attack` at enemy e (damage on "combat", the crit on "crit") and sends it flying. */
-export function fireAt(w: World, kind: number, x: number, z: number, attack: CompiledAttack, level: CompiledAttackLevel, e: number, source: number, dmgMul: number, critAdd: number, areaMul: number, edgeAdd = 0): void {
+export function fireAt(w: World, kind: number, x: number, z: number, attack: CompiledAttack, level: CompiledAttackLevel, e: number, source: number, dmgMul: number, areaMul: number): void {
   if (w.projectiles.count >= w.projectiles.cap) return;
   const base = level.min + w.rng.combat.float() * (level.max - level.min);
-  const chance = attack.crit + critAdd;
-  launch(w, kind, x, z, attack, level, e, source, base * dmgMul, chance > 0 && w.rng.crit.chance(chance), areaMul, edgeAdd);
+  launch(w, kind, x, z, attack, level, e, source, base * dmgMul, attack.crit > 0 && w.rng.crit.chance(attack.crit), areaMul);
 }
 
 /** Burning (TK 10.3, Draconis' Word Shots from a cannon): magic damage a second after resist, dealt in whole points. */
@@ -100,28 +99,31 @@ export function statusStep(w: World): void {
 
 export const burnTicks = (w: World): number => ticks(w.c.content.hero.burn.durationS);
 
-/** Towers and the Bastion's crossbow: cooldowns run at the aura's rate; a ready tower with no target waits at 0. */
+/** Towers and the Bastion's crossbow: a ready tower with no target waits at 0; with a power charge its volley is powered (§4.5). */
 export function towersAttack(w: World): void {
   const B = w.buildings;
   for (let b = 0; b < B.top; b += 1) {
-    if (B.used[b] === 0 || w.tick < B.readyTick[b]!) continue;
-    const attack = w.c.buildings[B.def[b]!]!.attack;
+    if (B.used[b] === 0 || B.ready[b] === 0) continue;
+    const def = w.c.buildings[B.def[b]!]!;
+    const attack = def.attack;
     if (attack === null) continue;
     const level = attack.levels[B.level[b]! - 1]!;
-    const cd = B.atkCd[b]! - B.rateMul[b]!;
+    const cd = B.atkCd[b]! - 1;
     if (cd > 0) {
       B.atkCd[b] = cd;
       continue;
     }
-    const found = selectTargets(w, B.x[b]!, B.z[b]!, attack, level, Math.min(picked.length, level.targets + B.extraTargets[b]!));
+    const powered = B.charges[b]! > 0;
+    const found = selectTargets(w, B.x[b]!, B.z[b]!, attack, level, Math.min(picked.length, level.targets + (powered ? def.power.targets : 0)));
     if (found === 0) {
       B.atkCd[b] = 0;
       continue;
     }
+    if (powered) B.charges[b] = B.charges[b]! - 1;
     const keep = b === 0;
     const kind = keep ? PROJECTILE.bolt : level.splash > 0 ? PROJECTILE.shell : PROJECTILE.arrow;
     for (let index = 0; index < found; index += 1) {
-      fireAt(w, kind, B.x[b]!, B.z[b]!, attack, level, picked[index]!, keep ? SOURCE.crossbow : SOURCE.tower, B.dmgMul[b]!, B.critAdd[b]!, B.areaMul[b]!, B.edgeAdd[b]!);
+      fireAt(w, kind, B.x[b]!, B.z[b]!, attack, level, picked[index]!, keep ? SOURCE.crossbow : SOURCE.tower, powered ? def.power.dmg : 1, powered ? def.power.area : 1);
     }
     B.atkCd[b] = cd + level.period;
   }
@@ -140,11 +142,10 @@ export function meleeStep(w: World): void {
       continue;
     }
     const b = U.barracks[s]!;
-    // The barracks' outMul is its soldiers' strike rate (Flow's shout, TK 6.10).
-    U.atkCd[s] = U.atkCd[s]! - B.outMul[b]!;
+    U.atkCd[s] = U.atkCd[s]! - 1;
     if (U.atkCd[s]! > 0) continue;
     const level = w.c.buildings[B.def[b]!]!.barracks!.levels[B.level[b]! - 1]!;
-    damageEnemy(w, t, (level.min + w.rng.combat.float() * (level.max - level.min)) * B.dmgMul[b]!, 0, SOURCE.soldier);
+    damageEnemy(w, t, level.min + w.rng.combat.float() * (level.max - level.min), 0, SOURCE.soldier);
     U.atkCd[s] = U.atkCd[s]! + level.period;
     U.lastFight[s] = w.tick;
   }
@@ -160,19 +161,15 @@ export function meleeStep(w: World): void {
     if (E.meleeCd[e]! > 0) continue;
     E.meleeCd[e] = E.meleeCd[e]! + melee.period;
     const b = U.barracks[s]!;
-    const armour = w.c.buildings[B.def[b]!]!.barracks!.levels[B.level[b]! - 1]!.armor + B.armorAdd[b]!;
+    const armour = w.c.buildings[B.def[b]!]!.barracks!.levels[B.level[b]! - 1]!.armor;
     const dmg = Math.max(COMBAT.minDamage, Math.round((melee.min + w.rng.combat.float() * (melee.max - melee.min)) * (1 - armour)));
     U.hp[s] = U.hp[s]! - dmg;
     U.lastFight[s] = w.tick;
     if (U.hp[s]! > 0) continue;
-    if (U.temp[s] !== 0) {
-      U.release(s);
-      continue;
-    }
     U.hp[s] = 0;
     U.target[s] = -1;
     U.contact[s] = 0;
-    U.respawnAt[s] = w.tick + Math.round(w.c.buildings[B.def[b]!]!.barracks!.respawn / B.rateMul[b]!);
+    U.respawnAt[s] = w.tick + w.c.buildings[B.def[b]!]!.barracks!.respawn;
     bump(w.stats, STAT.soldierDeaths);
     w.events.ring.push(FX.soldierDown, U.x[s]!, U.z[s]!, s, w.tick);
   }

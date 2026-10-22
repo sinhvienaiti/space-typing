@@ -264,17 +264,19 @@ describe("Typing Defense boundary (TK 25.3)", () => {
     expect(crossing).toEqual([]);
   });
 
-  /** Lines of the 1A code (td.html, src/platform/rng.ts, src/td), counted as `wc -l` does. */
-  const codeLines = (): number =>
-    [readFileSync(join(ROOT, "td.html"), "utf8"), readFileSync(join(ROOT, "src/platform/rng.ts"), "utf8"), ...td.map((source) => source.text)].reduce((sum, text) => sum + (text.match(/\n/g) ?? []).length, 0);
+  /**
+   * Lines of the TD code as BUILD_1A6 §0 counts them: src/td's TypeScript, as `wc -l` does (1A counted td.html,
+   * src/platform/rng.ts and td.css too: 178 lines more; docs/td/BUILD_NOTES.md §3).
+   */
+  const codeLines = (): number => td.filter((source) => source.path.endsWith(".ts")).reduce((sum, source) => sum + (source.text.match(/\n/g) ?? []).length, 0);
 
-  it("the 1A code (td.html, src/platform/rng.ts, src/td) stays under BUILD_NOW §2's hard ceiling", () => {
-    const ceiling = /Trần cứng (\d+)\.(\d{3})/.exec(readFileSync(join(ROOT, "docs/td/BUILD_NOW.md"), "utf8"));
-    expect(ceiling, "BUILD_NOW §2 names the hard ceiling").not.toBeNull();
+  it("the TD code (src/td's TypeScript) stays under BUILD_1A6 §0's hard ceiling", () => {
+    const ceiling = /Ngân sách mã TD[^\n]*\*\*≤ (\d+)\.(\d{3}) dòng\*\*/.exec(readFileSync(join(ROOT, "docs/td/BUILD_1A6.md"), "utf8"));
+    expect(ceiling, "BUILD_1A6 §0 names the hard ceiling").not.toBeNull();
     expect(codeLines()).toBeLessThanOrEqual(Number(ceiling![1]! + ceiling![2]!));
   });
 
-  it("the 1A code stays inside the running total its milestone may reach (docs/td/BUILD_NOTES.md §1.2)", () => {
+  it("the TD code stays inside the running total its milestone may reach (docs/td/BUILD_NOTES.md §1.2)", () => {
     const notes = readFileSync(join(ROOT, "docs/td/BUILD_NOTES.md"), "utf8");
     const milestone = /Mốc đang làm: \*\*(1A\.\d)\*\*/.exec(notes)?.[1];
     expect(milestone, "BUILD_NOTES §1.2 names the milestone being built").toBeDefined();

@@ -1,15 +1,16 @@
-// Typing Defense 1A.4 (docs/td/BUILD_NOW.md §6.2), after campaign3d-ime.mjs:
+// Typing Defense 1A.4 (docs/td/BUILD_NOW.md §6.2; kept for 1A.6, BUILD_1A6 §8), after campaign3d-ime.mjs:
 // what a Vietnamese input method sends must never act as a command. UniKey /
 // EVKey rewrite in place: Telex "aa", "dd", "ee" and VNI "a1", "o6" reach the
 // page as the first letter, a Backspace and the accented letter (no key code;
 // VNI's digit never arrives). An OS input method composes: "Process" presses,
 // keyCode 229, a digit among them. Then plain keys: Digit2 / Digit4 / Digit1
-// pick an agent, Backquote steps through them, Tab and Enter send one, "-"
-// and "=" change the focused building's tempo. Checks: the Vietnamese and
+// pick an agent, Backquote steps through them, Tab and Enter send one; "-"
+// and "=" (the 1A tempo keys, gone in 1A.6 "Lời Gọi", BUILD_1A6 §8) make no
+// command. Checks: the Vietnamese and
 // composing presses made only key and backspace commands and moved no
 // selection; the HUD asked to switch the input method off; digits pick, and
 // Backquote is safe right after them. Picture td-1a-ime with the notice up.
-//   URL=http://127.0.0.1:3110/ OUT_DIR=… node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-ime.mjs --width=1280 --height=720
+//   URL=http://127.0.0.1:3140/ OUT_DIR=… node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-ime.mjs --width=1280 --height=720
 import { DEV_URL, out } from "./common.mjs";
 
 const td = (code) => "(() => { const t = window.__td; if (!t) return null; " + code + " })()";
@@ -52,9 +53,9 @@ export default async function (page) {
     ready = (await page.eval(td("return t.ready();"))) === true;
     if (!ready) await page.sleep(250);
   }
-  // Four slots and an archer to focus (set up through the dev handle; what is tested is the keys).
+  // Four slots and an archer's site to focus (set up through the dev handle; what is tested is the keys).
   await page.eval(td(`t.send({ t: "sandbox", op: { op: "keepLevel", value: 4 } }); t.send({ t: "build", def: t.defs().indexOf("archer"), qx: -32, qz: 48 }); return true;`));
-  await page.sleep(1800);
+  await page.sleep(600);
   const before = await ui(page);
 
   // Telex through UniKey: "aa" → â, "dd" → đ, "viet" + "ee" → ê; VNI: "a1" → á, "o6" → ô (the digit never arrives).
@@ -70,7 +71,7 @@ export default async function (page) {
   const shot = await page.shot(out("td-1a-ime-" + size + ".png"));
   const notice = await page.eval("document.querySelector('.td-chip').textContent.includes('Tắt bộ gõ tiếng Việt')");
 
-  // Plain keys: digits pick, Backquote steps, Tab + Enter send, "-" "=" change the tempo.
+  // Plain keys: digits pick, Backquote steps, Tab + Enter send, "-" "=" do nothing (no tempo since 1A.6).
   const picked = [];
   for (const code of ["Digit2", "Digit4", "Digit1"]) {
     await command(page, code);
@@ -89,8 +90,11 @@ export default async function (page) {
     await command(page, "Tab");
     tabbed.push((await ui(page)).focus);
   }
+  const beforeTempoKeys = (await ui(page)).logLength;
   await command(page, "Equal");
   await command(page, "Minus");
+  await page.sleep(100);
+  const afterTempoKeys = (await ui(page)).logLength;
   await command(page, "Enter");
   await command(page, "Escape");
   await page.sleep(300);
@@ -111,7 +115,7 @@ export default async function (page) {
     backquoteSteps: cycled1 === 1 && cycled2 === 2,
     backquoteTypesNothing: after.filter((c) => c.t === "key").length === 1,
     tabFocuses: tabbed.length === 2 && tabbed[1] === archer?.id,
-    minusEqualSetTempo: after.filter((c) => c.t === "setTempo").length === 2,
+    minusEqualMakeNoCommand: afterTempoKeys === beforeTempoKeys,
     enterSends: after.some((c) => c.t === "assignUnit" && c.agent === 0 && c.building === archer?.id),
     noConsoleErrors: page.logs.filter((line) => line.startsWith("error")).length === 0,
     noExceptions: page.exceptions.length === 0,

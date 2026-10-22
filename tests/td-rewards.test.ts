@@ -1,36 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { COMBAT, FIVE_GOOD, REWARD, RICHNESS, TEMPO } from "../src/td/content/rules";
-import type { WordReward } from "../src/td/content/types";
+import { COMBAT, MODES, POWER } from "../src/td/content/rules";
 import { STAT } from "../src/td/sim/stats";
+import { CALL_KIND, CALL_STATE } from "../src/td/sim/stores/calls";
 import { PROJECTILE } from "../src/td/sim/stores/projectiles";
-import { rewardValue } from "../src/td/sim/systems/rewards";
-import { spawnWord } from "../src/td/sim/systems/words";
+import { towersAttack } from "../src/td/sim/systems/combat";
+import { shotPower } from "../src/td/sim/systems/rewards";
 import type { World } from "../src/td/sim/world";
 import { wordText } from "../src/td/typing/decks";
-import { scoreWord, type Score } from "../src/td/typing/scorer";
-import { tempoIndex } from "../src/td/typing/tempo";
-import { build, enemyAt, ready, run, world } from "./td/fixtures";
-import { smallDeck, type } from "./td/typing";
+import { scoreWord } from "../src/td/typing/scorer";
+import { built, enemyAt, goTo, run, send, world } from "./td/fixtures";
+import { callWord, smallDeck, type, wordOf } from "./td/typing";
 
-/** Word rewards (docs/td/TYPING_DEFENSE_DESIGN.md 6.11; BUILD_NOW §6.1 td-rewards). */
+/** Power charges and power words (docs/td/BUILD_1A6.md §4.5; TK 6.11's Word Shot). */
 const deck = smallDeck(["apple", "bread", "cider", "dream", "eagle", "fable", "grape", "house", "ivory", "lemon", "mango"]);
-const id = (text: string) => [...Array(deck.count).keys()].find((word) => wordText(deck, word) === text)!;
 const lenF = (len: number) => Math.max(0.8, Math.min(1.2, (len + 1) / 6));
-
-function field(): World {
-  const w = world({ deck, gold: 5000 });
-  return w;
-}
-
-/** Deals `text` at b as agent `agent` would, types it at once with `errors` wrong keys; returns its score. */
-function play(w: World, b: number, text: string, errors = 0, agent = -1): Score {
-  w.buildings.assist[b] = agent;
-  spawnWord(w, b, id(text), 1);
-  const s = w.words.top - 1;
-  const life = w.words.life[s]!;
-  type(w, text[0]! + "z".repeat(errors) + text.slice(1), 100, true);
-  return scoreWord(text.length, errors, life, 0, w.expected, 1);
-}
+const T = (seconds: number) => Math.round(seconds * 60);
 
 /** An enemy on the ground route point nearest (x, z): it walks on from there. */
 function enemyNear(w: World, id: string, x: number, z: number): number {
@@ -47,189 +31,173 @@ function enemyNear(w: World, id: string, x: number, z: number): number {
 
 const shots = (w: World) => w.projectiles.live().filter((p) => w.projectiles.kind[p] === PROJECTILE.wordShot);
 
-describe("Word Shots (towers)", () => {
-  it("power = D̄ × (0.8 + 1.2·Q) × T_N × lenF, fired at once; Perfect and Flash always crit, with no draw", () => {
-    const w = field();
-    const archer = build(w, "archer", -16, -4);
-    ready(w);
-    w.phase = "battle";
+/** A power word `text` on building b, typed at once with `errors` wrong keys; returns its score. */
+function power(w: World, b: number, text: string, errors = 0) {
+  const s = callWord(w, wordOf(deck, text), 1, CALL_KIND.power, b);
+  const life = w.words.life[s]!;
+  type(w, text[0]! + "z".repeat(errors) + text.slice(1), 100, true);
+  return scoreWord(text.length, errors, life, 0, w.expected, 1);
+}
+
+describe("power words (§4.5)", () => {
+  it("fire a Word Shot at once, D̄ × (0.8 + 1.2·Q) × lenF; Perfect and Flash always crit, with no draw; +2 charges, +1 for a whole Perfect call", () => {
+    const w = world({ deck, gold: 1000 });
+    const archer = built(w, "archer", -16, -4);
     const target = enemyNear(w, "thuong-luong", -16, -4);
     w.buildings.atkCd[archer] = 1e6; // the tower's own arrows (and their crit draws) wait
     const crits = w.rng.crit.state;
-    const score = play(w, archer, "apple");
+    const score = power(w, archer, "apple");
     expect(score.grade).toBe("flash");
     const fired = shots(w);
-    expect(fired.length).toBeGreaterThanOrEqual(1);
+    expect(fired.length).toBe(1); // one target in reach (it could pierce to a second)
     const p = fired[0]!;
-    const power = 7.5 * (0.8 + 1.2 * score.quality) * TEMPO[tempoIndex(4)]!.tAttack * lenF(5);
-    expect(w.projectiles.power[p]).toBeCloseTo(power * COMBAT.critMul, 9);
-    expect(w.projectiles.crit[p]).toBe(1);
-    expect(w.rng.crit.state).toBe(crits);
-    expect(w.projectiles.target[p]).toBe(w.enemies.id(target));
+    expect(w.projectiles.power[p]).toBeCloseTo(shotPower(7.5, 5, score.quality) * COMBAT.critMul, 9);
+    expect(shotPower(7.5, 5, score.quality)).toBeCloseTo(7.5 * (0.8 + 1.2 * score.quality) * lenF(5), 12);
+    expect([w.projectiles.crit[p], w.rng.crit.state, w.projectiles.target[p]]).toEqual([1, crits, w.enemies.id(target)]);
     expect(w.stats[STAT.wordShots]).toBe(1);
+    expect(w.buildings.charges[archer]).toBe(POWER.perWord + POWER.perfect);
   });
 
-  it("with no enemy in range a Word Shot fizzles; the word still warms the building and adds to the chain", () => {
-    const w = field();
-    const archer = build(w, "archer", -16, -4);
-    ready(w);
-    w.phase = "battle";
-    play(w, archer, "bread");
+  it("with no enemy in reach a Word Shot fizzles; the charges still come, and the chain grows", () => {
+    const w = world({ deck, gold: 1000 });
+    const archer = built(w, "archer", -16, -4);
+    power(w, archer, "bread", 1); // one error: not Perfect, no bonus charge
     expect(shots(w).length).toBe(0);
     expect(w.stats[STAT.fizzles]).toBe(1);
-    expect(w.buildings.heat[archer]).toBeGreaterThan(0);
-    expect(w.typing.chain).toBe(1);
+    expect([w.buildings.charges[archer], w.typing.chain]).toEqual([POWER.perWord, 1]);
+    w.buildings.charges[archer] = 4;
+    power(w, archer, "cider");
+    expect(w.buildings.charges[archer]).toBe(POWER.max);
   });
 
-  it("the cannon's blast is ×1.15 wider; Draconis on a cannon sets the enemies it hurts burning", () => {
-    const w = field();
-    const cannon = build(w, "cannon", 10, -16);
-    ready(w);
-    w.phase = "battle";
+  it("the cannon's Word Shot blasts ×1.15 wider; with Draconis within his ring it sets what it hurts burning", () => {
+    const w = world({ deck, gold: 1000 });
+    const cannon = built(w, "cannon", 10, -16);
+    goTo(w, 0, 10, -10);
     const target = enemyNear(w, "thuong-luong", 10, -16);
     w.enemies.hp[target] = 10000;
     w.buildings.atkCd[cannon] = 1e6; // only the Word Shot fires
-    const area = w.buildings.areaMul[cannon]!; // the aura of the tick before (TK 25.6 step 6)
-    play(w, cannon, "cider", 0, 0);
+    w.agents.atkCd[0] = 1e9; // and Draconis throws no fireball of his own
+    power(w, cannon, "cider");
     const p = shots(w)[0]!;
-    expect(w.projectiles.splash[p]).toBeCloseTo(2.2 * area * 1.15, 9);
+    expect(w.projectiles.splash[p]).toBeCloseTo(2.2 * 1.15, 9);
     expect(w.projectiles.burn[p]).toBe(1);
     while (w.enemies.burnUntil[target] === 0) run(w, 1);
     const hp = w.enemies.hp[target]!;
     run(w, 130);
-    // 3 a second for 2 s (Thuồng Luồng has no magic resist), paid in whole points.
     expect(hp - w.enemies.hp[target]!).toBeGreaterThanOrEqual(5);
     expect(hp - w.enemies.hp[target]!).toBeLessThanOrEqual(6);
   });
+
+  it("the Bastion's power word is a crossbow volley at one target more", () => {
+    const w = world({ deck });
+    const lane = w.lanes[0]!;
+    enemyAt(w, "thuong-luong", 0, lane.length - 4);
+    enemyAt(w, "thuong-luong", 1, w.lanes[1]!.length - 5);
+    w.buildings.atkCd[0] = 1e6;
+    power(w, 0, "dream");
+    expect(w.projectiles.live().filter((p) => w.projectiles.kind[p] === PROJECTILE.bolt).length).toBe(2);
+  });
 });
 
-describe("gold words (mines, the Bastion)", () => {
-  it("a mine pays G × lenF × qA × qS × T_N × richness straight to the treasury, in thousandths", () => {
-    const w = field();
-    const mine = build(w, "gold-mine", 26, -30); // ★★★
-    ready(w);
-    w.phase = "battle";
-    const gold = w.gold;
-    const score = play(w, mine, "dream", 1);
-    const expected = 2.0 * lenF(5) * (0.4 + 0.6 * score.accuracy) * (0.8 + 0.4 * score.speed) * TEMPO[tempoIndex(4)]!.tEconomy * RICHNESS[2];
-    expect(w.gold - gold).toBe(Math.round(expected * 1000));
-    expect(w.buildings.pile[mine]).toBe(0);
-    expect(w.stats[STAT.goldWord]).toBe(w.gold - gold);
+describe("powered shots (§4.5)", () => {
+  it("spend a charge a volley: archer ×1.6 damage and one target more; cannon ×1.4 and a blast ×1.3 wider; the Bastion one target more", () => {
+    const volley = (id: string, x: number, z: number, charges: number) => {
+      const w = world({ gold: 1000 });
+      const b = id === "keep" ? 0 : built(w, id, x, z);
+      for (let k = 0; k < 3; k += 1) enemyNear(w, "thuong-luong", x, z);
+      w.buildings.charges[b] = charges;
+      towersAttack(w);
+      const fired = w.projectiles.live();
+      return { count: fired.length, splash: w.projectiles.splash[fired[0]!]!, charges: w.buildings.charges[b]!, w };
+    };
+    const [plain, powered] = [volley("archer", -16, -4, 0), volley("archer", -16, -4, 2)];
+    expect([plain.count, powered.count, powered.charges]).toEqual([1, 2, 1]);
+    const [cannon, boom] = [volley("cannon", 10, -16, 0), volley("cannon", 10, -16, 1)];
+    expect([cannon.count, boom.count, boom.charges]).toEqual([1, 1, 0]);
+    expect(boom.splash).toBeCloseTo(cannon.splash * 1.3, 9);
+    const [keep, crossbow] = [volley("keep", 0, 36, 0), volley("keep", 0, 36, 1)];
+    expect([keep.count, crossbow.count]).toEqual([1, 2]);
+    // ×1.6 before armour: the same roll on the same stream, so the same base.
+    const damage = (charges: number) => {
+      const { w } = volley("archer", -16, -4, charges);
+      return w.projectiles.power[w.projectiles.live()[0]!]!;
+    };
+    expect(damage(1)).toBeCloseTo(damage(0) * 1.6, 9);
   });
+});
 
-  it("the Bastion pays 1.5 × qA × T_N × lenF and its crossbow fires one more bolt", () => {
-    const w = field();
-    w.phase = "battle";
-    enemyAt(w, "cuong-thi", 0, w.lanes[0]!.length - 6);
-    w.buildings.atkCd[0] = 1e6; // the crossbow's own shot is not ready: any bolt is the word's
-    const gold = w.gold;
-    const score = play(w, 0, "eagle");
-    expect(w.gold - gold).toBe(Math.round(1.5 * (0.4 + 0.6 * score.accuracy) * TEMPO[tempoIndex(4)]!.tEconomy * lenF(5) * 1000));
-    expect(w.projectiles.live().some((p) => w.projectiles.kind[p] === PROJECTILE.bolt)).toBe(true);
-  });
+describe("power calls (§4.5)", () => {
+  /** A power word comes from the lower half of the length band (§5.2): 3–4 letters at E = 35. */
+  const short = smallDeck(["cat", "dog", "sun", "map", "pen", "kite", "lamp", "frog"]);
+  const night = () => {
+    const w = world({ deck: short, gold: 1000 });
+    const archer = built(w, "archer", -16, -4);
+    send(w, { t: "sandbox", op: { op: "night" } });
+    w.spawnQueue.length = 0; // the test's enemies only
+    w.lives = 1e6;
+    return { w, archer };
+  };
 
-  it("a helper on its specialty adds its share (Gạch at a mine: +10 %)", () => {
-    const plain = field();
-    const mine = build(plain, "gold-mine", 26, -30);
-    ready(plain);
-    plain.phase = "battle";
-    const start = plain.gold;
-    play(plain, mine, "fable");
-    const base = plain.gold - start;
-    const helped = field();
-    const mine2 = build(helped, "gold-mine", 26, -30);
-    ready(helped);
-    helped.phase = "battle";
-    const start2 = helped.gold;
-    play(helped, mine2, "fable", 0, 3);
-    expect(Math.abs(helped.gold - start2 - base * 1.1)).toBeLessThanOrEqual(1);
-  });
-
-  it("five good words in a row at a mine pay +5 × richness; a sloppy word starts the count again", () => {
-    const w = field();
-    const mine = build(w, "gold-mine", 26, -30);
-    ready(w);
-    w.phase = "battle";
-    play(w, mine, "apple");
-    play(w, mine, "bread", 3);
-    const paid: number[] = [];
-    for (const word of ["cider", "dream", "eagle", "fable", "grape"]) {
-      const gold = w.gold;
-      play(w, mine, word);
-      paid.push(w.gold - gold);
+  it("come only at night, with an enemy in reach, under 5 charges, past the mode's cooldown: 1 word that lives 6 s", () => {
+    const day = world({ deck, gold: 1000 });
+    const tower = built(day, "archer", -16, -4);
+    enemyNear(day, "thuong-luong", -16, -4);
+    run(day, 2);
+    expect(day.buildings.call[tower]).toBe(-1);
+    const { w, archer } = night();
+    run(w, 2);
+    expect(w.buildings.call[archer]).toBe(-1); // nothing in reach
+    const e = enemyNear(w, "thuong-luong", -16, -4);
+    const at = w.enemies.dist[e]!;
+    const hold = (ticks: number) => {
+      for (let k = 0; k < ticks; k += 1) {
+        w.enemies.dist[e] = at; // it stays in reach
+        run(w, 1);
+      }
+    };
+    w.enemies.hp[e] = 1e6;
+    w.buildings.atkCd[archer] = 1e9;
+    hold(1);
+    const c = w.buildings.call[archer]!;
+    const born = w.calls.born[c]!;
+    expect([w.calls.kind[c], w.calls.words[c], w.calls.expire[c]! - born, w.calls.state[c]]).toEqual([CALL_KIND.power, 1, T(6), CALL_STATE.open]);
+    // Not typed: it ends at 6 s, costing nothing; the next comes once the cooldown (8 s from the last) is over.
+    const chain = w.typing.chain;
+    hold(T(6));
+    expect([w.calls.used[c], w.buildings.call[archer], w.typing.chain]).toEqual([0, -1, chain]);
+    let again = -1;
+    for (let k = 0; k < T(10) && again < 0; k += 1) {
+      hold(1);
+      if (w.buildings.call[archer]! >= 0) again = w.calls.born[w.buildings.call[archer]!]!;
     }
-    expect(paid[4]! - paid[3]!).toBeGreaterThanOrEqual(FIVE_GOOD.mineGold * RICHNESS[2] * 1000 - 50);
-    expect(w.buildings.streak[mine]).toBe(0);
+    expect(again - born).toBe(T(MODES.balanced.powerCdS));
+    w.buildings.charges[archer] = POWER.max;
+    closeAll(w);
+    hold(T(10));
+    expect(w.buildings.call[archer]).toBe(-1); // full
   });
 
-  it("pays nothing while preparing (TK 11.2)", () => {
-    const w = field();
-    const mine = build(w, "gold-mine", 26, -30);
-    ready(w);
-    const gold = w.gold;
-    play(w, mine, "house");
-    expect(w.gold).toBe(gold);
-    expect(w.buildings.heat[mine]).toBeGreaterThan(0);
+  it("a locked power word outlives the 6 s until it is typed", () => {
+    const { w, archer } = night();
+    goTo(w, 0, -16, 0);
+    const e = enemyNear(w, "thuong-luong", -16, -4);
+    w.enemies.hp[e] = 1e6;
+    run(w, 1);
+    const c = w.buildings.call[archer]!;
+    const s = w.calls.word[c]!;
+    const letters = wordText(w.typing.deck, w.words.word[s]!);
+    type(w, letters[0]!);
+    run(w, T(7));
+    expect([w.calls.used[c], w.typing.router.lock]).toEqual([1, s]);
+    type(w, letters.slice(1));
+    expect(w.calls.used[c]).toBe(0);
+    expect(w.buildings.charges[archer]).toBeGreaterThanOrEqual(POWER.perWord - 1);
   });
 });
 
-describe("barracks words", () => {
-  it("bring the longest-dead soldier back 3 s × qQ × T_N × lenF sooner; with none dead, heal 8 % × the same", () => {
-    const w = field();
-    const barracks = build(w, "barracks", 2, 18);
-    ready(w);
-    w.phase = "battle";
-    const squad = w.units.live().filter((s) => w.units.barracks[s] === barracks);
-    w.units.hp[squad[0]!] = 0;
-    w.units.respawnAt[squad[0]!] = w.tick + 400;
-    w.units.hp[squad[1]!] = 0;
-    w.units.respawnAt[squad[1]!] = w.tick + 500;
-    const before = w.units.respawnAt[squad[0]!]!;
-    const score = play(w, barracks, "ivory");
-    const share = (0.5 + 0.5 * score.quality) * TEMPO[tempoIndex(4)]!.tAttack * lenF(5);
-    expect(before - w.units.respawnAt[squad[0]!]!).toBe(Math.round(3 * 60 * share));
-    const healthy = field();
-    const b2 = build(healthy, "barracks", 2, 18);
-    ready(healthy);
-    healthy.phase = "battle";
-    const soldiers = healthy.units.live().filter((s) => healthy.units.barracks[s] === b2);
-    for (const s of soldiers) healthy.units.hp[s] = 20;
-    const score2 = play(healthy, b2, "lemon");
-    const heal = Math.round(60 * 0.08 * (0.5 + 0.5 * score2.quality) * TEMPO[tempoIndex(4)]!.tAttack * lenF(5));
-    for (const s of soldiers) expect(healthy.units.hp[s]).toBe(20 + heal);
-  });
-
-  it("five good words in a row add a soldier for 15 s, at most 2 a barracks", () => {
-    const w = field();
-    const barracks = build(w, "barracks", 2, 18);
-    ready(w);
-    w.phase = "battle";
-    const count = () => w.units.live().filter((s) => w.units.barracks[s] === barracks && w.units.temp[s] === 2).length;
-    for (const word of ["apple", "bread", "cider", "dream", "eagle"]) play(w, barracks, word);
-    expect(count()).toBe(1);
-    for (const word of ["fable", "grape", "house", "ivory", "lemon"]) play(w, barracks, word);
-    expect(count()).toBe(2);
-    for (const word of ["mango", "apple", "bread", "cider", "dream"]) play(w, barracks, word);
-    expect(count()).toBe(2);
-    run(w, 15 * 60);
-    expect(count()).toBe(0);
-  });
-});
-
-describe("no cap on a word's reward (TK 0.2 rule 5)", () => {
-  it("grows in proportion to tempo, level, richness and specialty, however large", () => {
-    const score: Score = { grade: "perfect", accuracy: 1, speed: 1, speedEff: 1, quality: 1 };
-    const rewards: WordReward[] = [
-      { kind: "shot", dBar: [7.5, 11, 15.5], pierce: 1 },
-      { kind: "resource", resource: "gold", perLevel: [2, 2.4, 2.8], richness: true },
-      { kind: "keep", goldPerWord: 1.5, crossbowShot: true },
-      { kind: "soldiers", respawnCutS: 3, healPct: 0.08 },
-    ];
-    for (const reward of rewards) {
-      const one = rewardValue(reward, 3, 8, score, 1, 1.25, 1);
-      expect(rewardValue(reward, 3, 8, score, 1000, 1.25, 1)).toBeCloseTo(one * 1000, 6);
-      expect(rewardValue(reward, 3, 8, score, 1, 1.25, 50)).toBeCloseTo(one * 50, 6);
-    }
-    expect(rewardValue(rewards[0]!, 3, 8, score, 1, 1, 1)).toBeCloseTo(15.5 * (REWARD.shotQ[0] + REWARD.shotQ[1]) * 1.2, 9);
-  });
-});
+/** Ends every call (a test's clean slate). */
+function closeAll(w: World): void {
+  for (const c of w.calls.live()) w.calls.expire[c] = w.tick;
+  run(w, 1);
+}

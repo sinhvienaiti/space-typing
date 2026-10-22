@@ -1,22 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { STAT } from "../src/td/sim/stats";
-import { spawnWord } from "../src/td/sim/systems/words";
 import type { World } from "../src/td/sim/world";
-import { wordText } from "../src/td/typing/decks";
 import { KEY } from "../src/td/typing/router";
-import { build, ready, run, send, world } from "./td/fixtures";
-import { live, smallDeck, type } from "./td/typing";
+import { send, world } from "./td/fixtures";
+import { callWord, live, smallDeck, type, wordOf } from "./td/typing";
 
 /** The key router (docs/td/TYPING_DEFENSE_DESIGN.md 6.15; BUILD_NOW §6.1 td-router). */
 const deck = smallDeck(["cat", "dog", "fish", "frog", "bird", "duck", "flame", "fresh"]);
-const id = (text: string) => [...Array(deck.count).keys()].find((word) => wordText(deck, word) === text)!;
-
-/** A world with an archer and `words` live on it (tier 2 when the letter is taken). */
+/** A world with `words` live, each on a bright call of its own at the Bastion (tier 2 when the letter is taken). */
 function withWords(...words: string[]): { w: World; slot: (text: string) => number } {
   const w = world({ deck });
-  const archer = build(w, "archer", -16, -4);
-  ready(w);
-  for (const text of words) spawnWord(w, archer, id(text), w.typing.letters.owner[text.charCodeAt(0) - 97]! >= 0 ? 2 : 1);
+  for (const text of words) callWord(w, wordOf(deck, text), w.typing.letters.owner[text.charCodeAt(0) - 97]! >= 0 ? 2 : 1);
   return { w, slot: (text) => live(w).find((word) => word.text === text)!.s };
 }
 
@@ -85,23 +79,35 @@ describe("key router", () => {
     expect(w.buildings.count).toBe(buildings);
   });
 
-  it("unlock (Escape) lets go of the word; a key that starts nothing is a stray, counted against accuracy", () => {
-    const { w } = withWords("duck");
-    type(w, "du");
-    send(w, { t: "unlock" });
-    expect(w.typing.router.lock).toBe(-1);
-    expect(results(type(w, "z"))).toEqual([KEY.stray]);
-    expect(w.stats[STAT.strays]).toBe(1);
+  it("a lock with no letter in (a call's next word, BUILD_1A6 §5.2): another word's first letter switches, Backspace lets go, never wrapping (review R1)", () => {
+    const { w, slot } = withWords("cat", "dog");
+    w.typing.router.lock = slot("cat"); // what a call does with its next word
+    expect(results(type(w, "d"))).toEqual([KEY.switch]);
+    expect([w.typing.router.lock, w.words.typed[slot("dog")], w.words.errors[slot("cat")]]).toEqual([slot("dog"), 1, 0]);
+    const back = withWords("cat");
+    back.w.typing.router.lock = back.slot("cat");
+    send(back.w, { t: "backspace", atMs: 0 });
+    expect([back.w.typing.router.lock, back.w.words.typed[back.slot("cat")]]).toEqual([-1, 0]);
+    // A wrong key that starts nothing is still an error on the locked word; after it, no switch.
+    const typo = withWords("cat", "dog");
+    typo.w.typing.router.lock = typo.slot("cat");
+    expect(results(type(typo.w, "xd"))).toEqual([KEY.wrong, KEY.wrong]);
   });
 
-  it("several keys in one tick route in order; a locked word that runs out lets go of the lock", () => {
+  it("unlock (Escape) lets go of the word and drops what was typed, errors uncounted; a key that starts nothing is a stray, counted against accuracy", () => {
+    const { w, slot } = withWords("duck");
+    type(w, "dux");
+    send(w, { t: "unlock" });
+    expect([w.typing.router.lock, w.words.typed[slot("duck")], w.words.errors[slot("duck")]]).toEqual([-1, 0, 0]);
+    expect(type(w, "duck", 50, true).find((event) => event.t === "wordHit")).toMatchObject({ errors: 0 });
+    const again = withWords("duck");
+    expect(results(type(again.w, "z"))).toEqual([KEY.stray]);
+    expect(again.w.stats[STAT.strays]).toBe(1);
+  });
+
+  it("several keys in one tick route in order", () => {
     const { w } = withWords("flame");
     expect(results(type(w, "flame", 50, true))).toEqual([KEY.lock, KEY.advance, KEY.advance, KEY.advance, KEY.done]);
-    expect(w.stats[STAT.streamDone]).toBe(1);
-    const late = withWords("duck");
-    type(late.w, "d");
-    run(late.w, 600);
-    expect(late.w.typing.router.lock).toBe(-1);
-    expect(late.w.stats[STAT.streamMissed]).toBe(1);
+    expect(w.stats[STAT.callWords]).toBe(1);
   });
 });

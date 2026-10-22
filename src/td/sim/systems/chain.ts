@@ -1,14 +1,12 @@
 /**
- * The chain (docs/td/TYPING_DEFENSE_DESIGN.md 6.8): one count for the whole
- * run. A Flash, Perfect or Good word adds 1 and an Ok word keeps it; a
- * sloppy word, or one that expires touched, halves it; one that expires
- * untouched costs 2, so dropping a word on purpose is cheap. Its tier gives
- * r_c, Flow's share. Losses wait out the order grace and a frozen pause.
+ * The chain (docs/td/TYPING_DEFENSE_DESIGN.md 6.8; BUILD_1A6 §5.4): one
+ * count for the whole run. A word that is not sloppy adds 1, a sloppy one
+ * halves it, and nothing else touches it: a call ignored, dimmed or closed
+ * costs nothing. Its tier multiplies a whole Perfect call's bonus.
  */
 import { CHAIN } from "../../content/rules";
 import type { Grade } from "../../content/types";
 import type { World } from "../world";
-import { penaltyFree } from "./heat";
 
 export function chainTier(chain: number): number {
   let tier = 0;
@@ -16,21 +14,14 @@ export function chainTier(chain: number): number {
   return tier;
 }
 
-export const chainRc = (chain: number): number => CHAIN.tiers[chainTier(chain)]!.rc;
+export const chainMul = (chain: number): number => CHAIN.tiers[chainTier(chain)]!.mul;
 
-function setChain(w: World, value: number): void {
+/** A finished word's grade moves the chain. */
+export function chainStep(w: World, grade: Grade): void {
   const before = w.typing.chain;
+  const value = grade === "sloppy" ? Math.floor(before / 2) : before + CHAIN.good;
   if (value === before) return;
   w.typing.chain = value;
   const callout = CHAIN.callouts.some((mark) => before < mark && value >= mark);
   w.events.rare.push({ t: "chain", tick: w.tick, chain: value, tier: chainTier(value), callout });
-}
-
-/** A finished word's grade; `expired` with `touched` for a word that ran out. */
-export function chainStep(w: World, grade: Grade, touched = false): void {
-  const chain = w.typing.chain;
-  if (grade === "flash" || grade === "perfect" || grade === "good") setChain(w, chain + CHAIN.good);
-  else if (penaltyFree(w) || grade === "ok" || grade === "cancelled") return;
-  else if (grade === "sloppy" || touched) setChain(w, Math.floor(chain / 2));
-  else setChain(w, Math.max(0, chain + CHAIN.untouchedExpire));
 }

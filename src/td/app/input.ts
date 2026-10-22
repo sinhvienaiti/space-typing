@@ -1,19 +1,19 @@
 /**
- * The keyboard and the mouse (docs/td/BUILD_NOW.md §5.4, TK 6.15, 8.3, 23.6).
+ * The keyboard and the mouse (docs/td/BUILD_NOW.md §5.4, BUILD_1A6 §8, TK 6.15, 8.3, 23.6).
  * A letter is a `key` command, Backspace a `backspace`; any other key is read
  * by event.code into the action its button carries, so a letter is never a
  * command. Composing, held (arrows aside), Ctrl, Alt, Meta and synthetic
- * presses (unless the dev flag allows them) do nothing.
+ * presses (unless the dev flag allows them) do nothing. A Space right after a
+ * letter the game took is the space typed between words, not the pause.
  */
 import { isComposingKey, typedLetter, vietnameseInputSign } from "../../scene3d/keys";
 import type { CommandBody } from "../sim/commands";
 
-/** Command keys by event.code, "Shift" + code with Shift held; "" swallows the key. */
+/** Command keys by event.code, "Shift" + code with Shift held (BUILD_1A6 §8: no tempo keys; Space pauses only in relax and learn, else it is swallowed). */
 export const KEY_ACTIONS: Readonly<Record<string, string>> = {
-  Digit1: "pick:1", Digit2: "pick:2", Digit3: "pick:3", Digit4: "pick:4", Digit0: "recall", Backquote: "cycle",
-  Tab: "next", ShiftTab: "prev", Enter: "send", NumpadEnter: "send", ShiftEnter: "wave",
-  Minus: "slower", Equal: "denser", NumpadSubtract: "slower", NumpadAdd: "denser", ShiftMinus: "stopAll", ShiftEqual: "restore",
-  Insert: "build", Backslash: "build", Delete: "undo", Escape: "escape", Pause: "pause", F9: "sandbox", Space: "",
+  Digit1: "pick:1", Digit2: "pick:2", Digit3: "pick:3", Digit4: "pick:4", Digit5: "pick:5", Digit0: "recall", Backquote: "cycle",
+  Tab: "next", ShiftTab: "prev", Enter: "send", NumpadEnter: "send", ShiftEnter: "night",
+  Insert: "build", Backslash: "build", ShiftInsert: "hire", ShiftBackslash: "hire", Delete: "undo", Escape: "escape", Pause: "pause", F9: "sandbox", Space: "space",
   ArrowLeft: "pan:1:0", ArrowRight: "pan:-1:0", ArrowUp: "pan:0:1", ArrowDown: "pan:0:-1",
 };
 
@@ -26,24 +26,33 @@ export function keyAction(event: KeyboardEvent, allowUntrusted = false): number 
   return action === undefined || (event.repeat && !action.startsWith("pan")) ? null : action;
 }
 
-/** `onVietnamese`: an input method seems on, so the page asks the player to switch it off. */
-export function installKeys(target: Window, keys: { send(command: CommandBody): void; act(action: string): void; onVietnamese(): void; allowUntrusted: boolean }): void {
+/** A Space within this many ms of a letter the game took is a typist's space between words: swallowed (review R2). */
+export const WORD_SPACE_MS = 800;
+
+/**
+ * `send` says whether the game took the key (not while paused); `onVietnamese`: an input method seems on, so the page
+ * asks the player to switch it off. Space, the tactical pause of relax and learn, stays still for a moment after a
+ * letter: a habit of typing tests would otherwise pause the game after a word and drop the next word's letters.
+ */
+export function installKeys(target: Window, keys: { send(command: CommandBody): boolean; act(action: string): void; onVietnamese(): void; allowUntrusted: boolean }): void {
+  let letterAt = -Infinity;
   target.addEventListener("keydown", (event) => {
     if ((event.isTrusted || keys.allowUntrusted) && vietnameseInputSign(event)) keys.onVietnamese();
     const action = keyAction(event, keys.allowUntrusted);
     if (action === null) return;
     event.preventDefault();
-    if (typeof action === "number") keys.send({ t: "key", letter: action, atMs: event.timeStamp });
-    else if (action === "backspace") keys.send({ t: "backspace", atMs: event.timeStamp });
-    else if (action !== "") keys.act(action);
+    if (typeof action === "number") {
+      if (keys.send({ t: "key", letter: action, atMs: event.timeStamp })) letterAt = event.timeStamp;
+    } else if (action === "backspace") keys.send({ t: "backspace", atMs: event.timeStamp });
+    else if (action !== "space" || event.timeStamp - letterAt >= WORD_SPACE_MS) keys.act(action);
   });
 }
 
 type Spot = { x: number; z: number };
 type Camera = { panBy(dx: number, dy: number): void; zoomAt(x: number, y: number, factor: number): void; unproject(x: number, y: number): Spot };
 
-/** On the map a press that moves under 6 px is a click; a left or middle drag pans, the wheel zooms. */
-export function installPointer(canvas: HTMLCanvasElement, camera: Camera, hand: { pointer(p: Spot): void; click(p: Spot, right: boolean): void }): void {
+/** On the map a press that moves under 6 px is a click (at a field point and a screen point); a left or middle drag pans, the wheel zooms. */
+export function installPointer(canvas: HTMLCanvasElement, camera: Camera, hand: { pointer(p: Spot): void; click(p: Spot, right: boolean, screen: { x: number; y: number }): void }): void {
   let down: { x: number; y: number; button: number; drag: boolean } | null = null;
   canvas.addEventListener("contextmenu", (event) => event.preventDefault());
   canvas.addEventListener("pointerdown", (event) => {
@@ -62,7 +71,7 @@ export function installPointer(canvas: HTMLCanvasElement, camera: Camera, hand: 
     down.y = event.clientY;
   });
   canvas.addEventListener("pointerup", (event) => {
-    if (down !== null && !down.drag && down.button !== 1) hand.click(camera.unproject(event.clientX, event.clientY), down.button === 2);
+    if (down !== null && !down.drag && down.button !== 1) hand.click(camera.unproject(event.clientX, event.clientY), down.button === 2, { x: event.clientX, y: event.clientY });
     down = null;
   });
   canvas.addEventListener("wheel", (event) => {

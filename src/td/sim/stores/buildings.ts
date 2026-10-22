@@ -1,14 +1,16 @@
-import { HEAT } from "../../content/rules";
+import { FARM } from "../../content/rules";
 import { Slots } from "./slots";
 
-const RECENT = HEAT.recentWords;
+/** A plot is empty (to sow), growing, or ripe (to harvest): BUILD_1A6 §4.1. */
+export const PLOT = { empty: 0, growing: 1, ripe: 2 } as const;
+const NEVER = -0x40000000;
 
 /**
- * Buildings, the Bastion in slot 0 (TK 11). The aura columns are the
- * multipliers the typing systems compute each tick (TK 6.10) and combat and
- * production read; with nobody assisting they stay at 1 and 0. The stream
- * columns follow TK 25.8: a deal at anchor + k × period, `shift` ticks put
- * back for the 0.2 s spacing.
+ * Buildings, the Bastion in slot 0 (TK 11). A new one is a site (BUILD_1A6
+ * §4.3): `upTo` is the level being built (0: none), `progress` 0–1 of that
+ * work, and nothing runs before `ready`; an upgrade keeps the building
+ * running at its level meanwhile. `builtTick` and `paidGold`/`paidWood` are
+ * the last site or upgrade and its price: what an undo within 5 s refunds.
  */
 export class BuildingStore extends Slots {
   readonly def = new Uint8Array(this.cap);
@@ -16,62 +18,36 @@ export class BuildingStore extends Slots {
   readonly x = new Float64Array(this.cap);
   readonly z = new Float64Array(this.cap);
   readonly hp = new Int32Array(this.cap);
-  /** Construction ends at this tick; nothing runs before. */
-  readonly readyTick = new Int32Array(this.cap);
+  readonly ready = new Uint8Array(this.cap);
+  readonly upTo = new Uint8Array(this.cap);
+  readonly progress = new Float64Array(this.cap);
   readonly builtTick = new Int32Array(this.cap);
-  /** Gold spent on it (an undo refunds exactly this). */
-  readonly paid = new Int32Array(this.cap);
+  readonly paidGold = new Int32Array(this.cap);
+  readonly paidWood = new Int32Array(this.cap);
+  /** Builder NPC on the site, −1 none; a whole Perfect build call left it sturdy (+10 % hit points). */
+  readonly builder = new Int16Array(this.cap);
+  readonly sturdy = new Uint8Array(this.cap);
   /** Ore node it stands on, −1 none. */
   readonly node = new Int8Array(this.cap);
   readonly atkCd = new Float64Array(this.cap);
-  /** Ticks of production done toward the next yield. */
-  readonly progress = new Float64Array(this.cap);
-  /** Mine pile, thousandths of gold. */
+  /** Mine: ticks of production toward the next yield; the pile (thousandths of gold); the miner's next haul. */
+  readonly prod = new Float64Array(this.cap);
   readonly pile = new Int32Array(this.cap);
-  /** Agent slot assisting it, −1 none; its pile next goes to the treasury at `collectAt`. */
-  readonly assist = new Int8Array(this.cap);
-  readonly collectAt = new Int32Array(this.cap);
+  readonly haulAt = new Int32Array(this.cap);
+  /** Towers and the Bastion: power charges 0–5, the tick of the last power call (§4.5). */
+  readonly charges = new Uint8Array(this.cap);
+  readonly powerAt = new Int32Array(this.cap);
+  /** The building's own call (mine, power), −1 none. */
+  readonly call = new Int16Array(this.cap);
   readonly rallyX = new Float64Array(this.cap);
   readonly rallyZ = new Float64Array(this.cap);
-  readonly rateMul = new Float64Array(this.cap);
-  readonly dmgMul = new Float64Array(this.cap);
-  readonly areaMul = new Float64Array(this.cap);
-  readonly critAdd = new Float64Array(this.cap);
-  readonly outMul = new Float64Array(this.cap);
-  readonly extraTargets = new Uint8Array(this.cap);
-  /** Soldiers' armour added; a blast's rim share added (cannon). */
-  readonly armorAdd = new Float64Array(this.cap);
-  readonly edgeAdd = new Float64Array(this.cap);
-  /** Tempo index (0: Dừng) and the one "stop all" put aside. */
-  readonly tempo = new Uint8Array(this.cap);
-  readonly tempoPrev = new Uint8Array(this.cap);
-  /** The assistant settles (and the building starts to count as assisted) at this tick. */
-  readonly assistAt = new Int32Array(this.cap);
-  readonly anchor = new Int32Array(this.cap);
-  readonly anchorK = new Int32Array(this.cap);
-  readonly nextEmit = new Int32Array(this.cap);
-  readonly shift = new Uint8Array(this.cap);
-  /** A deal is due but the caps are full ("…" on the roof). */
-  readonly waiting = new Uint8Array(this.cap);
-  readonly liveWords = new Uint8Array(this.cap);
-  /** First letter of its last word, −1 none: the next may not share it. */
-  readonly lastLetter = new Int8Array(this.cap);
-  /** Heat 0–5000 (thousandths); afterglow cools from `glowAt` (−1: not cooling). */
-  readonly heat = new Int32Array(this.cap);
-  readonly glowAt = new Int32Array(this.cap);
-  /** S_w and A_w of its last 5 finished words (a ring of RECENT per slot), and their means. */
-  readonly recentS = new Float64Array(this.cap * RECENT);
-  readonly recentA = new Float64Array(this.cap * RECENT);
-  readonly recentN = new Uint8Array(this.cap);
-  readonly recentHead = new Uint8Array(this.cap);
-  readonly speedAvg = new Float64Array(this.cap);
-  readonly accAvg = new Float64Array(this.cap);
-  /** Good words in a row here; words ended and caught since its tempo was set (the tempo hint). */
-  readonly streak = new Uint8Array(this.cap);
-  readonly resolved = new Uint16Array(this.cap);
-  readonly hits = new Uint16Array(this.cap);
+  /** Farm: each plot's stage and its work 0–1 (sowing, growth or harvest by stage), its farmer, the plot to harvest first (−1). */
+  readonly plot = new Uint8Array(this.cap * FARM.plots);
+  readonly plotWork = new Float64Array(this.cap * FARM.plots);
+  readonly farmer = new Int16Array(this.cap);
+  readonly prio = new Int8Array(this.cap);
 
-  add(def: number, x: number, z: number, hp: number, tick: number, readyTick: number, paid: number, node: number): number {
+  add(def: number, x: number, z: number, hp: number, tick: number, node: number): number {
     const slot = this.take();
     if (slot < 0) return -1;
     this.def[slot] = def;
@@ -79,12 +55,10 @@ export class BuildingStore extends Slots {
     this.x[slot] = this.rallyX[slot] = x;
     this.z[slot] = this.rallyZ[slot] = z;
     this.hp[slot] = hp;
-    this.readyTick[slot] = readyTick;
     this.builtTick[slot] = tick;
-    this.paid[slot] = paid;
     this.node[slot] = node;
-    this.assist[slot] = this.lastLetter[slot] = this.glowAt[slot] = -1;
-    this.rateMul[slot] = this.dmgMul[slot] = this.areaMul[slot] = this.outMul[slot] = 1;
+    this.builder[slot] = this.call[slot] = this.farmer[slot] = this.prio[slot] = -1;
+    this.powerAt[slot] = NEVER;
     return slot;
   }
 }

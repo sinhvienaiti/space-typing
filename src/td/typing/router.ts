@@ -2,7 +2,8 @@
  * The key router (docs/td/TYPING_DEFENSE_DESIGN.md 6.15), run inside the
  * simulation: a key is a command with a tick. With a word locked, the right
  * letter moves it on and a wrong one is an error on it, except the soft
- * switch: one letter in, no error yet, and the key starts another live word
+ * switch: at most one letter in (none for a call's next word, which comes
+ * locked: BUILD_1A6 §5.2), no error yet, and the key starts another live word
  * (the lock moves there; the first word goes back to untyped, unpunished).
  * With no lock, a tier-1 first letter locks its word, a tier-2 letter opens
  * the pair and the second key picks one, and anything else is a stray key.
@@ -40,7 +41,7 @@ export function routeKey(router: Router, deck: Deck, letters: Letters, live: Typ
       return KEY.done;
     }
     const other = letters.owner[c]!;
-    if (live.typed[lock] === 1 && live.errors[lock] === 0 && other >= 0 && other !== lock && letters.partner[c]! < 0) {
+    if (live.typed[lock]! <= 1 && live.errors[lock] === 0 && other >= 0 && other !== lock && letters.partner[c]! < 0) {
       live.typed[lock] = 0;
       live.touched[lock] = 0;
       lockOn(router, live, other, 1);
@@ -75,14 +76,14 @@ export function routeKey(router: Router, deck: Deck, letters: Letters, live: Typ
   return KEY.lock;
 }
 
-/** One letter back on the locked word (its errors stay); at 0 the lock goes. An open pair just closes. */
+/** One letter back on the locked word (its errors stay); at 0 the lock goes (a call's next word has none to take back). An open pair just closes. */
 export function routeBackspace(router: Router, live: TypedWords): boolean {
   if (router.group >= 0) {
     router.group = -1;
     return true;
   }
   if (router.lock < 0) return false;
-  live.typed[router.lock] = live.typed[router.lock]! - 1;
+  live.typed[router.lock] = Math.max(0, live.typed[router.lock]! - 1);
   if (live.typed[router.lock] === 0) router.lock = -1;
   return true;
 }

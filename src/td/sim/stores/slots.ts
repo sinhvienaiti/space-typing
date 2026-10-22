@@ -61,3 +61,9 @@ export class Slots {
     return out;
   }
 }
+
+/** Adds `by` to column[i] and returns the sum: a progress step and its test in one. */
+export const addAt = (column: Float64Array, i: number, by: number): number => (column[i] = column[i]! + by);
+
+/** Work done: a share summed tick by tick (1/2400 2400 times) may land a hair under 1. */
+export const DONE = 1 - 1e-9;

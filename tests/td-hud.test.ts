@@ -3,79 +3,147 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { TICK_HZ } from "../src/td/content/rules";
 import { PLACE_CHECKS } from "../src/td/sim/placement";
-import { tempoIndex } from "../src/td/typing/tempo";
-import { REASON, statusHtml } from "../src/td/ui/hud";
+import { CALL_KIND } from "../src/td/sim/stores/calls";
+import { makeCall } from "../src/td/sim/systems/calls";
+import { Selection } from "../src/td/app/selection";
+import { review } from "../src/td/sim/systems/calls";
+import { compileDeck } from "../src/td/typing/decks";
+import { dockHtml } from "../src/td/ui/build-menu";
+import { actionsHtml, REASON, statusHtml, stripHtml } from "../src/td/ui/hud";
 import { teamHtml } from "../src/td/ui/team-bar";
-import { arrive, run, send, world } from "./td/fixtures";
-import { smallDeck } from "./td/typing";
+import { pips } from "../src/td/view/words/cards";
+import { built, run, send, world } from "./td/fixtures";
+import { callWord, type } from "./td/typing";
 
 /**
- * The HUD's words and numbers (docs/td/BUILD_NOW.md §5.3; TK 6.13, 18.3): what
+ * The HUD's words and numbers (docs/td/BUILD_NOW.md §5.3, BUILD_1A6 §9): what
  * a panel promises is what the sim does. The panels are HTML strings, read here
  * without a page.
  */
 const status = (w: ReturnType<typeof world>) => statusHtml(w, true, false, false, []);
 
 describe("the status panel", () => {
-  it("the flag button promises the gold an early call pays, at every tick of the count; the count itself rounds up", () => {
-    // A tick in: 29.98 s left; 31 in: 29.48 s ("30 s · +29"); 59 in: 29.02 s; 60 in: exactly 29 s.
-    for (const into of [0, 1, 31, 59, 60, 61, 1799]) {
+  it("shows gold, wood, food, seeds and lives, then the day's clock or the night's enemies left", () => {
+    const w = world();
+    const html = status(w);
+    for (const [label, value] of [["Vàng", "220"], ["Gỗ", "40"], ["Lúa", "0"], ["Hạt", "4"], ["Mạng", "20"]]) expect(html).toContain(`<small>${label}</small><b>${value}</b>`);
+    expect(html).toContain("<b>Ngày 1 · 1:15</b>");
+    run(w, 61);
+    expect(status(w)).toContain("<b>Ngày 1 · 1:14</b>"); // 73.98 s left rounds up
+    send(w, { t: "callNight" });
+    expect(status(w)).toMatch(/<b>Đêm 1 · còn \d+ quái<\/b>/);
+    expect(status(w)).not.toContain("Gọi đêm sớm");
+  });
+
+  it("the call button promises the gold an early night pays, at every tick of the day", () => {
+    for (const into of [0, 1, 31, 59, 60, 61, 3000, 4439, 4441]) {
       const w = world();
-      send(w, { t: "callWave" });
-      while (w.nextWaveAt < 0) run(w, 1);
       run(w, into);
       const html = status(w);
-      const promised = Number(/Gọi đợt 2 sớm · \+(\d+) vàng/.exec(html)?.[1]);
-      const left = (w.nextWaveAt - w.tick) / TICK_HZ;
-      const called = send(w, { t: "callWave" }).find((event) => event.t === "waveCalled");
-      expect(called, "tick " + into).toMatchObject({ wave: 2, bonus: promised });
-      expect(html, "tick " + into).toContain(`<small>${Math.ceil(left)} s</small>`);
-      expect(promised).toBe(Math.min(30, Math.floor(left)));
+      const promised = Number(/Gọi đêm sớm · \+(\d+) vàng/.exec(html)?.[1]);
+      const called = send(w, { t: "callNight" }).find((event) => event.t === "nightCalled");
+      expect(called, "tick " + into).toMatchObject({ day: 1, bonus: promised });
+      expect(promised).toBe(Math.min(30, Math.floor((w.phaseEnd < 0 ? 4500 - into : 0) / TICK_HZ)));
     }
   });
 
-  it("shows the wave as n/N through the list, then n alone in the sandbox's endless waves", () => {
-    const w = world();
-    const wave = () => /<small>Đợt<\/small><b>([^<]*)/.exec(status(w))?.[1];
-    expect(wave()).toBe("0/6");
-    w.wave = 6;
-    expect(wave()).toBe("6/6");
-    w.wave = 7;
-    expect(wave()).toBe("7");
-  });
-
   it("names every reason the sim may refuse a command for, in Vietnamese", () => {
-    // applyCommand's reasons: the string literals commands.ts returns, typeKey's (words.ts), and canPlace's checks.
-    const files = ["../src/td/sim/commands.ts", "../src/td/sim/systems/words.ts"].map((path) => readFileSync(join(__dirname, path), "utf8"));
+    // applyCommand's reasons: the string literals commands.ts returns, typeKey's (calls.ts), and canPlace's checks.
+    const files = ["../src/td/sim/commands.ts", "../src/td/sim/systems/calls.ts"].map((path) => readFileSync(join(__dirname, path), "utf8"));
     const returned = files.flatMap((text) => [...text.matchAll(/return ([^;]*);/g)].flatMap((match) => [...match[1]!.matchAll(/"([a-z][A-Za-z]*)"/g)].map((literal) => literal[1]!)));
     const reasons = [...new Set([...returned, ...PLACE_CHECKS])];
-    expect(reasons).toEqual(expect.arrayContaining(["noBuilding", "noBarracks", "badValue", "noSandbox", "badKey", "blocked", "notCounting", "path"]));
+    expect(reasons).toEqual(expect.arrayContaining(["noBuilding", "noBarracks", "badValue", "noSandbox", "badKey", "blocked", "notDay", "path", "tree", "wood", "food", "villagerCap", "notRipe", "noTree"]));
     expect(reasons.filter((reason) => REASON[reason] === undefined)).toEqual([]);
   });
 });
 
-describe("the load chip (TK 6.13)", () => {
-  /** The Bastion assisted at 4 s (15 words a minute) with 4-letter words: K = 0.75 × E × 5 / 5, so E = 20 is 100 % and E = 16 is 125 %. */
-  function loadAt(expected: number) {
-    const w = world({ deck: smallDeck(["cats", "dogs", "fish", "bird", "lamp", "ring"]), difficulty: "easy", expected });
-    send(w, { t: "assignUnit", agent: 0, building: w.buildings.id(0) });
-    arrive(w);
-    send(w, { t: "setTempo", building: w.buildings.id(0), idx: tempoIndex(4) });
-    run(w, 60);
-    const chip = /class="td-load" style="background:(#[0-9a-f]{6})"[^>]*>Tải (\d+) %/.exec(teamHtml(w, 0));
-    return [Number(chip?.[2]), chip?.[1]];
-  }
+describe('the "Đang gọi" chip (BUILD_1A6 §9)', () => {
+  it("counts the open calls against the mode's cap", () => {
+    const w = world();
+    const chip = () => /Đang gọi (\d+)\/(\d+)/.exec(teamHtml(w, 0))?.slice(1).map(Number);
+    expect(chip()).toEqual([0, 3]);
+    for (let k = 0; k < 4; k += 1) makeCall(w, CALL_KIND.mine, 1, -1, 0, -1, -1);
+    run(w, 1);
+    expect(chip()).toEqual([3, 3]);
+    send(w, { t: "sandbox", op: { op: "mode", value: "challenge" } });
+    expect(chip()).toEqual([4, 4]);
+  });
+});
 
-  it("is jade up to 100 %, amber up to 125 %, orange past it (never red, the enemy's)", () => {
-    expect(loadAt(21)).toEqual([95, "#0b8a78"]);
-    expect(loadAt(20)).toEqual([100, "#0b8a78"]);
-    expect(loadAt(19)).toEqual([105, "#c98a2e"]);
-    expect(loadAt(16)).toEqual([125, "#c98a2e"]);
-    expect(loadAt(15)).toEqual([133, "#e2701e"]);
+describe("learning in the HUD (BUILD_1A6 §7)", () => {
+  const deck = compileDeck([{ id: "g", text: "good", level: 1, vi: "tốt; hay", ipa: "/ɡʊd/" }, { id: "c", text: "cold", level: 1, vi: "lạnh; rét", ipa: "/koʊld/" }]);
+
+  it("the status counts knowledge and the review book once there are any", () => {
+    const w = world({ deck });
+    expect(status(w)).not.toContain("Tri thức");
+    review(w, 1, true);
+    expect(status(w)).toContain("Tri thức <b>0</b> · Sổ ôn <b>1</b>");
   });
 
-  it("counts only buildings that deal: none assisted is 0 % with no list", () => {
-    const html = teamHtml(world(), 0);
-    expect(html).toContain('title="Chưa nhà nào phát chữ">Tải 0 %');
+  it("the strip hides a quiz's word past what is typed, under its meaning; the learn mode adds meaning and IPA; other modes neither", () => {
+    const w = world({ deck });
+    callWord(w, 0, 1, CALL_KIND.quiz);
+    type(w, "g", 60, true);
+    expect(stripHtml(w, "")).toContain('<b class="td-word"><span>g</span>___</b><small class="td-mean">tốt; hay</small>');
+    type(w, "o", 60, true);
+    expect(stripHtml(w, "")).toContain("<span>go</span>__</b>");
+    for (const [mode, mean] of [["learn", '<small class="td-mean">lạnh; rét /koʊld/</small>'], ["balanced", ""]] as const) {
+      const other = world({ deck, mode });
+      callWord(other, 1);
+      type(other, "c", 60, true);
+      expect(stripHtml(other, "")).toContain('<b class="td-word"><span>c</span>old</b>' + mean + "<span");
+    }
+  });
+});
+
+describe("cards and buttons (BUILD_1A6 §8–§9)", () => {
+  it("the farm's card: plots by stage, seeds, a pack, the auto-buy; the Bastion's: villagers, builders, food, hire, sale; a tower's: power charges", () => {
+    const w = world({ gold: 1000 });
+    const sel = new Selection(w, () => undefined);
+    send(w, { t: "sandbox", op: { op: "preset" } });
+    const card = (id: string) => {
+      sel.focus = w.buildings.id(w.buildings.live().find((b) => w.c.buildings[w.buildings.def[b]!]!.id === id)!);
+      return dockHtml(w, sel);
+    };
+    const farm = card("farm");
+    for (const text of ["Chín <b>1</b> · Lớn <b>2</b> · Trống <b>1</b>", "Hạt giống <b>", "Mua 4 hạt · 30 vàng", 'class="is-on">Tự mua hạt']) expect(farm).toContain(text);
+    for (const text of ["Dân <b>5/7</b> · Thợ xây <b>3</b> · Lúa <b>0</b>", "Thuê dân · 25 vàng, 5 lúa", "Bán 10 Lúa · +10 vàng"]) expect(card("keep")).toContain(text);
+    expect(card("archer")).toContain("Lượt mạnh <b>0/5</b>");
+  });
+
+  it("the card of a dim call Tab is on names it and sends the agent; the actions bar has Space only where the mode pauses", () => {
+    const w = world({ gold: 1000 });
+    const mine = built(w, "gold-mine", 26, -30);
+    [w.buildings.haulAt[mine], w.buildings.pile[mine]] = [1e9, 31000];
+    run(w, 1);
+    const sel = new Selection(w, () => undefined);
+    sel.call = w.calls.id(w.buildings.call[mine]!);
+    expect(dockHtml(w, sel)).toMatch(/⛏️ Đào.*2 từ · đang mờ.*Ngoài vòng giúp.*Gửi Draconis/s);
+    w.agents.x[0] = w.buildings.x[mine]!; // in the ring, still dim: it waits for room, sending someone would not light it
+    w.agents.z[0] = w.buildings.z[mine]! + 4;
+    expect(dockHtml(w, sel)).toMatch(/Trong vòng giúp: sáng khi bớt lời gọi đang sáng/);
+    expect(actionsHtml(w, false)).not.toContain("Space");
+    send(w, { t: "sandbox", op: { op: "mode", value: "relax" } });
+    expect([actionsHtml(w, false), actionsHtml(w, true)].map((html) => /data-act="space">([^<]+)/.exec(html)?.[1])).toEqual(["Tạm dừng", "Chạy tiếp"]);
+  });
+});
+
+describe("the tactical pause and the word dots (review R2)", () => {
+  it("the strip says the game waits, beside the locked word, where the eyes are", () => {
+    const deck = compileDeck([{ id: "g", text: "good", level: 1 }]);
+    const w = world({ deck, mode: "relax" });
+    expect(stripHtml(w, "", true)).toMatch(/^<em class="td-warn td-halt">Tạm dừng · Space<\/em><span class="td-chain"/);
+    callWord(w, 0);
+    type(w, "g", 60, true);
+    expect(stripHtml(w, "", true)).toContain('<b class="td-word"><span>g</span>ood</b><em class="td-warn td-halt">Tạm dừng');
+    expect(stripHtml(w, "")).not.toContain("Tạm dừng");
+  });
+
+  it("dots count the words a call still asks, the current one included, then the typed ones; none for a one-word call", () => {
+    const w = world();
+    const chop = makeCall(w, CALL_KIND.chop, 4, -1, 0, -1, -1);
+    w.calls.done[chop] = 1;
+    expect(pips(w, chop)).toBe("●●●○");
+    expect(pips(w, makeCall(w, CALL_KIND.power, 1, -1, 0, -1, -1))).toBe("");
   });
 });

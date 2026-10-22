@@ -1,12 +1,17 @@
 /**
  * Small builders for Typing Defense simulation tests: a world, commands that
- * act this tick, and enemies dropped straight onto a route.
+ * act this tick, buildings built at once, and enemies dropped straight onto a route.
  */
-import type { CommandBody } from "../../src/td/sim/commands";
+import { placeBuilding, type CommandBody } from "../../src/td/sim/commands";
+import { TASK } from "../../src/td/sim/stores/npcs";
+import { MODE } from "../../src/td/sim/stores/walkers";
+import { closeCall } from "../../src/td/sim/systems/calls";
+import { finishSite } from "../../src/td/sim/systems/economy";
 import { createWorld, step, type World, type WorldOptions } from "../../src/td/sim/world";
 
+/** A world on seed 1; asking for `gold` brings as much wood (a test's building budget), unless `wood` is given. */
 export function world(options: Partial<WorldOptions> = {}): World {
-  return createWorld({ seed: 1, ...options });
+  return createWorld({ seed: 1, wood: options.gold, ...options });
 }
 
 /** Runs one tick with the given commands and returns its rare events. */
@@ -31,17 +36,41 @@ export function build(w: World, id: string, x: number, z: number): number {
   return built.building & 1023;
 }
 
-/** Finishes every construction. */
+/** Finishes every site at once, as if its builder were done (no call, no bonus): a test shortcut. */
 export function ready(w: World): void {
-  run(w, 151);
+  const B = w.buildings;
+  for (const b of B.live()) {
+    if (B.upTo[b] === 0) continue;
+    const n = B.builder[b]!;
+    if (n >= 0) {
+      if (w.npcs.call[n]! >= 0) closeCall(w, w.npcs.call[n]!);
+      w.npcs.task[n] = TASK.idle;
+      w.npcs.job[n] = -1;
+    }
+    finishSite(w, b);
+  }
 }
 
-/** Steps until every agent sent to a building assists it (walking and flying take time since 1A.3); returns on the tick after the last arrival. */
+/** Puts `id` down at (x, z) already built (the sandbox preset's way), free; returns its slot. */
+export function built(w: World, id: string, x: number, z: number): number {
+  const node = w.map.nodes.findIndex((n) => n.x === x && n.z === z);
+  const slot = placeBuilding(w, def(w, id), x, z, node, true);
+  if (slot < 0) throw new Error("no room for " + id);
+  return slot;
+}
+
+/** Steps until every agent stands where it was sent (walking and flying take time); returns on the tick after the last arrives. */
 export function arrive(w: World, limit = 60 * 60): void {
   const A = w.agents;
-  const pending = () => A.live().some((a) => A.goal[a]! >= 0 && A.at[a] !== A.goal[a]);
+  const pending = () => A.live().some((a) => A.mode[a] !== MODE.stand || A.x[a] !== A.gx[a] || A.z[a] !== A.gz[a]);
   for (let tick = 0; tick < limit && pending(); tick += 1) step(w);
   if (pending()) throw new Error("agents still on their way after " + limit + " ticks");
+}
+
+/** Sends agent a to stand at (x, z) and steps until it is there. */
+export function goTo(w: World, a: number, x: number, z: number): void {
+  send(w, { t: "move", agent: a, qx: q(x), qz: q(z) });
+  arrive(w);
 }
 
 /**

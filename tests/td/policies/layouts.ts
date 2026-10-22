@@ -1,7 +1,6 @@
 /**
- * Layouts on the sandbox field (BUILD_NOW §3.1, TK 19.4–19.5): where the bots
- * build and who assists what. Spots are checked by canPlace in the tests that
- * use them; mines sit on the ore nodes' centres.
+ * Layouts on the sandbox field (BUILD_NOW §3.1, BUILD_1A6 §4, §12 gate 4): where the bots build and whom the
+ * helpers stand by. Spots are checked by canPlace in the tests that use them; mines sit on the ore nodes' centres.
  */
 import type { Layout, Spot } from "./stand";
 
@@ -17,39 +16,33 @@ export const ARCHER_WEST: Spot = { id: "archer", x: -16, z: -4 };
 export const MINE_N1: Spot = { id: "gold-mine", x: 26, z: -30 };
 export const MINE_N2: Spot = { id: "gold-mine", x: -12, z: 32 };
 export const MINE_N3: Spot = { id: "gold-mine", x: -34, z: 8 };
-
-/** Gold that puts any layout below down at once (the sandbox). */
-export const LAYOUT_GOLD = 2000;
-
-/**
- * The same five buildings for every slot count, so only the slots differ (TK 19.4): 1 the hero at the merge's
- * archer; 2 Chấm at the mine; 3 the hero at the cannon (his burn), Chấm at the archer (his shot), Phẩy at the mine;
- * 4 Phẩy at the barracks (his drum), Gạch at the mine (his craft).
- */
-export function slotsLayout(slots: 1 | 2 | 3 | 4): Layout {
-  const assign = [[0], [0, 4], [1, 0, 4], [1, 0, 2, 4]][slots - 1]!;
-  return { name: slots + " ô", builds: [ARCHER_MERGE, CANNON, BARRACKS, ARCHER_EAST, MINE_N1], assign, keep: [[1, slots]], gold: LAYOUT_GOLD };
-}
+/** The farm by the Bastion (the sandbox preset's). */
+export const FARM_KEEP: Spot = { id: "farm", x: -17, z: 40 };
+/** The farm by the south-east trees, the cluster nearest the Bastion (14–22 m): fields and wood in one ring. */
+export const FARM_EAST: Spot = { id: "farm", x: 18, z: 30 };
+/** A second farm south of it, its fields 6.5 m off: the hero's ring holds both. */
+export const FARM_SOUTH: Spot = { id: "farm", x: 18, z: 23.5 };
+/** Where marks go, cluster by cluster: the south-east trees, the stream's east bank, its west bank, the gate's west side, the gate, the north-east corner. */
+export const WOOD = [[17, 38], [-18.5, -26], [-29, -29], [-18, -41], [6, -43], [38, -40]] as const;
 
 /**
- * The balanced bot's build (TK 19.5 "An toàn", 19.7): from 220 gold, the merge's archer and barracks, the rich mine,
- * then the roads' archers, the cannon and a second mine as gold comes; the Bastion at level 2 from wave 3, then
- * Chấm holds the mine and the hero the merge (TK 19.4 "Trực mỏ"; the hero swings between them before, by a rule).
+ * The standard build (BUILD_1A6 §12 gate 4: a farm, trees chopped, towers, barracks, a mine, the Bastion raised with
+ * gold): the farm by the south-east trees, the merge's archer and barracks, the rich mine on N1, the Bastion to
+ * level 2 (Chấm out, by the farm), the east road's archer and the cannon, a second farm, the Bastion to level 3
+ * (Phẩy out, by the mine), then level 2 for the merge's archer, the west archer, level 2 for the cannon, the mine
+ * and the barracks. Marked
+ * trees: the villagers' count and 2 more, cluster by cluster from the south-east trees; up to 4 villagers, 20 gold
+ * kept back; food past 20 sold; the days run out (no early night).
  */
-export const BALANCED: Layout = {
-  name: "Cân bằng",
-  builds: [ARCHER_MERGE, BARRACKS, MINE_N2, ARCHER_EAST, CANNON, ARCHER_WEST, MINE_N3],
-  assign: [0, 2],
-  keep: [[1, 1], [3, 2]],
-};
-
-/** As balanced, three slots from wave 3 (the fast typist of TK 19.7: 2–3 slots); Phẩy at the second mine. */
-export const BALANCED_3: Layout = { ...BALANCED, name: "Cân bằng 3 ô", assign: [0, 2, 6], keep: [[1, 1], [3, 3]] };
-
-/** Every slot on a mine, the fourth on the Bastion ("Đứng Mỏ", TK 19.6). */
-export const MINES_ONLY: Layout = {
-  name: "Đứng Mỏ",
-  builds: [ARCHER_MERGE, BARRACKS, MINE_N2, MINE_N1, MINE_N3, ARCHER_EAST, CANNON],
-  assign: [2, 3, 4, -1],
-  keep: [[1, 1], [3, 2]],
+export const STANDARD: Layout = {
+  name: "Chuẩn",
+  builds: [
+    FARM_EAST, ARCHER_MERGE, BARRACKS, MINE_N1, { keep: 2 }, ARCHER_EAST, CANNON, { keep: 3 },
+    { upgrade: 1, level: 2 }, ARCHER_WEST, { upgrade: 6, level: 2 }, { upgrade: 3, level: 2 }, { upgrade: 2, level: 2 },
+  ],
+  helpers: [0, 3],
+  marks: { spare: 2, woodAt: WOOD },
+  villagers: 4,
+  hireReserve: 20,
+  foodKeep: 20,
 };

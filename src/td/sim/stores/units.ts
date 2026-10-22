@@ -20,16 +20,14 @@ export class UnitStore extends Slots {
   readonly lastFight = new Int32Array(this.cap);
   /** Fraction of a hit point regained but not yet added. */
   readonly regen = new Float64Array(this.cap);
-  /** 0: one of the squad; 1: Flow's extra soldier; 2: five good words' extra soldier, gone at `expireAt`. */
-  readonly temp = new Uint8Array(this.cap);
-  readonly expireAt = new Int32Array(this.cap);
+  /** Its respawn found no food and waits twice as long (BUILD_1A6 §4.6). */
+  readonly hungry = new Uint8Array(this.cap);
 
   add(barracks: number, post: number, hp: number, x: number, z: number): number {
     const slot = this.take();
     if (slot < 0) return -1;
     this.barracks[slot] = barracks;
     this.post[slot] = post;
-    this.expireAt[slot] = -1;
     this.stand(slot, hp, x, z, 0);
     return slot;
   }
@@ -45,5 +43,6 @@ export class UnitStore extends Slots {
     this.respawnAt[slot] = -1;
     this.lastFight[slot] = tick;
     this.regen[slot] = 0;
+    this.hungry[slot] = 0;
   }
 }

@@ -33,7 +33,7 @@
 
 ### 1.2 Phần cho từng mốc còn lại (ước lượng lại sau review 1A.3; 1A.4 ghi số thật)
 
-Mốc đang làm: **1A.5**. Test `td-boundary` đọc dòng này và cột "Cộng dồn tối đa" của mốc đó, rồi hỏng khi tổng vượt (ngoài trần cứng 5.500). Bắt đầu mốc mới thì đổi dòng trên trước khi viết mã.
+Mốc đang làm: **1A.6**. Test `td-boundary` đọc dòng này và cột "Cộng dồn tối đa" của mốc đó, rồi hỏng khi tổng vượt (ngoài trần cứng của `BUILD_1A6.md` §0). Bắt đầu mốc mới thì đổi dòng trên trước khi viết mã. Từ 1A.6 đếm như `BUILD_1A6.md` §0: chỉ TypeScript trong `src/td` (1A đếm thêm `td.html`, `rng.ts`, `td.css`: 178 dòng; mục 3).
 
 | Mốc | Phần mới (ước lượng theo mã thật đã có) | Tối đa | Cộng dồn tối đa |
 |---|---|---|---|
@@ -41,6 +41,7 @@ Mốc đang làm: **1A.5**. Test `td-boundary` đọc dòng này và cột "Cộ
 | 1A.3 Người và ô (xong, gồm sửa review) | 378 thật: 337 của mốc (mục 1.4: `nav/astar` 107, kho `agents` 36, hệ `agents` 174, `stream` −29, nối `commands` `world` `placement` `compile` `events` `main` +13, vẽ người, đường A*, dây +36) và 41 của bản sửa review 1A.3 (mục 1.6: `nav` +18, hệ `agents` +4, `debug-2d` +17, `cards` +2) | 340 + 41 | 4.960 |
 | 1A.4 Điều khiển, HUD (xong, gồm sửa review) | 496 thật: 499 của mốc (mục 1.7; bản đầu đủ mục 5.3–5.4 dài 822, cắt UI theo mục 1.8) và −3 của bản sửa review 1A.4 (mục 1.10) | 500 | 5.460 |
 | 1A.5 Bot, báo cáo (xong) | 41 thật (mục 1.11): op hộp cát `flood` (TK 25.12) ở `spawn.ts` +19 và `commands.ts` +6, đo khung ở `main.ts` +16; bot, chính sách, báo cáo nằm ở `tests/` và `scripts/` | 40 | 5.500 |
+| 1A.6 Lời Gọi (R1, R2 xong, R3 còn; đếm mới, chỉ `.ts` của `src/td`) | R1: 5.319 → 5.540 thật (mục 3, gồm sửa review); R2: 5.540 → 5.850 thật (mục 4) | R1 tới 6.600; R2 tới 7.000; R3 phần còn lại | 7.300 |
 
 Ước lượng lại 1A.4 (review 1A.3, mục 5), tính cả `move` và đốm sáng dọc dây trợ lực mà 1A.3 dời sang, cùng 41 dòng của bản sửa review 1A.3. Bản sửa đó dùng hết 38 dòng dự phòng dưới trần, nên phần của 1A.4 giữ 500 mà phải chứa thêm hai việc. Cắt theo BUILD_NOW §10 (cắt UI trước, không cắt luật, test) trước khi viết mã 1A.4:
 
@@ -321,51 +322,315 @@ Cấu hình này:
 - file `public/` nào worktree không có thì đọc từ `public/` của bản checkout chính, chỉ đọc. File của worktree vẫn được ưu tiên;
 - phục vụ `/vocabulary/` từ `shared/vocabulary` của kho, chỉ đọc, như cấu hình nginx dev (`infra/nginx/typing-game.local.dev.conf`). Với lệnh Vite thường, `/vocabulary/` trả 404 và `td.html` chạy bằng từ dự phòng (mục 1.3).
 
-Các cổng của một mốc:
+Các cổng của một mốc (từ 1A.6 R3; cổng 3110 của 1A thành 3140 ở worktree R3):
 
 ```bash
 npx tsc -p tsconfig.json --noEmit
+npx tsc -p tsconfig.server.json --noEmit
 npx vitest run
-# server ở trên chạy nền, rồi:
-URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-boot.mjs --width=1280 --height=720
-URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-combat.mjs --width=1280 --height=720
-URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-stream.mjs --width=1280 --height=720
-URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-slots.mjs --width=1280 --height=720
-URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-keyboard-only.mjs --width=1280 --height=720
-URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-words-dense.mjs --width=1280 --height=720
-URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-ime.mjs --width=1280 --height=720
-URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-perf.mjs --width=1280 --height=720
-URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-tour.mjs --width=1280 --height=720
-MAPS=halo-garden ISLANDS=0 URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/defense.mjs
+npx vite build --outDir <thư mục tạm ngoài repo>
+node --import tsx scripts/td/golden.ts --check
+# server ở trên chạy nền, rồi mỗi kịch bản ở hai cỡ (--width=1280 --height=720 và --width=1920 --height=1080):
+URL=http://127.0.0.1:3140/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/<tên>.mjs --width=1280 --height=720
+#   <tên>: td-1a-boot, td-1a-ime, td-1a6-day, td-1a6-night, td-1a6-keyboard, td-1a6-attention, td-1a6-learn, td-1a6-perf, td-1a6-tour
+MAPS=halo-garden ISLANDS=0 URL=http://127.0.0.1:3140/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/defense.mjs
 ```
 
-Chạy thêm một lần mỗi kịch bản `td-1a-*` với `--width=1920 --height=1080` (trừ `td-1a-tour`, bộ ảnh 1280 × 720).
-
-Bot và báo cáo (1A.5), trong worktree gọi thẳng bằng `node` (mục 1.12):
+Bot và báo cáo, trong worktree gọi thẳng bằng `node` (mục 1.12):
 
 ```bash
-node --import tsx scripts/td/balance.ts [--seeds=3] [--waves=6]   # pnpm td:balance
+node --import tsx scripts/td/balance.ts [--seeds=5] [--nights=4]   # pnpm td:balance (mục 5.2)
 node --import tsx scripts/td/golden.ts [--check] [--fresh-words]   # pnpm td:golden:update
+node --import tsx scripts/td/replay.ts <thư mục tạm>/td-1a6-day-replay-1280x720.json
 ```
 
-`td-1a-stream.mjs` gõ đợt 1 ở nhịp 4 s (mỗi lúc một từ), rồi cho tháp sang nhịp 1 s trong 12 s: đòi ≥ 2 từ sống cùng lúc và một lần đổi khóa mềm cố ý, chụp thêm `td-1a-stream-dense`. Tầng 2 cần 3–4 nhà bận nên để `td-1a-slots` (1A.3) kiểm.
+Kịch bản 1A.6 và việc từng cái kiểm: mục 5.7. Bảy kịch bản 1A viết theo dòng chữ, nhịp và trợ lực ở ổ (`td-1a-combat`, `td-1a-stream`, `td-1a-slots`, `td-1a-keyboard-only`, `td-1a-words-dense`, `td-1a-perf`, `td-1a-tour`) đã xóa ở R3 (luật của chúng không còn; xem git trước `ce740e0c`). Giữ `td-1a-boot` (khởi động không media, phông, HUD) và `td-1a-ime`: kiểu UniKey / EVKey (chữ đầu, Backspace, chữ có dấu không mã phím: Telex "aa", "dd", "ee", VNI "a1", "o6") và kiểu bộ gõ hệ điều hành (phím "Process", keyCode 229); phím tiếng Việt chỉ ra lệnh `key` và `backspace`; số chọn người, Backquote bước sang người kế, Tab và Enter ra đúng lệnh; từ R3 `-` và `=` (núm nhịp cũ) không ra lệnh nào. Đây là phím giả qua CDP: không thay được kiểm tra UniKey và EVKey thật (BUILD_NOW §8).
 
-`td-1a-slots.mjs` (1A.3) làm "Đặt sẵn 4 ô" bằng lệnh: Lũy cấp 4, 1.000 Vàng hộp cát, Tháp Pháo (7, 12), Tháp Cung (−8, 12), Trại Lính (3, 18) ở khúc nhập, Mỏ trên N3 (−34, 8); Draconis tới Pháo (ái lực), Chấm tới Cung, Phẩy tới Trại Lính, Gạch tới Mỏ (đúng sở trường). Chụp `td-1a-route` khi Gạch đang đi (đường A* nét đứt qua cầu nam), gõ 70 WPM, gọi đợt 1 khi Gạch tới mỏ, gọi đợt 2 ngay khi được, rồi cả bốn nhà nhịp 1 s trong 10 s; chụp `td-1a-four-slots` khi bốn nhà cùng có từ. Cặp tầng 2 cần ≤ 5 chữ đầu trống, tức 12 từ giữ chữ và 5 chữ đang nghỉ: bốn nhà nhịp 1 s chỉ chạm lúc đỉnh. Nên nếu chưa thấy cặp nào, pha cuối đặt E = 45 trong hộp cát và gõ 45 WPM, chờ tới khi có cặp, tối đa 120 s (Node, 60 seed: lúc này có khoảng 4 cặp mỗi phút, cặp đầu trong 60 s ở cả 60 seed); chụp `td-1a-tier2` và chặn bằng cổng `tier2PairOnScreen`: cả hai thẻ của cặp đều gạch chân hai chữ đầu (review 1A.3, mục 7). Mỗi lần nhìn đều kiểm thẻ: không chồng, chữ ≥ 18 px, trong vùng an toàn và không dưới chip HUD, chữ đầu không mơ hồ; từ review 1A.4, không thẻ nào chạm một bảng HUD (`cardsClearOfHudPanels`, phần chồng theo từng bảng in ở `cardsOverHud`). Đường của Gạch chỉ qua suối ở cầu. Với lệnh Vite thường, kịch bản này vẫn đạt (bằng từ dự phòng); `td-1a-boot` hỏng hai cổng phông như mục trên.
+---
 
-`td-1a-keyboard-only.mjs` (1A.4) chơi ba đợt chỉ bằng phím thật qua CDP, không một sự kiện chuột: Insert + Enter, Insert + Tab + Enter (hai Tháp Cung ở chỗ gợi ý), Insert + 3 + Enter (Trại Lính); Tab tới Tháp Cung đầu, Enter gửi Draconis, `=` nhịp dày hơn, Esc đóng thẻ, Shift+Enter gọi đợt; gõ 45 WPM; giữa hai đợt (sân trống, đợt kế đang đếm) Tab + Enter đưa Draconis sang Tháp Cung kia rồi gọi đợt kế. `__td` chỉ được đọc, nên mọi lệnh trong nhật ký đến từ phím; cổng `onlyKeyCommands` kiểm điều đó, cổng `nodeReplaysToBrowserHash` chạy lại nhật ký trên Node. Ảnh `td-1a-keyboard`.
+## 3. 1A.6 "Lời Gọi", đợt R1 (`BUILD_1A6.md` §1–§6)
 
-`td-1a-words-dense.mjs` (1A.4) đặt bốn nhà trong 20 m (ba nhà của bố cục 4 ô và một Tháp Cung ở điểm trống gần giữa chúng nhất), mỗi nhà một người, nhịp 1 s; hai pha 20 s: E = 12 Dễ (từ 5 chữ sống 7,5 s) rồi E = 35 Thường; cứ ba lần nhìn thì gõ một phím, để có thẻ đang khóa (×1,2). Mỗi lần nhìn đo thẻ: không chồng, cột ≤ 240 px, tổng diện tích thẻ ≤ 6 % màn hình, chữ ≥ 18 px, trong màn hình, và (từ review 1A.4) không chạm bảng HUD nào (`cardsClearOfHudPanels`, `cardsOverHud`). Ảnh `td-1a-dense-easy`, `td-1a-dense-normal`.
+Worktree `games/.wt-td-1a6`, nhánh `feat/td-1a6`. R1 làm phần sim, dữ liệu, lệnh, test và file vàng; view chỉ sửa đủ để build và chơi thô (R2 làm view, HUD, thẻ, học, tạm dừng, âm; R3 làm bot, báo cáo, kịch bản, cổng).
 
-`td-1a-combat.mjs` (1A.1; phần chuột từ review 1A.4) dựng bố cục chỉ bằng chuột thật qua CDP `Input.dispatchMouseEvent`: bấm trái lên đất mở menu xây, nhà mờ ở đó (ảnh `td-1a-mouse-menu`); bấm hàng "Trại Lính" của menu khi cần; bấm trái lần nữa để xây. Rồi nút Xây, rê nhà mờ vào vòng 11 m quanh Lũy: vòng đỏ và chip lý do (`td-1a-mouse-ghost-red`); bấm phải đóng menu. Chờ 3,3 s (xây xong, hết hồi ân hạn), bấm trái lên Tháp Cung đầu: thẻ nhà, có ân hạn (`td-1a-mouse-card`); bấm phải lên nó gửi Draconis, bấm phải lên đất dời Draconis; lăn chuột zoom quanh Tháp Cung thứ hai (`td-1a-mouse-zoom`), kéo bản đồ; nút 2× và nút gọi đợt của HUD. Cổng: ba lệnh `build` đúng chỗ (±0,25 m), chỗ đỏ có lý do `keep`, bấm phải trong menu chỉ đóng menu, thẻ mở bằng bấm có ân hạn, `assignUnit` và `move` của Draconis có trong nhật ký, zoom và kéo không ra lệnh nào, nút HUD đều tìm thấy; rồi như trước: lính chặn, hạ quái, hai đợt kết thúc, Node chạy lại ra đúng mã băm. Chỗ bấm tính theo cách `main.ts` và `DebugView.resize` đặt bản đồ ở zoom 1 (sân 100 m trên dải 60 px × `--hud`).
+### 3.1 Đã làm
 
-`td-1a-ime.mjs` (1A.4, theo `campaign3d-ime.mjs`): kiểu UniKey / EVKey (chữ đầu, Backspace, chữ có dấu không mã phím: Telex "aa", "dd", "ee", VNI "a1", "o6", số của VNI không tới trang) và kiểu bộ gõ hệ điều hành (phím "Process", keyCode 229, có cả số); rồi `Digit2`, `Digit4`, `Digit1`, `Backquote` hai lần ngay sau một chữ có dấu, Tab hai lần, `=`, `-`, Enter. Cổng: phím tiếng Việt chỉ ra lệnh `key` và `backspace`, không đổi người đang chọn, thẻ hay menu; HUD nhắc tắt bộ gõ; số chọn người; Backquote bước sang người kế và không gõ gì; Tab, `=` / `-`, Enter ra đúng lệnh. Đây là phím giả qua CDP: không thay được kiểm tra UniKey và EVKey thật (BUILD_NOW §8). Ảnh `td-1a-ime`.
+- **§1 Bỏ:** `systems/stream.ts`, `systems/heat.ts`, `systems/aura.ts`, `typing/tempo.ts`; `systems/words.ts` gộp vào `systems/calls.ts`, `systems/production.ts` gộp vào `systems/economy.ts`. Hằng số `TEMPO`, `DEFAULT_TEMPO_S`, `LOAD`, `EVENNESS`, `HEAT`, `AURA_*`, `PRESENCE`, `CANNON_AURA`, `FIVE_GOOD`, `ORDER_GRACE`, `CHAIN.untouchedExpire`, `EMIT` (trừ `letterSlack` mà `decks.ts` còn dùng). Lệnh `setTempo`, `setAllTempo`, `uiFocus`; phím `-`, `=`, `Shift+-`, `Shift+=`; chip Tải; trợ lực ở ổ (`at`, `assist`), có mặt, sở trường Thư Đồng, lính tạm. `WordReward` thành `ShotSpec` (Phát Chữ) và `PowerSpec` (phát mạnh).
+- **§2:** pha `day` / `night` / `dawn` / `defeat`, `w.day`, `w.phaseEnd`; `w.mode` với bảng `MODES` trong `rules.ts` (ngày, trần lời gọi, giây gõ trong 20 s, máu quái, sàn E, hồi lời gọi tháp, `lifeK` cho đồng hồ chấm điểm). Lệnh `callNight` (thưởng như `earlyCall`), op hộp cát `night`, `mode`. Hết đêm trả `waveBonus`, bình minh 3 s.
+- **§3:** `w.wood`, `w.food`, `w.seeds`, `w.knowledge`, `w.autoSeeds`. Giá nhà `gold`/`wood` tính trong `compile.ts` (Gỗ = round(0,3 G)). Hoàn tác 5 s hoàn đủ hai thứ. `sellFood`. Trại Lính: mỗi lần hồi ăn 1 Lúa, thiếu thì chờ gấp đôi rồi đứng dậy (`units.hungry`).
+- **§4.1** Nhà `farm` (khuôn L, 60 → 42 Vàng + 18 Gỗ), 4 ô (`buildings.plot`, `plotWork`), nông dân (NPC, đi thẳng trong ruộng 1,5 m/s, không A*), gieo 2 s, lớn 40 s, gặt 12 s ra 5 Lúa, lời gọi Gặt khi bắt đầu gặt; `buySeeds`, `autoSeeds` (mặc định bật, 8 Vàng một hạt), `harvestPlot`. **§4.2** 36 cây trong 5 cụm (`map.trees`, test `td-content` kiểm luật đặt), `TreeStore`; 2 dân đầu trận, `hire` (25 Vàng + 5 Lúa, trần 3/5/7/9), dân rảnh chặt cây đánh dấu gần nhất, không thì cây gần Lũy nhất trong 30 m; chặt 20 s ra 8 Gỗ, lời gọi Chặt; `markTree`; cây chặn đặt nhà (kiểm `tree` sau `overlap`), gốc không chặn. **§4.3** Công trường: `upTo`, `progress`, `ready`, thợ xây = cấp Lũy (`staffBuilders`), thợ rảnh lấy công trường chờ lâu nhất, S 8 s / M 14 s / L 18 s, ban đêm ×1,5, lời gọi Xây 2/3/4 từ. Lệnh `upgrade` (giá chênh giữa hai cấp, 0,75 thời gian, 3 từ; nhà vẫn chạy ở cấp cũ). **§4.4** Mỏ: đống như 1A, thợ mỏ chở mỗi 10 s (lệch 1), đống ≥ 50 % thì lời gọi Đào 2 từ. **§4.5** Lượt mạnh 0–5 (`charges`), phát mạnh tiêu 1 lượt (Cung ×1,6 sát thương +1 mục tiêu, Pháo ×1,4 và nổ ×1,3, Lũy +1 mục tiêu), lời gọi Bắn mạnh chỉ ban đêm (quái trong tầm, < 5 lượt, qua thời gian hồi của chế độ, 1 từ, sống 6 s), từ xong bắn Phát Chữ ngay và +2 lượt. **§4.6** như §3.
+- **§5:** `stores/calls.ts` (`CallStore`), `systems/calls.ts` (tạo, cho từ, trả từ, gõ, chấm, tiến độ, đóng, thưởng Hoàn hảo), `systems/attention.ts` (AttentionDirector trong sim, bước 11). Kind `call` trong `KIND_PRIORITY`, giữ chỗ dự trữ như dòng chữ cũ. Chỉ lời gọi SÁNG giữ một từ và một chữ đầu; mờ thì trả; khóa giữ từ, từ kế đến khóa ngay; Esc nhả. Tự làm và gõ cộng dồn; Ẩu ×0,6 tiến độ, Chuỗi ÷2, mất thưởng; Chuỗi +1 mỗi từ không Ẩu, không phạt khác; bậc Chuỗi nhân thưởng Hoàn hảo (`CHAIN.tiers[].mul`, trần ×1,3). Kind `quiz` có ưu tiên và hạn, nhưng R1 chưa tạo (sổ ôn là R2).
+- **§6:** vòng giúp (`inRing`: Tướng 10 m, Thư Đồng đã mở 6 m), Thư Đồng tự giúp ×1,5 (`passive`: ruộng, cây, công trường, mỏ), `assignUnit` tới cạnh nhà, `move` tới điểm (NPC, cây: app gửi điểm), Tướng tự đánh khi đứng.
+- **Lệnh mới:** `upgrade`, `callNight`, `markTree`, `hire`, `buySeeds`, `autoSeeds`, `sellFood`, `harvestPlot`; op hộp cát `wood`, `mode`, `night`; `preset` làm §10 (Lũy 3, đặt sẵn đã xây, 5 dân, 8 cây gần Lũy được đánh dấu) vì op cũ phải còn chạy.
+- **View, UI (thô):** cây, gốc, viền vàng khi đánh dấu, thanh tiến độ chặt; 4 ô ruộng theo giai đoạn; NPC chấm có chữ (N, D, X) với "!" và "…"; công trường nét đứt với cung tiến độ; 5 chấm lượt mạnh; vòng giúp của người đang chọn; thẻ chữ đặt trên NPC, màu theo loại lời gọi, thanh thời gian chỉ cho Bắn mạnh; HUD Vàng / Gỗ / Lúa / Hạt / Mạng, "Ngày n · m:ss", "Đêm n · còn k quái", nút gọi đêm sớm, chip "Đang gọi n/N"; thẻ nhà có nút nâng cấp, thẻ Ruộng (hạt, mua, tự mua), thẻ Lũy (dân, thuê, bán Lúa); bảng hộp cát có Chế độ, +Gỗ, Sinh đêm. Bấm cây đánh dấu, bấm ô chín gặt trước; `Shift+\` thuê dân, `Shift+Enter` gọi đêm, `Digit5` chọn Ruộng trong menu xây.
 
-`td-1a-combat.mjs`, `td-1a-stream.mjs` và `td-1a-slots.mjs` ghi `td-1a-<tên>-replay-<cỡ>.json` (seed, mã nội dung, mã bộ từ, nguồn từ, tick, mã băm, nhật ký lệnh) vào `OUT_DIR` rồi tự chạy `scripts/td/replay.ts` trên Node. `td-1a-stream` gõ phím thật qua CDP (`WPM=40` mặc định, đổi được bằng biến môi trường), nên nhật ký của nó có lệnh `key` và chạy lại kiểm cả phần gõ. Cổng `nodeReplaysToBrowserHash` đạt khi Node ra đúng mã băm của Chrome (BUILD_NOW §7 cổng 4). Chạy lại bằng tay:
+### 3.2 Lệch (có lý do)
 
-```bash
-node --import tsx scripts/td/replay.ts <thư mục tạm>/td-1a-combat-replay-1280x720.json
-```
+1. **Thợ mỏ chở một gùi, không cả đống.** §4.4 nói thợ mỏ đổ đống mỗi 10 s và đống ≥ 50 % thì gọi. Đổ cả đống thì đống không bao giờ quá ~5 Vàng (Mỏ cấp 1 ★★★ ra 3,75 Vàng / 8 s, sức chứa 60), lời gọi Đào không bao giờ có. Thợ mỏ chở `MINE.haulK` = 0,8 × sản lượng một lần của cấp mỗi 10 s: ★ đủ chở hết (không gọi), ★★ đầy nửa sau ~220 s, ★★★ sau ~130 s. Không gõ thì mỏ giàu chỉ ra phần gùi. Số này để R3 chỉnh theo bot.
+2. **Thưởng Hoàn hảo khi việc xong trước từ cuối.** Tự làm cộng với gõ nên việc thường xong trước khi gõ hết (gặt 12 s: 1/3 tự làm mất 4 s, ba từ ở 35 WPM mất ~6–7 s). Đọc chữ nghĩa "mọi từ" thì thưởng gần như không bao giờ có. R1 trả thưởng khi việc xong lúc lời gọi còn sống, đã gõ ≥ 1 từ và mọi từ đã gõ đều Chớp hoặc Hoàn hảo (`finished` của lời gọi). Mỏ và Bắn mạnh không có việc riêng: từ cuối là việc xong. *Review R1 siết lại (mục 3.6, số 4): một từ gõ phải là nhát làm xong việc.*
+3. **Trần đếm lời gọi MỞ (sáng và mờ), không chỉ sáng.** Đếm chỉ lời gọi sáng thì đi giữa nhiều lời gọi mờ làm sáng quá trần cùng lúc. Lời gọi sáng là tập con của lời gọi mở, nên "sáng ≤ trần" (§12 cổng 6) vẫn đúng; chip "Đang gọi n/N" đếm lời gọi mở. *Review R1 bỏ lệch này (mục 3.6, số 1): trần đếm lời gọi sáng như §5.3.*
+4. **Bắn mạnh đang khóa sống quá 6 s** tới khi gõ xong hoặc Esc (§5.2: lời gọi khóa giữ từ tới khi xong hoặc Esc).
+5. **Lời gọi không dùng tầng 2.** Chữ đầu tầng 2 bị tính như kẹt chữ và chờ tick sau, để mọi từ sống có chữ đầu khác nhau (§12 cổng 6). Với ≤ 4 từ sống thì chữ không bao giờ thiếu.
+6. **Thêm lệnh `upgrade`.** §4.3 cho thời gian và số từ của nâng cấp nhưng 1A chỉ có cấp hộp cát. Nâng cấp trả giá chênh (Vàng + Gỗ), đi qua thợ xây; hoàn tác 5 s hủy nâng cấp. Op hộp cát `level` vẫn tức thì, miễn phí (như 1A), nhưng không áp cho công trường chưa xong (`notReady`).
+7. **Từ Ẩu ở Mỏ và Bắn mạnh:** "tiến độ ×0,6" thành 0,6 Vàng thưởng (đống vẫn chở cả) và round(2 × 0,6) = 1 lượt mạnh.
+8. **Phát Chữ** giữ công thức 1A trừ T_N (không còn nhịp) và sở trường Thư Đồng (bỏ): D̄ × (0,8 + 1,2·Q) × lenF. **Cháy** (ái lực Draconis với Pháo) nay là: Draconis trong vòng 10 m của Tháp Pháo khi từ Bắn mạnh xong.
+9. **Biên pha:** ngày là các tick [đầu ngày, `phaseEnd`); đêm bắt đầu ở tick `phaseEnd`. Một việc N tick tính cả tick bắt đầu.
+10. **Tiến độ là phân số, xong khi ≥ 1 − 10⁻⁹** (`DONE` trong `stores/slots.ts`): cộng 1/2400 đủ 2400 lần có thể thiếu một chút dưới 1.
+11. **Cách đếm dòng** theo `BUILD_1A6.md` §0 (chỉ `.ts` của `src/td`, 5.319 ở cuối 1A). `td-boundary` đổi theo: đọc trần 7.300 từ `BUILD_1A6.md` §0 và dòng 1A.6 của mục 1.2.
+12. **Hỏi bài** (`quiz`) có trong bảng ưu tiên, luật đêm, thưởng, nhưng chưa tạo (sổ ôn là §7, R2). **Chủ đề từ** (§5.2) là chú thích móc ở `bagFor`: từ vựng chưa gắn chủ đề.
+13. **Số không có trong đặc tả** (đặt ở `rules.ts`): NPC đi 3 m/s (A*), nông dân 1,5 m/s trong ruộng; ô ruộng cách tâm 1,1 m; dân và thợ mới hiện thành cột ngắn phía đông Lũy.
+14. **Người:** `assignUnit` không còn đổi chỗ (hai người đứng cạnh một nhà được); Tướng tự đánh mỗi khi đứng trên đất.
+15. **Test:** `world({ gold })` của test cho thêm Gỗ bằng số Vàng (ngân sách xây của test), trừ khi truyền `wood`. Bot, chính sách và báo cáo cũ (nhịp, con lắc, tải) bỏ; bot R1 mới ở `tests/td/{bot,reader}.ts`, `policies/{stand,layouts,hero}.ts`: xây theo bố cục (Ruộng trước), Chấm đứng cạnh Ruộng, Tướng bay tới lời gọi mờ cũ nhất mỗi 2 s, đánh dấu 5 cây bờ đông suối, thuê tới 4 dân, gọi đêm sau 45 s ngày. `pnpm td:balance` in một bảng ngắn (gõ 35 WPM so với không gõ); R3 làm lại báo cáo và cổng.
 
-`td-1a-perf.mjs` (1A.5, BUILD_NOW §7 cổng 4 và 5): "Đặt sẵn 4 ô", đợi bốn người tới, cả bốn nhà nhịp 1 s (vặn từng nhà, cách 0,35 s), gọi đợt 1, rồi `__td.flood(300)`; gõ thật 70 WPM qua CDP trong 10 s và đọc `__td.costs()` của đúng các khung trong cửa sổ đó (đếm khung bằng một vòng `requestAnimationFrame` riêng). Cổng: phần vẽ (bản 2D và thẻ chữ) p95 ≤ 8 ms trên ≥ 200 khung, quái trên sân ≥ 240 suốt cửa sổ, bốn nhà cùng phát; Node làm lại lượt vàng (`scripts/td/golden.ts --check --log`), rồi trang chạy đúng nhật ký đó bằng chính các module `/src` mà Vite phục vụ, mỗi mã băm 60 tick phải bằng của Node; nhật ký của trang (gồm `flood`) chạy lại trên Node ra đúng `__td.hash()`. Ảnh `td-1a-perf`.
+### 3.3 Số dòng (cách đếm của §0: `.ts` trong `src/td`)
 
-`td-1a-tour.mjs` (1A.5): bộ ảnh cho chủ dự án ở 1280 × 720, một lượt, từ vựng thật, gõ thật, bảng hộp cát ẩn (F9) trừ ảnh của nó: `1-placement` (menu xây, nhà mờ cạnh đường, vòng tầm), `2-tempo-card` (thẻ nhà có núm nhịp, đặt 2 s), `3-one-slot` (một Tháp Cung, Draconis trên mái, hai từ bay), `4-three-slots` (ba nhà phát, E = 55), `5-four-slots` (bốn nhà, Gạch ở mỏ bên kia suối), `6-sandbox` (bảng hộp cát), `7-wave` (đợt 4: hai Thuồng Luồng, lính, đạn). Cổng: mỗi ảnh chụp đúng trạng thái của nó, không lệnh nào bị từ chối, không lỗi console.
+| Nhóm | Cuối 1A | Sau R1 | Đổi |
+|---|---|---|---|
+| Nội dung (`content/`) | 573 | 610 | +37 (bảng chế độ, giá, cây, Ruộng) |
+| Gõ thuần (`typing/`) | 453 | 394 | −59 (`tempo.ts` bỏ) |
+| Sim lõi (`sim/*.ts`) | 837 | 945 | +108 (`commands.ts` lệnh mới, `world.ts`) |
+| Kho (`sim/stores/`) | 367 | 442 | +75 (`calls`, `npcs`, `trees`, `walkers`) |
+| Đường (`sim/nav/`) | 233 | 233 | 0 |
+| Hệ (`sim/systems/`) | 1.393 | 1.428 | +35 (`calls`, `attention`, `economy` thay `stream`, `heat`, `aura`, `words`, `production`) |
+| App (`app/`, `main.ts`) | 541 | 537 | −4 |
+| UI, view (`ui/*.ts`, `view/`) | 922 | 938 | +16 |
+| **Tổng** | **5.319** | **5.527** | **+208** (đích R1 ≤ 6.600; trần 7.300 cuối R3) |
+
+Cách đếm cũ của 1A (`td.html`, `rng.ts`, mọi file `src/td` gồm `td.css`): 5.497 → 5.705.
+
+### 3.4 Kiểm ở cuối R1
+
+- `npx tsc -p tsconfig.json --noEmit`, `npx tsc -p tsconfig.server.json --noEmit`: sạch.
+- `npx vitest run`: 405 file, 2.644 test đạt, 1 bỏ qua (cuối 1A: 408 file, 2.670); TD riêng: 18 file, 178 test. Bỏ `td-stream-schedule`, `td-heat-chain`, `td-aura`, `td-balance-smoke`; thêm `td-calls`; viết lại `td-agents`, `td-hud`, `td-rewards` (lượt mạnh), `td-sim-economy` (ngày đêm, Ruộng, cây, dân, công trường, mỏ, không sinh tiền), phần đổi của `td-content`, `td-input`, `td-placement`, `td-scorer`, `td-router`, `td-letters` (bỏ phần thuộc tính của dòng chữ cũ, giữ test chữ đầu), `td-sim-block` (Lúa), `td-sim-combat`, `td-nav`, `td-sim-perf`, `td-golden`.
+- Thuộc tính (`td-calls`): 3 seed × 240 s chơi ngẫu nhiên trên từ vựng thật, mỗi tick: lời gọi mở ≤ trần, chỉ lời gọi sáng giữ từ (của nó), khóa nằm trên từ của lời gọi sáng, chữ đầu không trùng; nhật ký chạy lại ra đúng mã băm. Bỏ qua mọi lời gọi 300 s: Chuỗi không đổi, Vàng chỉ giảm vì hạt tự mua, Lúa chỉ giảm vì lính ăn, Gỗ không giảm.
+- File vàng làm lại bằng `node --import tsx scripts/td/golden.ts` (cùng từ của file cũ): 3 ngày và 3 đêm, 16.754 tick, 279 mã băm, 320 lệnh, 50 từ gõ, 24 lời gọi Hoàn hảo; `--check` thoát 0. Sim một bước (Node, `td-sim-perf`): 300 quái, 9 dân, 4 ruộng, 20 cây đánh dấu, ban đêm: trung vị 0,017 ms; tải đầy TK 25.12: 0,028 ms.
+- `npx vite build --outDir <thư mục tạm>`: đạt.
+- Trình duyệt (cấu hình Vite của worktree, cổng 3110): `td-1a-boot` đạt 11/11 ở 1280 × 720 và 1920 × 1080, không lỗi console. Một kịch bản thử tạm ngoài repo (đặt sẵn, gõ phím thật qua CDP cho lời gọi sáng, gọi đêm) ở cả hai cỡ: không lỗi console, không ngoại lệ trang.
+- `node --import tsx scripts/td/balance.ts --seeds=3 --nights=4`: cả bot gõ 35 WPM và bot không gõ qua 4 đêm ở mọi seed; không bất biến nào vỡ. Số chỉ để xem, chưa phải cổng (R3).
+
+### 3.5 Kịch bản trình duyệt 1A sau R1
+
+Viết theo dòng chữ, nhịp, trợ lực ở ổ; R3 thay bằng `td-1a6-*` (`BUILD_1A6.md` §12 cổng 8). Chạy ở 1280 × 720, giới hạn 150 s mỗi kịch bản:
+
+| Kịch bản | Kết quả | Cổng hỏng (lý do) |
+|---|---|---|
+| `td-1a-boot` | Đạt | — |
+| `td-1a-combat` | Hỏng, không lỗi console | `builtByMouse`, `built`, `kills`, `twoWavesEnded`… (Vàng + Gỗ, công trường chưa xong, ân hạn và `callWave` đã bỏ) |
+| `td-1a-stream` | Hỏng, không lỗi console | `streamDone`, `severalWordsLive`, `softSwitch` (không còn dòng chữ) |
+| `td-1a-words-dense` | Hỏng, không lỗi console | `fourWithin20m`, `cardsPiledUp` (nhịp 1 s) |
+| `td-1a-ime` | Hỏng, không lỗi console | `minusEqualSetTempo` (phím `-` `=` đã bỏ); phần bộ gõ tiếng Việt vẫn đạt |
+| `td-1a-perf` | Hỏng, không lỗi console | `presetAssisted`, `fourBuildingsDealtAt1s`, `noRejectedCommand` (`setTempo`) |
+| `td-1a-slots`, `td-1a-keyboard-only`, `td-1a-tour` | Hết 150 s | chờ trợ lực, nhịp, đợt mà luật mới không có |
+
+### 3.6 Review R1 (phản biện độc lập, 23/10)
+
+Đọc diff `8ab227eb..e77ceeae` theo `BUILD_1A6.md` §1–§6 và ý của kế hoạch; dựng lại từng lỗi bằng test thăm dò; thử 24 đột biến luật (tắt ×1,5 ban đêm, bỏ kiểm vàng khi tự mua hạt, hai dân một cây…): bộ test TD bắt cả 24, nhưng 2 cái chỉ file vàng bắt (nay có test riêng).
+
+| # | Mức | Lỗi (cách dựng lại) | Sửa |
+|---|---|---|---|
+| 1 | Cao | Lệch 3 (trần đếm lời gọi MỞ) làm bỏ qua có phạt: lời gọi Đào không tự đóng, mờ ở xa vẫn giữ chỗ mãi. Hai mỏ bị bỏ qua ở Thư giãn (ba ở Cân bằng) làm một lời gọi Xây ngay cạnh Tướng nằm CHỜ 30 s; Bắn mạnh cũng không mở được | Trần đếm lời gọi SÁNG (§5.3). Lời gọi mờ không giữ chỗ; lời gọi mở trong vòng chỉ sáng khi còn chỗ, theo ưu tiên, nên đi vào giữa nhiều lời gọi vẫn không sáng quá trần. Luật đêm đếm lời gọi kinh tế đang sáng. Chip "Đang gọi n/N" đếm lời gọi sáng |
+| 2 | Cao | Từ kế của lời gọi đến KHÓA với 0 chữ: Backspace trừ `typed` (Uint8) thành 255, từ kẹt, mọi phím sau đó là lỗi (5 lỗi trên một từ gõ đúng); gõ chữ đầu của lời gọi khác là lỗi, không đổi khóa (trái kế hoạch 4.6: không cướp bàn phím) | `router.ts`: đổi khóa mềm khi đã gõ ≤ 1 chữ, chưa lỗi (0 chữ với từ kế); Backspace không trừ dưới 0, ở 0 thì nhả khóa. `firstMs` của từ kế lấy từ phím đầu của chính nó (tốc thô) |
+| 3 | TB | Hoàn tác trong 5 s sau một nâng cấp đã xong (gõ 3 từ, 23 tick) xóa cả nhà, chỉ hoàn giá nâng cấp; hoàn tác lần hai sau khi hủy nâng cấp hoàn tiền lần nữa (+63 Vàng, +27 Gỗ) và xóa nhà | Chỉ hoàn tác việc đang xây (công trường, nâng cấp dở); việc xong trả `finished` ("Xây xong rồi, không hoàn tác") |
+| 4 | TB | Lệch 2 quá rộng: gõ 1 từ Hoàn hảo rồi bỏ đi, thợ tự làm xong, vẫn được thưởng "cả lời gọi Hoàn hảo" (Chặt: +2 Gỗ cho 1 từ trong 4) | Thưởng cần một từ gõ là nhát làm xong việc (đã trả lời tới cùng), mọi từ đã gõ Chớp hoặc Hoàn hảo; tự làm tha cho các từ cuối thì vẫn được. Mỏ, Bắn mạnh: từ cuối là việc xong, như cũ |
+| 5 | Thấp | Hủy một nâng cấp đóng mọi lời gọi của nhà (Đào của mỏ, Gặt của ruộng) | `stopSite` chỉ đóng lời gọi Xây; xóa nhà vẫn đóng hết |
+| 6 | Thấp | Op hộp cát `level` trong lúc nâng cấp: nâng cấp xong ghi đè cấp | Từ chối `notReady` khi đang nâng cấp |
+| 7 | Thấp | Nhà "nền chắc" mất +10 % máu khi nâng cấp không Hoàn hảo | `finishSite` giữ ×1,1 |
+| 8 | Thấp | Esc giữ chữ và lỗi của từ dở; gõ lại thì lỗi cũ vẫn tính (kế hoạch §8 câu 6: Esc bỏ từ dở, không tính lỗi) | `unlock` xóa chữ đã gõ và lỗi của từ đang khóa |
+
+Test thêm: `td-calls` (mỏ bị bỏ qua không chặn lời gọi trong vòng; quá trần thì chờ, sáng theo ưu tiên khi có chỗ; từ kế: đổi khóa, Backspace, tốc thô; thưởng chỉ khi gõ tới cùng; thuộc tính đếm sáng ≤ trần), `td-router` (khóa 0 chữ, Esc), `td-sim-economy` (hoàn tác việc xong và lần hai, op `level` khi nâng cấp, hủy nâng cấp giữ lời gọi Đào, nền chắc, tự mua hạt khi thiếu vàng, thợ lấy công trường cũ trước). Mỗi test mới đỏ trên mã R1.
+
+**Lệch của R1:** giữ 1, 4–15. Số 2 siết lại, số 3 bỏ (bảng trên). Ghi chú số 1: "★ không gọi" gần đúng (đống ★ lên 40 % sau 15 phút).
+
+**Để R2/R3 (thấp, chưa sửa):** Bắn mạnh tạo cuối đêm còn sống tối đa 3 s sang ngày (vô hại: lượt mạnh giữ lại); NPC đang làm bị `reroute` để ở chế độ đi (chỉ hình); dân không có đường thì chặt tại chỗ (hiếm); op `mode` không đổi độ dài ngày đang chạy. Báo cáo bot (3 seed, 4 đêm) sau sửa: cả hai bot qua 4 đêm, nhưng bot gõ còn 107 Vàng, 7 Gỗ, 124 Lúa, bot không gõ 186 Vàng, 28 Gỗ, 67 Lúa: cổng 7 cần chỉnh ở R3.
+
+**Số sau review:** 5.540 dòng (+13). File vàng làm lại vì luật đổi (lệch từ tick 780): 16.406 tick, 273 mã băm, 330 lệnh, 44 lời gọi, 52 từ, 22 lời gọi Hoàn hảo. `tsc` hai cấu hình sạch; `npx vitest run` 405 file, 2.655 đạt, 1 bỏ qua (TD 18 file, 189 test); `vite build` đạt; trình duyệt (1280 × 720, 1920 × 1080): `td-1a-boot` đạt và một kịch bản tạm ngoài repo (đặt sẵn, gõ phím thật cho lời gọi sáng, Backspace sau từ, gọi đêm) không lỗi console.
+
+## 4. 1A.6 "Lời Gọi", đợt R2 (`BUILD_1A6.md` §7–§10)
+
+Worktree `games/.wt-td-1a6`, nhánh `feat/td-1a6`, trên R1 và bản sửa review R1 (`fc5aad95`). R2 làm học, điều khiển, hình, HUD, thẻ, âm, đặt sẵn, và ba lỗi thấp review R1 để lại. R3 làm bot, báo cáo, kịch bản `td-1a6-*`, cổng §12.
+
+### 4.1 Đã làm
+
+- **§7 Học.** `typing/decks.ts`: mỗi từ có thêm `vi`, `ipa` (lấy từ file từ vựng qua `app/vocab.ts`; từ dự phòng không có). Mã băm của bộ từ và của thế giới không đọc hai trường này (test). `gloss()` rút nghĩa cho thẻ: bỏ ghi chú trong ngoặc, lấy nghĩa đầu, thêm nghĩa sau khi còn ≤ 22 chữ, quá 26 chữ thì cắt ("…").
+  - Từ xong: thẻ đổi thành "từ · nghĩa" (nền ngọc), đứng 1 s trong cột của lời gọi, trên từ kế của lời gọi. Lời gọi đã đóng thì thẻ nghĩa đứng ở chỗ cũ, thành một cột riêng để cột khác vẫn tránh nó. Dấu chấm điểm (Chớp, Hoàn hảo…) vẫn bay lên như 1A. Bộ từ không có nghĩa thì thẻ bay về NPC như R1.
+  - Chế độ `learn`: thẻ có dòng nghĩa dưới từ ngay khi sáng; dải chữ dưới cùng hiện nghĩa và IPA của từ đang khóa.
+  - **Sổ ôn** trong sim (`w.typing.review`, `reviewN`, có trong mã băm): từ gõ Ẩu hoặc có ≥ 2 lỗi vào cuối sổ (đã có thì dời xuống cuối), tối đa 20, đầy thì bỏ từ cũ nhất; Hỏi bài gõ đúng thì xóa từ khỏi sổ (`review()` trong `systems/calls.ts`).
+  - **Hỏi bài:** ban Ngày, mỗi Thư Đồng đang mở tạo một lời gọi `quiz` (1 từ, ở ngay Thư Đồng: cột `agent` của `CallStore`) mỗi 25 s (`agents.quizAt`), khi sổ còn nhiều từ hơn số Hỏi bài đang sống; mỗi Thư Đồng một Hỏi bài một lúc. Lời gọi lấy từ cũ nhất của sổ có chữ đầu trống lúc nó sáng (chưa có thì chờ, không đếm kẹt chữ). Thẻ hiện nghĩa và chữ đầu với chỗ trống ("khá, hơi · r _ _ _ _ _"), chữ gõ đúng hiện dần; dải chữ cũng giấu từ. Gõ xong: +1 Tri thức, cả lời gọi Hoàn hảo +1 nữa (thưởng của R1). Hết Ngày (kể cả gọi Đêm sớm) thì Hỏi bài đóng, trừ cái đang khóa. HUD có dòng "Tri thức n · Sổ ôn m" khi đã có.
+- **§8 Điều khiển.** Tab / Shift + Tab đi qua các nhà rồi các lời gọi MỜ, gần người đang chọn trước; dock hiện thẻ của lời gọi đó ("🪓 Chặt · 4 từ · đang mờ", nút "Gửi …"). Enter gửi người tới nhà của lời gọi (Gặt, Xây, Đào, Bắn mạnh) hoặc chỗ NPC đứng (Chặt). Bấm NPC: tới lời gọi của nó; nông dân không có lời gọi thì tới Ruộng; còn lại tới chỗ NPC đứng. Bấm bong bóng (thẻ chữ, hay bong bóng mờ trên bản đồ) gửi người tới lời gọi đó. Space: tạm dừng chiến thuật ở `relax`, `learn` (`Selection.tactical`): session ngừng bước; menu, thẻ, đặt nhà vẫn chạy; lệnh xếp hàng và chạy ở tick kế; phím gõ không nhận; chip trạng thái ghi "Tạm dừng chiến thuật · Space để chạy tiếp"; nút ▶ và nút "Chạy tiếp" của thanh hành động cũng tắt nó. Chế độ khác: Space bị nuốt; đổi sang chế độ không có tạm dừng thì tạm dừng tắt. Shift + `\` / Shift + Insert thuê dân, bấm ô chín, bấm cây: đã có từ R1. Test input thêm Space, Space và Shift + `\` khi bộ gõ đang soạn, Space giữ phím.
+- **§9 Hình.** Cây tròn xanh đậm có đỉnh sáng; gốc chấm nâu; cây đánh dấu viền vàng dày. Ô ruộng 4 màu (đất nâu, mạ xanh nhạt ở nửa đầu lúc lớn, lúa xanh, lúa vàng) có viền; thanh tiến độ chỉ khi gặt. NPC chấm có chữ (N, D, X, và M thợ mỏ cạnh mỗi mỏ) với "!" khi làm, "…" khi lời gọi CHỜ. Công trường nét đứt và cung tiến độ (R1). Bong bóng lời gọi SÁNG là thẻ chữ có biểu tượng loại việc (emoji: 🏹 🔨 🌾 🪓 ⛏️ 📖) và chấm số từ còn lại (●●○; lời gọi 1 từ không có). Lời gọi MỜ: bong bóng mờ trên canvas có biểu tượng và chấm, không có chữ, chạm nhau thì xếp chồng lên. Lời gọi nằm ngoài khung sân của zoom 1: mũi tên ở mép khung, màu theo loại. 5 chấm lượt mạnh dưới tháp, tối thiểu 7 px ở mọi zoom. HUD: thẻ Ruộng ("Chín 1 · Lớn 2 · Trống 1", hạt, "Mua 4 hạt · 30 vàng", "Tự mua hạt"); thẻ Lũy ("Dân 5/7 · Thợ xây 3 · Lúa n", "Thuê dân · 25 vàng, 5 lúa", "Bán 10 Lúa · +10 vàng", mỗi nút một hàng); thẻ tháp ("Lượt mạnh n/5"); nút nâng cấp một hàng riêng (R1 bị tràn chữ); hàng "Chế độ" của hộp cát đặt nhãn lên trên để bốn tên chế độ không bị cắt.
+- **§9 Âm** (`view/audio-min.ts`, tổng hợp bằng mã): khi một lời gọi SÁNG, một tiếng báo theo loại (Gặt chuông cao, Chặt gõ gỗ thấp, Xây hai nhát búa, Đào leng keng, Bắn mạnh tù và ngắn, Hỏi bài tiếng chim), tối đa 3 tiếng một giây. Bỏ tiếng tích khi lời gọi nhận từ mới của R1 (trùng với tiếng báo). Giữ tiếng phím và nốt xong từ của 1A.
+- **§10 Đặt sẵn:** như R1, thêm: 4 ô của Ruộng có đủ giai đoạn (chín, lớn 70 %, lớn 30 %, trống) để làng có việc ngay.
+- **Lỗi thấp của review R1:** NPC đang làm mà bị nhà mới phủ thì được đưa ra ô trống và đứng làm tiếp (không còn ở chế độ đi). Dân không có đường tới cây thì bỏ cây đó (`worker` = −2) đi tìm cây khác, không chặt từ xa; đánh dấu lại cây thì thử lại. Op `mode` ban ngày đổi luôn độ dài ngày đang chạy, giữ phần đã trôi (không phải chờ ngày sau).
+
+### 4.2 Lệch (có lý do)
+
+1. **Hỏi bài nhường chỗ.** §5.3 chỉ xếp ưu tiên khi còn chỗ. Hỏi bài luôn nằm trong vòng của Thư Đồng nên luôn sáng được: hai Hỏi bài giữ đủ trần của `relax`, `learn` (2) và mọi lời gọi việc phải mờ. Nay ở trần, một Hỏi bài chưa ai gõ (không khóa) tắt sáng để nhường cho lời gọi khác trong vòng (kế hoạch 4.5: Hỏi bài "bỏ được"). Hỏi bài đang gõ không nhường. Test `td-learn`.
+2. **Từ của Hỏi bài chọn lúc sáng**, không gắn khi tạo: lời gọi lấy từ cũ nhất của sổ có chữ đầu trống. Nhờ đó Hỏi bài không kẹt vì một từ khác đang giữ chữ đầu, và hai Hỏi bài không hỏi trùng (luật chữ đầu không cho hai từ giống nhau cùng sống).
+3. **Hỏi bài không có hạn** (`expire` = −1): đóng khi pha không còn là Ngày (§5.1 "Hết Ngày"), nên cũng đóng khi gọi Đêm sớm. Bot đọc `expire` để ưu tiên Bắn mạnh nên không nhầm Hỏi bài là lời gọi gấp.
+4. **"≥ 2 lỗi" trùng với Ẩu** ở mọi từ của bộ (3–8 chữ chỉ cho phép 1 lỗi). Luật vẫn viết đủ hai điều kiện (`CALL.reviewErrors`).
+5. **Cột thẻ đẩy ngang tới 240 px** (1A: 160). Bốn dân chặt bốn cây cạnh nhau cho bốn bong bóng gần cùng một chỗ; 160 px không đủ tách bốn thẻ rộng ~140 px. Thêm: khi các cột co về, nếu hai cột sắp chạm (hai cột đổi bên cho nhau) thì mọi cột lấy ngay chỗ đích, không trượt qua nhau. Thẻ nghĩa nhảy ngay vào chỗ của nó trong cột (không trượt), như luật "cột tách ngay" của 1A.
+6. **Đặt sẵn có ruộng đủ giai đoạn** (mục 4.1): §10 không nói; chỉ ở hộp cát, để ảnh và lần chơi đầu có Gặt ngay.
+7. **Thẻ đang rời** có lớp `is-gone` (`is-mean` khi đang hiện nghĩa) để kịch bản đo được thẻ sống (R3).
+8. **Thẻ lời gọi ở dock** chỉ có cho lời gọi MỜ mà Tab tô; bấm bong bóng thì gửi người ngay, không mở thẻ.
+9. **Bấm NPC** trúng khi trong 0,7 m (bằng chấm NPC): nông dân đứng trong Ruộng, nên bấm vào rìa Ruộng vẫn mở thẻ Ruộng.
+
+### 4.3 Số dòng (cách đếm của §0: `.ts` trong `src/td`)
+
+| Nhóm | Sau R1 (gồm review) | Sau R2 | Đổi |
+|---|---|---|---|
+| Nội dung (`content/`) | 610 | 611 | +1 |
+| Gõ thuần (`typing/`) | 395 | 412 | +17 (`vi`, `ipa`, `gloss`) |
+| Sim lõi (`sim/*.ts`) | 949 | 953 | +4 |
+| Kho (`sim/stores/`) | 442 | 447 | +5 |
+| Đường (`sim/nav/`) | 233 | 233 | 0 |
+| Hệ (`sim/systems/`) | 1.437 | 1.492 | +55 (sổ ôn, Hỏi bài, nhường chỗ, ba lỗi thấp) |
+| App (`app/`, `main.ts`) | 537 | 582 | +45 (tạm dừng, Tab tới lời gọi, bấm NPC và bong bóng) |
+| UI, view (`ui/*.ts`, `view/`) | 937 | 1.120 | +183 (thẻ, bong bóng mờ, mũi tên, thẻ dock, âm) |
+| **Tổng** | **5.540** | **5.850** | **+310** (đích R2 ≤ 7.000; trần 7.300 cuối R3) |
+
+### 4.4 Kiểm ở cuối R2
+
+- `npx tsc -p tsconfig.json --noEmit`, `npx tsc -p tsconfig.server.json --noEmit`: sạch.
+- `npx vitest run`: 406 file, 2.676 đạt, 1 bỏ qua (sau review R1: 405 file, 2.655); TD 19 file, 210 test (189). File mới `td-learn`: nghĩa không vào mã băm, `gloss`, sổ ôn (Ẩu vào, 1 lỗi không, 20 từ, dời xuống cuối, xóa), Hỏi bài (có khi sổ có từ, ở Thư Đồng, sáng, đúng từ; gõ đúng xóa khỏi sổ, gõ Ẩu giữ lại; 25 s, một cái mỗi Thư Đồng, không quá số từ của sổ; nhường chỗ ở trần; đóng khi hết Ngày trừ cái đang khóa). Thêm ở `td-input`: Space ở bốn chế độ, nút ▶, lệnh xếp hàng khi dừng (qua `Session`), Tab qua nhà rồi lời gọi mờ, Enter, Esc, bấm NPC, `toCall`, đặt sẵn có ruộng đủ giai đoạn, phím khi bộ gõ đang soạn. Thêm ở `td-hud`: dòng Tri thức, dải chữ giấu từ Hỏi bài và hiện nghĩa ở `learn`, thẻ Ruộng, Lũy, tháp, thẻ lời gọi mờ, nút Space. Thêm ở `td-sim-economy`: op `mode` đổi ngày đang chạy, cây không có đường, NPC đang làm bị phủ (ba test này đỏ trên mã R1). Hai test cũ đổi theo luật: Space nay là hành động `space`; Hỏi bài ban đêm đóng chứ không chờ.
+- File vàng **làm lại vì luật sim đổi** (sổ ôn, Hỏi bài, nhường chỗ; kho thêm cột): `node --import tsx scripts/td/golden.ts` trên cùng từ của file cũ: 16.406 tick, 273 mã băm, 348 lệnh, 47 lời gọi (3 Hỏi bài), 55 từ, 23 lời gọi Hoàn hảo; lệch từ tick 60 (mã băm có cột mới); `--check` thoát 0.
+- `npx vite build --outDir <thư mục tạm ngoài repo>`: đạt.
+- Trình duyệt (cấu hình Vite của worktree, cổng 3110), một kịch bản tạm ngoài repo: `td.html?sandbox=1` → Đặt sẵn, một công trường, Chấm tới Ruộng, Tướng tới cụm cây, chuột thật đánh dấu 5 cây ven suối; một Ngày gõ phím thật qua CDP (45 WPM, vài từ Ẩu cho sổ ôn); `learn`; lời gọi mờ, Tab, Enter; bấm Ruộng, Lũy; Space; một Hỏi bài gõ thật; Shift + Enter, một Đêm gõ Bắn mạnh. Ở 1280 × 720 và 1920 × 1080: mọi kiểm đạt; có lúc 3 lời gọi sáng; không hai thẻ sống nào chồng (ngưỡng 1 px như 1A); không thẻ nào chạm bảng HUD ở zoom 1; chữ ≥ 18 px; không lỗi console, không ngoại lệ trang. Thêm một lần zoom vào làng: lời gọi ngoài khung hiện mũi tên ở mép. Âm thanh chỉ kiểm là không lỗi (máy không đầu, không nghe).
+
+### 4.5 Để R3
+
+- Kịch bản `td-1a6-*` (§12 cổng 8) thay các kịch bản `td-1a-*` cũ; dùng lớp `is-gone`, `is-mean` để đo thẻ sống; `__td.state()` có `review` và `agent` của lời gọi, `__td.ui()` có `call`, `tactical`.
+- Bot mới, báo cáo, cổng 5 và 7 (mục 3.6: bot gõ chưa lợi hơn bot không gõ). Bot nên gõ cả Hỏi bài.
+- Ở zoom 1 cả sân 96 m nằm trong 660 px (1280 × 720): làng nhỏ, chấm NPC chỉ ~10 px. Bộ ảnh cho chủ dự án nên có thêm một ảnh zoom 2× vào làng.
+- Còn từ R1: Bắn mạnh tạo cuối đêm sống tối đa 3 s sang ngày.
+
+### 4.6 Review R2 (phản biện độc lập, 23/10)
+
+Đọc diff `fc5aad95..4913aea1` theo `BUILD_1A6.md` §7–§10 và ý của kế hoạch (kéo không đẩy, bỏ qua không mất gì, thư giãn, học); dựng lại từng lỗi bằng test thăm dò và trình duyệt thật (CDP, phím và chuột thật, cổng 3130, 1280 × 720 và 1920 × 1080); thử 14 đột biến luật R2: test bắt 9, 4 cái lọt nay có test riêng (dưới bảng).
+
+| # | Mức | Lỗi (cách dựng lại) | Sửa |
+|---|---|---|---|
+| 1 | TB | Dấu chấm điểm (Chớp, Hoàn hảo…) che nghĩa 1 s: ở lời gọi nhiều từ (Gặt, Chặt, Xây, Đào) thẻ nghĩa dời lên trên từ kế, dấu vẫn ở chỗ cũ nên nằm đè chữ ("rather · [Chớp] hơi"; đo: dấu chồng thẻ nghĩa) | Dấu đi theo thẻ nghĩa, đứng trên nó; đo lại 12 mẫu mỗi cỡ: chồng 0 px |
+| 2 | TB | Tạm dừng chiến thuật: lệnh tay xếp hàng mà không hiện gì tới khi chạy tiếp, người chơi bấm lại: "Mua 4 hạt" hai lần thành 8 hạt (60 vàng), bấm cây hai lần thành bỏ đánh dấu (chuột thật) | Trong tạm dừng chiến thuật, lệnh tay chạy ngay, đóng dấu tick đang chờ (`Session.orders`); bước của tick đó cũng chạy lệnh trước mọi hệ, nên nhật ký chạy lại ra cùng thế giới. Phím gõ và Backspace vẫn chờ; lúc thua không nhận. `replayTo` (`sim/world.ts`) và `scripts/td/replay.ts` cộng các lệnh đóng dấu đúng tick đang chờ (ảnh chụp giữa lúc dừng). Tạm dừng thường (Esc, ▶) vẫn xếp hàng như 1A |
+| 3 | TB | Space theo thói quen sau một từ ("rather" rồi Space sau 60 ms) bật tạm dừng ở Thư giãn và Học; phím của từ kế (đến đã khóa) bị bỏ im lặng; báo dừng chỉ ở góc trái trên | Space trong 800 ms sau một chữ game đã nhận là dấu cách giữa từ: bị nuốt (`WORD_SPACE_MS`, `installKeys`); chữ bị bỏ vì đang dừng không tính, nên Space để chạy tiếp ăn ngay; nút "Tạm dừng" không bị chặn. Dải chữ ghi "Tạm dừng · Space" cạnh từ đang khóa |
+| 4 | TB | Nghĩa ở chế độ Học 13,5 px trên thẻ ở 1280 × 720 (dải chữ 13 px), ngọc trên giấy 3,9 : 1; nghĩa Hỏi bài xanh 3,7 : 1 | Nghĩa ≥ 18 px, ngọc đậm `#07695c` (6 : 1); nghĩa Hỏi bài `#1f5bb5` (5,9 : 1). Đo lại: không chữ nào của thẻ < 18 px |
+| 5 | Thấp | 4 lời gọi sáng (Thử thách, cụm cây đông nam), thẻ Lũy mở ở dock, 1280 × 720: thẻ "maybe" bị đẩy (lệch 5, 240 px) đè mép trái dock | Cột tránh bảng HUD hai bên ở chiều cao của nó khi còn chỗ (`besidePanels`, đặt lại mỗi lượt tách); không còn chỗ (`lanesTouch`) thì như cũ: thẻ đè HUD chứ không đè nhau. Vòng tách 8 → 40 lượt để hội tụ. Đo lại: không thẻ nào đè bảng ở cả hai cỡ |
+| 6 | Thấp | Nghĩa dài cắt giữa chữ: 12/765 từ ("chưa bao giờ, không bao g…", "cơ sở kinh …") | Cắt ở dấu phẩy cuối còn vừa, không thì ở chữ trọn cuối và "…"; test chạy cả bộ từ thật |
+| 7 | Thấp | Thẻ dock của lời gọi mờ luôn ghi "Ngoài vòng giúp" kể cả khi lời gọi ở trong vòng mà chờ chỗ (trần đầy, Hỏi bài nhường): gửi người tới không làm nó sáng | Ghi "Trong vòng giúp: sáng khi bớt lời gọi đang sáng" |
+| 8 | Thấp | Hàng Chế độ của hộp cát vẫn cắt "Cân bằng" ở 1280 × 720 (mục 4.1 nói đã hết) | Bốn nút thành 2 × 2 |
+
+Test thêm (mỗi test đỏ trên mã R2, trừ 4 test chặn đột biến): `td-input` (Space sau chữ bị nuốt, sau chữ bị bỏ thì không; tạm dừng chiến thuật chạy lệnh ngay, phím chờ, `replayTo` giữa lúc dừng và sau đó cùng mã băm, tạm dừng thường vẫn xếp hàng), `td-hud` (dải chữ khi dừng; thẻ dock của lời gọi mờ trong vòng), `td-lanes` (bảng hai bên, có chỗ thì không đè dock, hết chỗ thì `lanesTouch`), `td-learn` (cắt nghĩa ở dấu phẩy hoặc chữ trọn, cả bộ từ thật). Chặn đột biến lọt: Hỏi bài lấy từ cũ nhất có chữ đầu trống (`td-learn`), Tab bỏ qua lời gọi sáng, bấm thợ xây đang làm thì tới công trường của lời gọi (`td-input`), chấm từ ●●●○ (`td-hud`). Đột biến còn lọt: cổng phím trong `main.ts` (nay `Session` cũng giữ phím trong tạm dừng chiến thuật), dòng nghĩa của thẻ ở chế độ Học và trần tiếng báo (DOM và âm: chỉ kiểm bằng trình duyệt); Hỏi bài tạo ban đêm chỉ file vàng bắt (đóng ngay trong tick, không ai thấy).
+
+**Lệch của R2 (mục 4.2):** giữ cả 9. Số 1 (Hỏi bài nhường) hợp ý "bỏ được"; số 5 giữ, thêm tránh HUD (số 5 bảng trên). **Lệch mới của review:** §8 "lệnh xếp hàng và chạy ở tick kế khi bỏ dừng" thành lệnh chạy ngay trên tick đang chờ (số 2), vì người chơi không thấy lệnh đã nhận; tick đóng dấu và thứ tự như cũ, nên nhật ký và file vàng không đổi. Space không dừng trong 800 ms sau một chữ (số 3).
+
+**Không sửa (thấp, ghi lại):** chế độ Học ở Lũy 1 không có Hỏi bài (chưa có Thư Đồng; §6 chỉ Thư Đồng hỏi); Hỏi bài sáng mà chưa có từ (chữ đầu của mọi từ trong sổ đang bận) giữ một chỗ trần không thấy, nhường khi trần đầy; Esc khi đang tạm dừng chiến thuật bật thêm tạm dừng thường (Esc như 1A); lời gọi ra vào mép vòng giúp kêu lại tiếng báo (đo 100 s ở Thư giãn: Hỏi bài sáng lại 7 lần; trần 3 tiếng/giây); mũi tên mép tính theo khung sân ở zoom 1, đúng phía; phím Tab qua hết nhà rồi mới tới lời gọi mờ (đúng §8). Kế hoạch Q10 "Cân bằng: tạm dừng chỉ xem" khác §8 "Esc … tạm dừng (như 1A)": giữ như 1A.
+
+**Tất định:** Node chạy lại nhật ký trình duyệt ra cùng mã băm: tour R2 (Học, Hỏi bài, tạm dừng, một Đêm; 1280 × 720: 5.000 tick, 121 lệnh; 1920 × 1080: 5.002 tick, 124 lệnh) và kịch bản tạm dừng (giữa lúc dừng có lệnh đã chạy, và sau khi chạy tiếp) ở cả hai cỡ. File vàng không đổi (`--check` khớp: luật sim không đổi).
+
+**Số sau review:** 5.955 dòng (+105: app 614, UI và view 1.177, gõ 419, sim lõi 962; còn lại như mục 4.3). `tsc` hai cấu hình sạch; `npx vitest run` 406 file, 2.685 đạt, 1 bỏ qua (TD 19 file, 219 test); `vite build` đạt (thư mục ngoài repo). Trình duyệt sau sửa: tour R2 đạt mọi kiểm ở hai cỡ, không lỗi console.
+
+**Cho R3:** kịch bản bấm Space để dừng phải chờ ≥ 800 ms sau phím chữ cuối; trong tạm dừng chiến thuật lệnh tay (và `__td.send` không phải phím) chạy ngay, phím chờ tới khi chạy tiếp; so mã băm với `scripts/td/replay.ts` (đã dùng `replayTo`).
+
+## 5. 1A.6 "Lời Gọi", đợt R3 (`BUILD_1A6.md` §11–§12: bot, báo cáo, kịch bản, cổng)
+
+Worktree `games/.wt-td-1a6-r3`, nhánh `feat/td-1a6-r3`, trên `feat/td-1a6` (`4913aea1`), đã gộp bản sửa review R2 (`2663f794`). R3 làm bot, báo cáo `td:balance`, kịch bản `td-1a6-*`, cổng §12; sửa một luật của bộ điều phối và hai số trong `rules.ts` để cổng 5 và 7 đạt (mục 5.4, 5.5).
+
+### 5.1 Bot (`tests/td/`)
+
+- **Mắt** (`reader.ts`): từ của lời gọi SÁNG thấy sau 0,35–0,6 s; từ kế của lời gọi đang khóa sau 0,15–0,3 s (mắt đã ở đó); từ Hỏi bài nhớ ra từ nghĩa sau 0,8–1,6 s. Chọn Bắn mạnh trước (còn kịp gõ thì gõ), rồi từ cũ nhất. Luồng ngẫu nhiên riêng, không chạm luồng của thế giới.
+- **Tay** (`keystrokes.ts`, giữ từ 1A): WPM (5 chữ một từ), khoảng phím ±50 %, trượt sang phím bên cạnh theo độ chuẩn, 30 % lần trượt bấm thêm Backspace (router không nhận phím sai, nên Backspace xóa một chữ đúng và phải gõ lại).
+- **Người gõ** (`bot.ts`): một phím mỗi tick khi tay rảnh; gõ từ đang khóa khi đã đọc nó, không thì từ mắt chọn. **Bot không gõ**: `hands: null`, cùng kế hoạch.
+- **Kế hoạch chuẩn** (`policies/stand.ts`, `layouts.ts` `STANDARD`, §12 cổng 4): mua theo thứ tự khi đủ Vàng và Gỗ: Ruộng cạnh rừng đông nam (18, 30), Tháp Cung khúc nhập, Trại Lính, Mỏ trên N1 ★★★, Lũy cấp 2, Tháp Cung đường đông, Tháp Pháo, Lũy cấp 3, rồi nâng cấp (Tháp Cung khúc nhập, Tháp Cung tây, Pháo, Mỏ, Trại Lính). Lũy lên cấp bằng hộp cát (1A.6 chỉ có nút hộp cát, §4.3) nhưng bot trả giá TK 2 (150 / 260 / 400) cắt như §3 (Gỗ = round(0,3 G)): 105 V + 45 G, 182 + 78, 280 + 120. Chấm đứng ở Ruộng, Phẩy ở Mỏ (khi Lũy mở chỗ). Giữ số cây đánh dấu còn đứng = số dân + 2, theo từng cụm (đông nam, bờ đông suối, bờ tây, cạnh cổng tây, cổng, đông bắc). Thuê tới 4 dân (giữ 20 Vàng), bán 10 Lúa khi quá 20, không thuê trong tick vừa mua (giá chỉ trừ khi lệnh chạy). Ngày chạy hết, không gọi Đêm sớm.
+- **Tướng** (`policies/hero.ts`), chỉ bằng lệnh bàn phím có (Tab tới nhà hay lời gọi mờ, Enter: `assignUnit` tới nhà, hoặc `move` tới chỗ NPC đứng). Ban Ngày, mỗi 0,5 s khi không khóa từ và đang đứng: cân mỗi chỗ bằng số từ còn lại của lời gọi mở hay chờ trong vòng 10 m mà không vòng Thư Đồng nào thắp, chia cho (1 + đường bay / 60 m); đi khi hơn chỗ đứng 1,5 từ (hay chỗ đứng không có gì). Ban Đêm: tới tháp (hay Lũy) có nhiều quái trong tầm và lời gọi Bắn mạnh đang mờ; ở đó Tướng cũng đánh.
+- **Đo** (`bot.ts`): tick gõ (có khóa) theo Ngày và Đêm, theo từng ngày; số đếm 20 s của bộ điều phối ở mức cao nhất; tài nguyên làm ra (Vàng mọi nguồn, Gỗ, Lúa, Tri thức; không tính vốn đầu, không tính bán Lúa) ở mỗi lúc chạng vạng và bình minh; lời gọi (tạo, từng sáng, có gõ, gõ xong việc, Hoàn hảo, sáng mà bỏ qua, chưa từng sáng) theo loại; giá mỗi bước sim; bất biến lời gọi mỗi tick.
+
+### 5.2 Báo cáo `td:balance`
+
+`node --import tsx scripts/td/balance.ts [--seeds=5] [--nights=4]` (5,6 s): mỗi chế độ (Thư giãn, Cân bằng, Thử thách, Học) chạy bot gõ và bot không gõ ở 5 seed, 4 đêm, từ vựng thật. In: bảng cổng §12 (Cân bằng); hai bot (đêm qua, mạng, tỉ lệ gõ Ngày và Đêm, cửa sổ 20 s đầy nhất, từ gõ, lời gọi Hoàn hảo, làm ra sau 3 Ngày); tỉ lệ gõ theo từng Ngày và Đêm; lời gọi theo loại; tài nguyên mỗi Ngày; bảng theo chế độ; giá một bước sim. `gates()` là bảng cổng; `tests/td-balance-gates.test.ts` giữ cổng 4, 5, 6, 7 trên đúng các seed đó (sim tất định, nên cùng số).
+
+### 5.3 Vì sao cổng 7 hỏng ở R1 (bot gõ "làm ra ít hơn")
+
+1. **R1 so số tồn cuối trận, không so cái làm ra.** Bot gõ có Lúa sớm hơn nên thuê dân, mua hạt, xây sớm hơn: tiêu nhiều hơn. Đo lại trên mã R1 (3 seed, hết Đêm 3), Vàng mọi nguồn + Gỗ + Lúa làm ra: gõ 486, không gõ 440, tức +10 %, không phải thua.
+2. **Bot R1 dở.** Tướng bay tới lời gọi mờ cũ nhất mỗi 2 s, qua lại giữa Ruộng cạnh Lũy và 5 cây bờ đông suối cách 60 m (bay mất ~10 s mỗi lượt); gọi Đêm ở giây 45 của 75; Mỏ ★ ở N2 không bao giờ đầy nửa đống nên không có lời gọi Đào.
+3. **Cây tự đổ nhanh quá:** 20 s một cây, phần lớn lời gọi Chặt xong trước khi Tướng tới; gõ chỉ góp một hai từ.
+4. **Cây hết:** 36 cây × 8 Gỗ = 288 Gỗ cả bản đồ; bot gõ chặt hết trước Ngày 4, Ngày 4 không còn lời gọi Chặt (tỉ lệ gõ Ngày 4 còn 15–24 %).
+
+Sửa: kế hoạch và Tướng (mục 5.1), Mỏ N1, đủ ngày; cây 45 s ra 12 Gỗ (mục 5.5). Sau sửa: +35,7 % (5 seed), +38 % (20 seed).
+
+### 5.4 Vì sao cổng 5 hỏng, và luật mới của bộ điều phối
+
+Bộ điều phối R1 chỉ nhìn 20 s đã qua lúc thắp: ba lời gọi thắp cùng lúc lúc vắng được bot gõ liền nhau (17 s trong 20 s ở 35 WPM); Bắn mạnh và Xây thắp cả khi đã quá 8 s (một lời gọi Xây 4 từ đưa lên 11 s). Giữ cửa sổ bằng cách giữ chỗ cả lời gọi (mọi từ còn lại) thì chặn quá tay: tỉ lệ gõ Ngày còn 9–25 % (lời gọi 3 từ chiếm chỗ ~6 s, và tự làm thường xong trước khi gõ hết).
+
+**Luật mới (`systems/attention.ts`, giữ từng từ):** một từ chỉ được bắt đầu khi gõ nó từ giờ (thời gian khóa ở tốc E: các chữ trừ chữ đầu, `typeSeconds(len − 1)` × `CALL.paceK`, cộng `CALL.slipS` cho phím trượt), sau từ đang gõ dở, vẫn giữ mọi cửa sổ 20 s trong số giây của chế độ, có tính các tick gõ cũ rời cửa sổ trong lúc đó; hoặc khi 20 s qua không gõ gì (một từ dài hơn ngân sách vẫn tới, một mình). Lời gọi chỉ thắp khi một từ dài nhất của dải vừa; lời gọi SÁNG có từ chưa gõ chữ nào thì MỜ lại (trả từ, không mất gì) khi từ đó không còn vừa, kể cả từ kế của lời gọi đang khóa (lệch §5.2 "từ kế vẫn KHÓA": ở mép ngân sách lời gọi nhả khóa và chờ). Bắn mạnh và Xây vẫn đứng đầu hàng nhưng cũng chờ chỗ (lệch §5.3 "vượt mức thì chỉ cho power và build mở thêm"). Test: `td-calls` (cửa sổ đầy thì không gì thắp, từ chưa gõ mờ lại không mất gì; cửa sổ trống thì thắp theo ưu tiên tới trần; 8 s gõ từ lâu rời cửa sổ thì vừa, 8 s vừa gõ thì không).
+
+**Biên trượt:** bot trượt và Backspace làm một từ dài hơn ước tính. Biên lớn thì cửa sổ an toàn nhưng tỉ lệ gõ Ngày giảm. Đo trên bản cuối, 20 seed, Cân bằng:
+
+| `slipS` | Cửa sổ 20 s đầy nhất | Gõ Ngày | Gõ Đêm |
+|---|---|---|---|
+| 0,6 s | 8,72 s (hỏng) | 32,2 % | 21,7 % |
+| 1,0 s | 8,68 s (hỏng) | 31,1 % | 20,5 % |
+| **1,1 s (chọn)** | **8,00 s** | **30,6 %** | 20,2 % |
+| 1,5 s | 8,00 s | 28,4 % (hỏng) | 20,7 % |
+| 2,0 s | 7,87 s | 26,8 % (hỏng) | 19,4 % |
+
+Hai cổng (≤ 8 s mọi cửa sổ, ≥ 30 % ban Ngày) sát nhau với một người gõ có trượt: mức đầy nhất 8 s là 40 %, nên trung bình 30 % đòi cửa sổ luôn gần đầy. Một từ trượt ba bốn lần ngay mép vẫn có thể vượt: ở Thư giãn (ngân sách 6 s, không là cổng) báo cáo có một cửa sổ 7,0 s, từ "right" trượt 4 lần (4,5 s).
+
+### 5.5 Đổi luật (số trong `rules.ts`, mã ở `attention.ts`)
+
+| Chỗ | Trước | Sau | Lý do |
+|---|---|---|---|
+| `attention.ts` | Thắp khi 20 s qua ≤ ngân sách; quá thì chỉ Bắn mạnh, Xây | Giữ ngân sách từng từ, nhìn trước (mục 5.4) | Cổng 5a: 17 s và 11 s trong 20 s |
+| `CALL.paceK` | — | 1 | Thời gian khóa một từ ước theo TK 6.3 ở tốc E |
+| `CALL.slipS` | — | 1,1 s | Biên cho phím trượt (bảng mục 5.4) |
+| `TREE.chopS` | 20 s | 45 s | Lời gọi Chặt có thời gian được trả lời; không gõ thì Gỗ chậm hơn (cổng 7) |
+| `TREE.wood` | 8 | 12 | Dân tự chặt ra 0,27 Gỗ/s (trước 0,4); 36 cây giữ 432 Gỗ, đủ tới Ngày 4 cho người gõ (cổng 5b ở Ngày 4) |
+
+Đã thử mà không giữ: `ECONOMY.woodShare` 0,4 và 0,5 (Gỗ dư, Vàng thiếu; thêm ~0,5 điểm tỉ lệ gõ nhưng 0,5 cần nhiều Gỗ hơn cả bản đồ có), lời gọi Chặt 3 từ và Xây L 3 từ (cần khi còn giữ chỗ cả lời gọi; giữ từng từ thì 4 từ của §5.1 lại tốt hơn: nhiều từ hơn mỗi cây), Ruộng thứ hai (hạt 8 Vàng ra 5 Lúa bán 5 Vàng: lỗ Vàng, không giúp).
+
+### 5.6 Cổng cứng §12 cuối R3
+
+| Cổng | Kết quả |
+|---|---|
+| 1. `pnpm check` từng bước, `td-boundary` | `tsc` hai cấu hình sạch; `npx vitest run` 407 file, 2.693 đạt, 1 bỏ qua (TD 20 file, 227 test); `vite build` đạt (thư mục ngoài repo) |
+| 2. Tất định | File vàng **làm lại** (luật sim đổi và bot chuẩn mới): 19.080 tick, 318 mã băm, 326 lệnh (có `callNight`: bot vàng gọi Đêm sau 60 s), 54 từ, 17 lời gọi Hoàn hảo; `--check` khớp. Chrome chạy nhật ký vàng ra đủ 318 mã băm (`td-1a6-perf`, hai cỡ); Node chạy lại nhật ký trang của `td-1a6-day`, `-night`, `-keyboard`, `-learn`, `-perf` ra đúng mã băm |
+| 3. Bước sim ≤ 0,5 ms (300 quái, 20 cây, 9 dân, 4 Ruộng) | Node: trung vị 0,0097 ms, p95 0,012 ms; Chrome (`td-1a6-perf`): trung vị 0,01 ms, p95 0,04 ms |
+| 4. Bot không gõ qua Đêm 1–4, Cân bằng, mọi seed | Đạt: mạng 10 / 13 / 13 / 10 / 9 (5 seed); 20 seed: thấp nhất 9 |
+| 5. Bot gõ 35 WPM 95 % | Cửa sổ 20 s đầy nhất 7,95 s (5 seed; 20 seed 8,00 s); Ngày 30,3 %; Đêm 20,5 % |
+| 6. Bất biến | Test thuộc tính `td-calls` xanh; mọi tick của mọi lượt bot (4 chế độ × 2 bot × 5 seed): 0 bất biến vỡ, 0 lệnh bị từ chối |
+| 7. Gõ hơn không gõ ≥ 25 % sau 3 Ngày | 505 / 372 = +35,7 % (Thư giãn, Học +37 %, Thử thách +58 %) |
+| 8. Kịch bản 1280 × 720 và 1920 × 1080 | Đạt cả 9 ở hai cỡ, không lỗi console (mục 5.7) |
+| 9. Ngân sách mã ≤ 7.300 | 6.012 dòng |
+
+Theo chế độ (5 seed, 4 đêm): Thư giãn và Học gõ Ngày 19 %, Đêm 15 % (ngân sách 6 s); Thử thách gõ Ngày 43 %, Đêm 31 %, bot không gõ thua Đêm 4 ở 1 trong 5 seed (Thử thách không là cổng 4). Lời gọi (Cân bằng, bot gõ, 5 seed): 424 tạo, 298 từng sáng, 254 có gõ, 176 gõ xong việc, 130 Hoàn hảo, 44 sáng mà bỏ qua; Xây ít sáng (30 tạo, 6 sáng): Tướng ít tới công trường, thợ tự xây.
+
+### 5.7 Kịch bản trình duyệt (§12 cổng 8)
+
+Chạy với `scripts/dev/vite.worktree.config.ts`, cổng 3140; phím thật qua CDP; mọi kịch bản kiểm không lỗi console, không ngoại lệ trang, và (trừ boot, IME) thẻ sống không chồng nhau, không đè bảng HUD, chữ ≥ 18 px, trong màn hình. Helper chung `td-1a6-common.mjs`.
+
+| Kịch bản | Kiểm |
+|---|---|
+| `td-1a6-day` | Đặt sẵn, gõ 45 WPM: Gặt, Chặt, Xây đều xong bởi một từ gõ (`callEnd.finished`); Lúa, hạt, Gỗ, cây đổ, nhà đứng; Node chạy lại ra cùng mã băm |
+| `td-1a6-night` | Shift + Enter gọi Đêm; từ Bắn mạnh gõ thật, lượt mạnh lên 3 rồi được tiêu, Phát Chữ bắn ra; hết Đêm còn mạng; chạy lại trên Node |
+| `td-1a6-keyboard` | Một Ngày và một Đêm không một sự kiện chuột: Insert / Digit / Enter xây, Tab tới lời gọi mờ rồi Enter, Esc nhả khóa, Digit0 gọi về, Shift + `\` thuê dân, Shift + Enter; mọi lệnh trong nhật ký là lệnh phím; chạy lại trên Node |
+| `td-1a6-attention` | Nhiều lời gọi (đặt sẵn, thêm công trường, cây đánh dấu); mỗi chế độ trên trang mới: sáng tối đa đúng trần (Thư giãn 2, Cân bằng 3, Thử thách 4), có lời gọi chờ khi trần đầy, lời gọi chờ sáng khi có chỗ; ~140 lần nhìn mỗi cỡ: 0 chồng, 0 đè HUD |
+| `td-1a6-learn` | Chế độ Học: mọi thẻ có nghĩa trước phím đầu, dải chữ có nghĩa và IPA; hai từ Ẩu vào sổ ôn; Hỏi bài "khá, hơi · r _ _ _ _ _" gõ đúng: Tri thức lên, từ rời sổ; Space dừng và chạy tiếp (chờ 0,8 s sau chữ cuối: review R2) |
+| `td-1a6-perf` | Làng bận (Lũy 4, 9 dân, 4 Ruộng, 20 cây đánh dấu, công trường) và Đêm đông (`flood(300)`), gõ 70 WPM 10 s: vẽ và thẻ p95 1,0 / 0,9 ms (1280 / 1920; trần 8 ms), bước và HUD p95 0,3 ms, 60 khung/s, luồng chính Chrome 1,2–1,3 ms/khung; bước sim trong Chrome trung vị 0,01 ms; nhật ký vàng chạy trong Chrome ra đủ mã băm của Node; nhật ký trang chạy lại trên Node |
+| `td-1a6-tour` | Bộ ảnh cho chủ dự án (mục 5.8), mỗi ảnh kiểm đúng trạng thái của nó |
+| `td-1a-boot` | Giữ từ 1A, đạt |
+| `td-1a-ime` | Chuyển: `-` và `=` không còn ra lệnh; phần bộ gõ tiếng Việt giữ nguyên |
+
+Thẻ đang khóa phóng ×1,2 từ mép dưới nhưng hộp cột tính chiều cao chưa phóng, nên đè cột bên 2–5 px (gặp ở `td-1a6-day` 1920, `td-1a6-tour`): `view/words/cards.ts` nay tính hộp cột tới đỉnh đã phóng của thẻ khóa; `day`, `night`, `tour` chặn thẻ sạch như `attention`.
+
+### 5.8 Bộ ảnh cho chủ dự án (`td-1a6-tour`, 1280 × 720 và 1920 × 1080)
+
+`01-village` (làng ban Ngày, zoom 1), `02-village-zoom` (zoom 2× vào làng, lời gọi xa thành mũi tên ở mép), `03-bright-calls` (lời gọi sáng, một từ đang gõ, thẻ nghĩa), `04-dim-bubbles` (Tướng bay đi, bong bóng mờ), `05-tab-dim-call` (Tab tới lời gọi mờ, thẻ dock), `06-farm-card`, `07-keep-card`, `08-learn` (nghĩa trên thẻ), `09-quiz`, `10-tactical-pause`, `11-night-power`, `12-night-charges`, `13-night-zoom` (khúc nhập 2× ban Đêm), `14-sandbox`. Ảnh nằm ở `OUT_DIR` (ngoài repo, không media trong Git).
+
+### 5.9 Số dòng (cách đếm của §0: `.ts` trong `src/td`)
+
+5.955 (sau review R2) → 6.012: `attention.ts` +45 (ngân sách từng từ), `rules.ts` +7 (hai số và chú thích), `cards.ts` +1. Bot, báo cáo, test và kịch bản không tính (`tests/td/*`, `tests/td-balance-gates.test.ts`, `scripts/visual/scenarios/td-1a6-*`: ~2.770 dòng).
+
+### 5.10 Còn lại (cho review R3)
+
+- Cổng 5a và 5b sát mép (mục 5.4): một bản gộp đổi luật sim nào cũng nên chạy lại `td:balance`; `td-balance-gates` sẽ báo.
+- Thư giãn và Học: một cửa sổ 7,0 s trên ngân sách 6 s (một từ trượt 4 lần); không là cổng.
+- Thử thách: bot không gõ thua Đêm 4 ở 1 / 5 seed; bot gõ qua cả 5.
+- Lời gọi Xây ít khi sáng (thợ xây đứng xa Tướng); các bước nâng cấp của kế hoạch chuẩn chưa tới trong 4 đêm (thiếu Vàng).
+- Từ R1: Bắn mạnh tạo cuối Đêm sống tối đa 3 s sang Ngày (vô hại).

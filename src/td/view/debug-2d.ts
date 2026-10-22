@@ -1,25 +1,38 @@
 /**
- * The 1A picture (docs/td/BUILD_NOW.md §5.1): the world seen from above on a
- * Canvas 2D, no media. Grass, lanes, the Silver Stream and its bridges, ore
- * nodes, buildings as discs of their true radius, enemies as ink-purple dots
- * sized by tier, soldiers, shots and short-lived hit marks read from the
- * combat ring; each building's heat lanterns and tempo badge; the hero and
- * the helpers with their paths and assist lines; Word Shots with a jade head
- * trailing their word; the player's hand. The camera zooms and pans. It reads
- * the world and never changes it.
+ * The 1A picture (docs/td/BUILD_NOW.md §5.1, BUILD_1A6 §9): the world seen
+ * from above on a Canvas 2D, no media. Grass, lanes, the Silver Stream and
+ * its bridges, ore nodes, trees (stumps once felled, a gold rim when marked),
+ * buildings as discs of their true radius (a site dashed, its progress an
+ * arc), a farm's four plots by stage with a harvest bar, a tower's five power
+ * charges, enemies as ink-purple dots sized by tier, soldiers, the NPC workers
+ * lettered (a miner by each mine) with "!" at work and "…" when their call
+ * waits, shots and short-lived hit marks read from the combat ring; the hero
+ * and the helpers with their paths and the selected one's help ring; Word
+ * Shots with a jade head trailing their word; a dim call's faded bubble (no
+ * word: walk over to help), an arrow at the edge for a call off screen; the
+ * player's hand. The camera zooms and pans. It reads the world and never changes it.
  */
-import { BUILD, TEMPO, TICK_HZ } from "../content/rules";
+import { AGENT, BUILD, FARM, TICK_HZ, TREE } from "../content/rules";
 import { FX } from "../sim/events";
 import { MODE, PATH_MAX } from "../sim/stores/agents";
+import { PLOT } from "../sim/stores/buildings";
+import { CALL_STATE } from "../sim/stores/calls";
+import { TASK } from "../sim/stores/npcs";
 import { PROJECTILE } from "../sim/stores/projectiles";
 import { slotsOpen } from "../sim/systems/agents";
+import { plotAt } from "../sim/systems/economy";
 import type { World } from "../sim/world";
 import { wordText } from "../typing/decks";
+import { CALL_COLOR, CALL_ICON, pips, ROOF_M } from "./words/cards";
 
 const COLOR = {
   grass: "#7dba5a", edge: "#6aa64b", road: "#c9a66b", roadEdge: "#8f6f3f", water: "#5da9e9", bridge: "#8b5a2b",
   ink: "#2b2118", paper: "#fff4d6", ore: "#c98a2e", soldier: "#3b7ddd", enemyHp: "#ff4a4a", buildingHp: "#ffb020", jade: "#0b8a78", lamp: "#ffb84d",
+  tree: "#2f6b2a", treeTop: "#3f8a37", stump: "#7a4f12", plots: ["#8b5a2b", "#b5e48c", "#4f9a2f", "#e9c46a"],
 } as const;
+/** NPC letters (§9): N farmer, D villager, X builder; M the miner by a mine. */
+const NPC_LETTER = ["N", "D", "X"];
+const NPC_FILL = ["#f4d35e", "#c8b6a6", "#d9a066"];
 
 const FONT = '"Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif';
 /** How long a hit mark stays, in ticks. */
@@ -30,8 +43,9 @@ const DRAGON = new Path2D("M0 -1.15L0.35 -0.15L1.3 0.7L0.27 0.4L0 0.85L-0.27 0.4
 const FLAG = new Path2D("M0 0V-1.6L1.1 -1.25L0 -0.9Z");
 
 type Mark = { kind: number; x: number; z: number; value: number; tick: number };
-/** The player's hand (app/selection.ts): the selected agent, the building in focus by id, the build menu's kind and ghost. */
-export type Hand = { agent: number; focus: number; kind: number; ghost(): { x: number; z: number; reason: string } | null };
+/** The player's hand (app/selection.ts): the selected agent, the building and the dim call in focus by id, the build menu's kind and ghost. */
+export type Hand = { agent: number; focus: number; call: number; kind: number; ghost(): { x: number; z: number; reason: string } | null };
+type Bubble = { id: number; x: number; y: number; w: number; h: number };
 
 export class DebugView {
   private readonly ctx: CanvasRenderingContext2D;
@@ -43,6 +57,8 @@ export class DebugView {
   private readonly fit = { scale: 1, x: 0, y: 0 };
   private readCursor = 0;
   private readonly marks: Mark[] = [];
+  /** The dim bubbles drawn last frame, CSS px: what a click hits. */
+  private readonly bubbles: Bubble[] = [];
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d", { alpha: false });
@@ -85,6 +101,11 @@ export class DebugView {
     return { x: (px * this.ratio - this.ox) / this.scale, z: (py * this.ratio - this.oy) / this.scale };
   }
 
+  /** The call (id) whose dim bubble is under the CSS point, −1 none. */
+  callAt(px: number, py: number): number {
+    return this.bubbles.find((b) => px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h)?.id ?? -1;
+  }
+
   draw(w: World, hand: Hand): void {
     const { ctx } = this;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -92,14 +113,17 @@ export class DebugView {
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.setTransform(this.scale, 0, 0, this.scale, this.ox, this.oy);
     this.ground(w);
+    this.trees(w);
     this.buildings(w, hand);
     this.ghost(w, hand);
     this.soldiers(w);
     this.enemies(w);
+    this.npcs(w);
     this.agents(w, hand);
     this.shots(w);
     this.readMarks(w);
     this.drawMarks(w);
+    this.calls(w, hand);
   }
 
   private px(pixels: number): number {
@@ -201,8 +225,19 @@ export class DebugView {
     });
   }
 
+  /** A round dark crown with a lighter top (a gold rim when marked), a brown dot once felled; the chop's bar under it. */
+  private trees(w: World): void {
+    w.map.trees.forEach(([x, z], t) => {
+      if (w.trees.standing[t] === 0) return this.disc(x, z, 0.45, COLOR.stump, COLOR.ink, 1);
+      this.disc(x, z, TREE.radiusM, COLOR.tree, w.trees.marked[t] === 1 ? COLOR.lamp : COLOR.ink, w.trees.marked[t] === 1 ? 3.5 : 1);
+      this.disc(x - 0.35, z - 0.35, TREE.radiusM * 0.55, COLOR.treeTop, null);
+      if (w.trees.progress[t]! > 0) this.bar(x, z + TREE.radiusM + 0.4, 2.4, w.trees.progress[t]!, COLOR.lamp);
+    });
+  }
+
   private buildings(w: World, hand: Hand): void {
     const B = w.buildings;
+    const { ctx } = this;
     for (let b = 0; b < B.top; b += 1) {
       if (B.used[b] === 0) continue;
       const spec = w.c.buildings[B.def[b]!]!;
@@ -210,30 +245,118 @@ export class DebugView {
       const z = B.z[b]!;
       const r = spec.radius;
       const level = B.level[b]!;
-      const building = w.tick < B.readyTick[b]!;
+      const site = B.ready[b] === 0;
       if (B.id(b) === hand.focus) this.disc(x, z, r + 0.7, "rgba(127, 245, 224, 0.35)", COLOR.jade, 3);
-      if (spec.attack !== null && !building) this.disc(x, z, spec.attack.levels[level - 1]!.range, null, "rgba(43, 33, 24, 0.22)", 1);
-      if (building) this.ctx.setLineDash([this.px(4), this.px(3)]);
-      this.disc(x, z, r, building ? "rgba(255, 244, 214, 0.6)" : spec.def.view.color, COLOR.ink, 2);
-      this.ctx.setLineDash([]);
-      this.text(spec.def.view.short, x, z - 0.2, b === 0 ? 15 : 14, COLOR.ink);
+      if (spec.attack !== null && !site) this.disc(x, z, spec.attack.levels[level - 1]!.range, null, "rgba(43, 33, 24, 0.22)", 1);
+      if (site) ctx.setLineDash([this.px(4), this.px(3)]);
+      this.disc(x, z, r, site ? "rgba(255, 244, 214, 0.6)" : spec.def.view.color, COLOR.ink, 2);
+      ctx.setLineDash([]);
+      if (B.upTo[b]! > 0) {
+        Object.assign(ctx, { strokeStyle: COLOR.jade, lineWidth: this.px(4) });
+        ctx.beginPath();
+        ctx.arc(x, z, r + 0.4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * B.progress[b]!);
+        ctx.stroke();
+      }
+      if (spec.farm && !site) {
+        // Soil, seedlings (the first half of growing), green rice, ripe gold; a ripe plot being cut shows its bar.
+        for (let p = 0; p < FARM.plots; p += 1) {
+          const at = plotAt(w, b, p);
+          const stage = B.plot[b * FARM.plots + p]!;
+          const work = B.plotWork[b * FARM.plots + p]!;
+          ctx.fillStyle = COLOR.plots[stage === PLOT.ripe ? 3 : stage === PLOT.growing ? (work < 0.5 ? 1 : 2) : 0]!;
+          ctx.fillRect(at.x - 0.9, at.z - 0.9, 1.8, 1.8);
+          Object.assign(ctx, { strokeStyle: COLOR.ink, lineWidth: this.px(1) });
+          ctx.strokeRect(at.x - 0.9, at.z - 0.9, 1.8, 1.8);
+          if (stage === PLOT.ripe && work > 0) this.bar(at.x, at.z + 0.5, 1.6, work, COLOR.jade);
+        }
+      } else this.text(spec.def.view.short, x, z - 0.2, b === 0 ? 15 : 14, COLOR.ink);
       // Level marks under the letter (the Bastion has 4 levels).
       for (let mark = 0; mark < level; mark += 1) {
-        this.ctx.fillStyle = COLOR.ink;
-        this.ctx.fillRect(x - 0.6 * level + mark * 1.2 + 0.25, z + r * 0.45, 0.7, this.px(3));
+        ctx.fillStyle = COLOR.ink;
+        ctx.fillRect(x - 0.6 * level + mark * 1.2 + 0.25, z + r * 0.45, 0.7, this.px(3));
       }
-      // Five lanterns over the roof: heat, a lantern per point, half lit at half a point.
-      for (let lamp = 0; lamp < 5; lamp += 1) {
-        const lit = B.heat[b]! - lamp * 1000;
-        this.disc(x - 1.9 + lamp * 0.95, z - r - 0.9, 0.42, lit >= 1000 ? COLOR.lamp : lit >= 500 ? "#ffe0a8" : COLOR.paper, COLOR.ink, 1);
-      }
-      const tempo = TEMPO[B.tempo[b]!]!.periodS;
-      this.text(tempo === 0 ? "Dừng" : tempo + "s", x + r + 0.9, z + r * 0.6, 10, COLOR.ink, 700);
-      if (B.assist[b]! >= 0 && B.waiting[b] === 1) this.text("…", x, z - r - 1.7, 14, COLOR.ink);
+      // Five power charges under a tower (§4.5), at least 7 px across at any zoom.
+      const [pip, step] = [Math.max(0.35, this.px(3.5)), Math.max(0.95, this.px(9))];
+      for (let k = 0; spec.attack !== null && !site && k < 5; k += 1) this.disc(x + (k - 2) * step, z + r + pip + 0.4, pip, k < B.charges[b]! ? COLOR.jade : COLOR.paper, COLOR.ink, 1);
+      if (spec.mine !== null && !site) this.worker(x - r - 0.2, z + r * 0.5, "M", "#e0b33a", B.call[b]!, w); // the miner never stops
+      else if (B.call[b]! >= 0) this.text(w.calls.state[B.call[b]!] === CALL_STATE.queued ? "…" : "!", x, z - r - 1.2, 14, COLOR.ink);
       if (spec.hp[0] > 0 && B.hp[b]! < spec.hp[level - 1]!) this.bar(x, z + r + 0.5, r * 2, B.hp[b]! / spec.hp[level - 1]!, COLOR.buildingHp);
       if (spec.barracks !== null) this.shape(FLAG, B.rallyX[b]!, B.rallyZ[b]!, COLOR.soldier);
       if (spec.mine !== null && B.pile[b]! > 0) this.text("+" + Math.floor(B.pile[b]! / 1000), x + r + 1.2, z, 11, "#7a4f12");
     }
+  }
+
+  /** A worker: a small lettered dot; over it "!" at work (call −1: working alone, −2: idle) or "…" while its call waits in the queue. */
+  private worker(x: number, z: number, letter: string, fill: string, call: number, w: World): void {
+    this.disc(x, z, 0.7, fill, COLOR.ink, 1.2);
+    this.text(letter, x, z, 10, COLOR.ink);
+    if (call >= -1) this.text(call >= 0 && w.calls.state[call] === CALL_STATE.queued ? "…" : "!", x, z - 1.3, 13, COLOR.ink);
+  }
+
+  private npcs(w: World): void {
+    const N = w.npcs;
+    for (let n = 0; n < N.top; n += 1) {
+      if (N.used[n] === 0) continue;
+      this.worker(N.x[n]!, N.z[n]!, NPC_LETTER[N.kind[n]!]!, NPC_FILL[N.kind[n]!]!, N.task[n] === TASK.working ? N.call[n]! : -2, w);
+    }
+  }
+
+  /**
+   * Open calls (BUILD_1A6 §9): one off the zoom-1 field's picture is an arrow at its edge in the kind's colour; a
+   * dim one on screen is a faded bubble over its caller with the kind's icon and its word dots, no word (the help
+   * ring lights it), stacked up out of each other's way; the one Tab is on gets a jade rim. Screen pixels; the
+   * bubbles are kept (CSS px) for clicks.
+   */
+  private calls(w: World, hand: Hand): void {
+    const { ctx, ratio } = this;
+    const C = w.calls;
+    const half = this.fit.scale * (w.map.halfM + 2) - 22 * ratio;
+    const dim: (Bubble & { c: number })[] = [];
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.textBaseline = "middle";
+    for (const c of C.live()) {
+      if (C.state[c] !== CALL_STATE.open) continue;
+      const kind = C.kind[c]!;
+      const dx = this.ox + C.x[c]! * this.scale - this.fit.x;
+      const dy = this.oy + C.z[c]! * this.scale - this.fit.y;
+      const out = Math.max(Math.abs(dx), Math.abs(dy)) / half;
+      if (out > 1) {
+        const [ax, ay, angle] = [this.fit.x + dx / out, this.fit.y + dy / out, Math.atan2(dy, dx)];
+        ctx.beginPath();
+        for (const [r, a] of [[16, 0], [9, 2.4], [9, -2.4]] as const) ctx.lineTo(ax + Math.cos(angle + a) * r * ratio, ay + Math.sin(angle + a) * r * ratio);
+        Object.assign(ctx, { fillStyle: CALL_COLOR[kind], strokeStyle: COLOR.ink, lineWidth: 2 * ratio });
+        ctx.fill();
+        ctx.stroke();
+      } else if (C.bright[c] === 0) {
+        const w2 = (pips(w, c).length * 8 + 30) * ratio; // its word card is the bright one's bubble
+        let y = this.oy + (C.z[c]! - ROOF_M) * this.scale - 24 * ratio;
+        const x = this.ox + C.x[c]! * this.scale - w2 / 2;
+        for (let k = 0; k < dim.length; k += 1) {
+          const b = dim[k]!;
+          if (x < b.x + b.w && b.x < x + w2 && y < b.y + b.h && b.y < y + 24 * ratio) [y, k] = [b.y - 27 * ratio, -1];
+        }
+        dim.push({ id: C.id(c), c, x, y, w: w2, h: 24 * ratio });
+      }
+    }
+    this.bubbles.length = 0;
+    for (const b of dim) {
+      const kind = C.kind[b.c]!;
+      ctx.globalAlpha = 0.65;
+      ctx.beginPath();
+      ctx.roundRect(b.x, b.y, b.w, b.h, 7 * ratio);
+      Object.assign(ctx, { fillStyle: COLOR.paper, strokeStyle: CALL_COLOR[kind], lineWidth: 2 * ratio });
+      ctx.fill();
+      ctx.stroke();
+      ctx.font = Math.round(14 * ratio) + "px " + FONT;
+      ctx.fillText(CALL_ICON[kind]!, b.x + 6 * ratio, b.y + b.h / 2 + ratio);
+      Object.assign(ctx, { font: "700 " + Math.round(9 * ratio) + "px " + FONT, fillStyle: COLOR.ink });
+      ctx.fillText(pips(w, b.c), b.x + 26 * ratio, b.y + b.h / 2);
+      ctx.globalAlpha = 1;
+      if (b.id === hand.call) Object.assign(ctx, { strokeStyle: COLOR.jade, lineWidth: 3 * ratio }).stroke();
+      this.bubbles.push({ id: b.id, x: b.x / ratio, y: b.y / ratio, w: b.w / ratio, h: b.h / ratio });
+    }
+    ctx.restore();
   }
 
   /** The build ghost (TK 12.5): the kind's disc and reach; where it may not stand, a red ring and the reason on a chip under it. */
@@ -293,7 +416,7 @@ export class DebugView {
     ctx.setLineDash([]);
   }
 
-  /** The assist line; a walker's path ahead, dashed; Thư Đồng as lettered discs, Draconis a winged triangle over its shadow. */
+  /** A walker's path ahead, dashed; Thư Đồng as lettered discs, Draconis a winged triangle over its shadow. */
   private agents(w: World, hand: Hand): void {
     const A = w.agents;
     const B = w.buildings;
@@ -315,17 +438,8 @@ export class DebugView {
         x += (dx / d) * out;
         z += (dz / d) * out;
       }
-      // The assist line stops 0.3 r inside the rim: joined to the building, off its letter and level marks.
-      const at = A.at[a]!;
-      const tx = at >= 0 ? B.x[at]! - x : 0;
-      const tz = at >= 0 ? B.z[at]! - z : 0;
-      const reach = at >= 0 ? 1 - (0.7 * w.c.buildings[B.def[at]!]!.radius) / Math.sqrt(tx * tx + tz * tz) : 0;
-      if (reach > 0) this.polyline([x, z, x + tx * reach, z + tz * reach], view.color, 0);
-      // The locked word's light runs down the line a step a right key and reaches the building as the word is done (TK 23.7).
-      const lock = w.typing.router.lock;
-      const f = lock >= 0 && reach > 0 && w.words.building[lock] === at ? (reach * w.words.typed[lock]!) / w.typing.deck.len[w.words.word[lock]!]! : 0;
-      if (f > 0) this.disc(x + tx * f, z + tz * f, 0.5, "#e6fffa", COLOR.jade, 1.5);
       if (a === hand.agent) this.disc(x, z, a === 0 ? 1.6 : 1.3, null, COLOR.jade, 3);
+      if (a === hand.agent) this.disc(A.x[a]!, A.z[a]!, a === 0 ? AGENT.heroRingM : AGENT.helperRingM, "rgba(11, 138, 120, 0.06)", COLOR.jade, 1); // the help ring (§6)
       if (A.mode[a] === MODE.walk) this.polyline([x, z, ...A.path.subarray((a * PATH_MAX + A.next[a]!) * 2, (a * PATH_MAX + A.pathN[a]!) * 2)], view.color, 7);
       if (a > 0) {
         this.disc(x, z, 0.85, view.color, COLOR.ink, 1.5);
@@ -374,7 +488,7 @@ export class DebugView {
     for (; this.readCursor < ring.written; this.readCursor += 1) {
       const slot = this.readCursor % ring.size;
       const kind = ring.kind[slot]!;
-      if (kind === FX.death || kind === FX.burst || kind === FX.leak || kind === FX.coin || kind === FX.soldierDown || kind === FX.fizzle || kind === FX.wordGold) {
+      if (kind === FX.death || kind === FX.burst || kind === FX.leak || kind === FX.coin || kind === FX.soldierDown || kind === FX.fizzle) {
         this.marks.push({ kind, x: ring.x[slot]!, z: ring.z[slot]!, value: ring.value[slot]!, tick: ring.tick[slot]! });
       }
     }
@@ -390,7 +504,6 @@ export class DebugView {
       else if (mark.kind === FX.soldierDown) this.disc(mark.x, mark.z, 0.5 + age, null, "rgba(59, 125, 221, " + alpha + ")", 2);
       else if (mark.kind === FX.leak) this.disc(mark.x, mark.z, 1 + age * 4, null, "rgba(255, 74, 74, " + alpha + ")", 3);
       else if (mark.kind === FX.fizzle) this.disc(mark.x, mark.z - 2 - age * 3, 0.4 + age * 1.6, null, "rgba(127, 245, 224, " + alpha + ")", 2);
-      else if (mark.kind === FX.wordGold) this.text("+" + Number((mark.value / 1000).toFixed(1)), mark.x, mark.z - 3 - age * 3, 13, "rgba(201, 138, 46, " + alpha + ")");
       else this.text("+" + mark.value, mark.x, mark.z - 1 - age * 2.5, 12, "rgba(201, 138, 46, " + alpha + ")");
     }
   }

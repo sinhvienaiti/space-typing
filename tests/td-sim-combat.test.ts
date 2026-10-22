@@ -41,7 +41,7 @@ describe("damage (TK 10.1–10.2)", () => {
     for (let shot = 0; shot < 2000; shot += 1) {
       // Extra draws on another stream never shift these two.
       w.rng.spawn.next();
-      fireAt(w, PROJECTILE.arrow, 0, 0, archer, level, target, SOURCE.tower, 1, 0, 1);
+      fireAt(w, PROJECTILE.arrow, 0, 0, archer, level, target, SOURCE.tower, 1, 1);
       const base = level.min + twin.combat.float() * (level.max - level.min);
       const crit = twin.crit.chance(0.1);
       const slot = w.projectiles.top - 1;
@@ -64,7 +64,7 @@ describe("damage (TK 10.1–10.2)", () => {
     const outside = enemyPoint(w, "thuong-luong", 12.3, -40);
     const wisp = enemyPoint(w, "ma-troi", 10, -40);
     for (const slot of [centre, half, rim, outside]) w.enemies.hp[slot] = 1000;
-    fireAt(w, PROJECTILE.shell, 10, -40, cannon, level, centre, SOURCE.tower, 1, 0, 1);
+    fireAt(w, PROJECTILE.shell, 10, -40, cannon, level, centre, SOURCE.tower, 1, 1);
     const shell = w.projectiles.top - 1;
     w.projectiles.power[shell] = 40;
     w.projectiles.damageType[shell] = 2;
@@ -86,7 +86,7 @@ describe("damage (TK 10.1–10.2)", () => {
     const lowNear = enemyPoint(w, "ma-troi", -0.5, -30);
     expect(w.enemies.altitude[target]).toBe(2);
     expect(selectTargets(w, 0, -38, fireball, fireball.levels[0]!, 1)).toBe(1);
-    fireAt(w, PROJECTILE.fireball, 0, -38, fireball, fireball.levels[0]!, target, SOURCE.hero, 1, 0, 1);
+    fireAt(w, PROJECTILE.fireball, 0, -38, fireball, fireball.levels[0]!, target, SOURCE.hero, 1, 1);
     expect(w.projectiles.splash[w.projectiles.top - 1]).toBe(1.8);
     for (let tick = 0; tick < 60 && w.projectiles.count > 0; tick += 1) projectilesStep(w);
     expect(w.projectiles.count).toBe(0);
@@ -101,8 +101,8 @@ describe("damage (TK 10.1–10.2)", () => {
     const cannon = attackOf(w, "cannon");
     const target = enemyPoint(w, "cuong-thi", 0, -30);
     const bystander = enemyPoint(w, "thuong-luong", 0.5, -30);
-    fireAt(w, PROJECTILE.shell, 0, -38, cannon, cannon.levels[0]!, target, SOURCE.tower, 1, 0, 1);
-    fireAt(w, PROJECTILE.arrow, 0, -38, attackOf(w, "archer"), attackOf(w, "archer").levels[0]!, target, SOURCE.tower, 1, 0, 1);
+    fireAt(w, PROJECTILE.shell, 0, -38, cannon, cannon.levels[0]!, target, SOURCE.tower, 1, 1);
+    fireAt(w, PROJECTILE.arrow, 0, -38, attackOf(w, "archer"), attackOf(w, "archer").levels[0]!, target, SOURCE.tower, 1, 1);
     projectilesStep(w);
     damageEnemy(w, target, 100, 2, SOURCE.soldier);
     deathsStep(w);
@@ -146,7 +146,7 @@ describe("targeting (TK 10.4)", () => {
     const w = world();
     build(w, "archer", -18, -10);
     ready(w);
-    send(w, { t: "callWave" });
+    send(w, { t: "callNight" });
     run(w, 60 * 60);
     expect(w.stats[STAT.kills]).toBeGreaterThan(0);
     expect(w.stats[STAT.damageTower]).toBeGreaterThan(0);
@@ -178,11 +178,12 @@ describe("leaks and determinism", () => {
 
   it("the same seed and commands give the same hash, and a replay of the log matches", () => {
     const log: Command[] = [
+      { tick: 0, t: "sandbox", op: { op: "wood", value: 500 } },
       { tick: 0, t: "build", def: 1, qx: q(-18), qz: q(-10) },
       { tick: 0, t: "build", def: 3, qx: q(6), qz: q(18) },
       { tick: 5, t: "build", def: 2, qx: q(-8), qz: q(10) },
-      { tick: 30, t: "callWave" },
-      { tick: 2400, t: "callWave" },
+      { tick: 30, t: "callNight" },
+      { tick: 2400, t: "callNight" },
     ];
     const hashes = (seed: number) => {
       const w = createWorld({ seed });
@@ -204,8 +205,8 @@ describe("leaks and determinism", () => {
     const w = session.world;
     const barracks = () => w.buildings.id(w.buildings.live(1).find((slot) => w.c.buildings[w.buildings.def[slot]!]!.barracks !== null)!);
     const sends: Record<number, () => CommandBody[]> = {
-      0: () => [{ t: "build", def: def(w, "archer"), qx: q(-18), qz: q(-10) }, { t: "build", def: def(w, "barracks"), qx: q(6), qz: q(18) }],
-      5: () => [{ t: "callWave" }],
+      0: () => [{ t: "sandbox", op: { op: "wood", value: 500 } }, { t: "build", def: def(w, "archer"), qx: q(-18), qz: q(-10) }, { t: "build", def: def(w, "barracks"), qx: q(6), qz: q(18) }],
+      5: () => [{ t: "callNight" }],
       90: () => [{ t: "sandbox", op: { op: "speed", value: 2 } }, { t: "sandbox", op: { op: "gold", value: 500 } }, { t: "build", def: def(w, "cannon"), qx: q(-8), qz: q(10) }],
       300: () => [{ t: "rally", building: barracks(), qx: q(0), qz: q(12) }],
     };
@@ -216,7 +217,7 @@ describe("leaks and determinism", () => {
       now += 16 + (frame % 7) * 2;
       session.frame(now);
     }
-    expect(session.log.map((command) => command.t)).toEqual(["build", "build", "callWave", "sandbox", "sandbox", "build", "rally"]);
+    expect(session.log.map((command) => command.t)).toEqual(["sandbox", "build", "build", "callNight", "sandbox", "sandbox", "build", "rally"]);
     expect(w.events.rare.filter((event) => event.t === "rejected")).toEqual([]);
     expect(w.stats[STAT.shots]).toBeGreaterThan(0);
     const replay = createWorld({ seed: 7 });

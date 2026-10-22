@@ -5,6 +5,7 @@
  * Node and in Chrome. Events are output, not state, and stay out.
  */
 import { rngState } from "../../platform/rng";
+import { MODE_IDS } from "./commands";
 import type { World } from "./world";
 
 type Column = Uint8Array | Int8Array | Uint16Array | Int16Array | Int32Array | Float64Array;
@@ -46,13 +47,12 @@ function mixStore(hash: number, store: object & { top?: number; cap?: number }):
 
 export function hashWorld(w: World): number {
   let h = 0x811c9dc5;
-  for (const value of [w.tick, w.gold, w.lives, w.expected, w.vocab, w.speed, w.wave, w.nextWaveAt, ["prep", "battle", "defeat"].indexOf(w.phase), ["easy", "normal", "hard"].indexOf(w.difficulty)]) {
-    h = mixNumber(h, value);
-  }
+  const scalars = [w.tick, w.gold, w.wood, w.food, w.seeds, w.knowledge, Number(w.autoSeeds), w.lives, w.expected, w.vocab, w.speed, w.wave, w.day, w.phaseEnd];
+  for (const value of [...scalars, ["day", "night", "dawn", "defeat"].indexOf(w.phase), MODE_IDS.indexOf(w.mode)]) h = mixNumber(h, value);
   for (const value of rngState(w.rng)) h = mix(h, value);
   for (const list of [w.waveLeft, w.waveAlive, w.waveEnded]) for (let index = 1; index <= w.wave; index += 1) h = mixNumber(h, list[index] ?? -1);
   for (const spawn of w.spawnQueue) h = mix(mix(mix(mix(h, spawn.tick), spawn.enemy), spawn.route), spawn.wave);
-  for (const store of [w.enemies, w.units, w.buildings, w.projectiles, w.words, w.agents]) h = mixStore(h, store);
+  for (const store of [w.enemies, w.units, w.buildings, w.projectiles, w.words, w.agents, w.npcs, w.calls, w.trees]) h = mixStore(h, store);
   const T = w.typing;
   h = mixStore(mixStore(mixStore(h, T), T.letters), T.router);
   T.bags.forEach((bag, hi) => (h = mixColumn(mixNumber(mixNumber(h, hi), bag!.next), bag!.order, bag!.order.length)));

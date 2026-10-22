@@ -2,28 +2,29 @@
  * Word life and scoring (docs/td/TYPING_DEFENSE_DESIGN.md 6.4, 6.6). Errors
  * weigh most, with slack for long words; speed counts from the moment the
  * word appeared (reading time included), so the clock is the tick, not the
- * keys. The grade is the one name rules and pictures share (TK 0.6).
+ * keys. The grade is the one name rules and pictures share (TK 0.6). Since
+ * 1A.6 a word never runs out: L_w is only the clock speed is scored against.
  *
- *   L_w   = clamp(1.2 + 12·(len + 1)/(E·d); 3; 6) × k_L
+ *   L_w   = clamp(1.2 + 12·(len + 1)/(E·d); 3; 6) × k_L (the mode's)
  *   A_w   = clamp(1 − e·clamp(1.5/len; 0.15; 0.40); 0; 1)
  *   S_w   = clamp((L_w − t_done)/(L_w − t_fast); 0; 1),  t_fast = 0.35 + 0.8·12·(len + 1)/(E·d)
  *   Q_w   = 0.6·A_w + 0.4·S_w·(0.4 + 0.6·A_w)
  */
-import { LIFE, SCORE, TICK_HZ } from "../content/rules";
-import type { Difficulty, Grade } from "../content/types";
+import { LIFE, MODES, SCORE, TICK_HZ } from "../content/rules";
+import type { Grade, Mode } from "../content/types";
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 /** Seconds to type a word at the expected speed E (12 s per WPM-minute of 5 letters plus the space). */
 export const typeSeconds = (len: number, expected: number, d: number): number => (LIFE.perChar * (len + 1)) / (expected * d);
 
-export function lifeSeconds(len: number, expected: number, d: number, difficulty: Difficulty): number {
-  const life = clamp(LIFE.base + typeSeconds(len, expected, d), LIFE.min, LIFE.max) * LIFE.k[difficulty];
-  return difficulty === "hard" ? Math.max(LIFE.hardMin, life) : life;
+export function lifeSeconds(len: number, expected: number, d: number, mode: Mode): number {
+  const life = clamp(LIFE.base + typeSeconds(len, expected, d), LIFE.min, LIFE.max) * MODES[mode].lifeK;
+  return mode === "challenge" ? Math.max(LIFE.hardMin, life) : life;
 }
 
-export const lifeTicks = (len: number, expected: number, d: number, difficulty: Difficulty): number =>
-  Math.round(lifeSeconds(len, expected, d, difficulty) * TICK_HZ);
+export const lifeTicks = (len: number, expected: number, d: number, mode: Mode): number =>
+  Math.round(lifeSeconds(len, expected, d, mode) * TICK_HZ);
 
 export type Score = { grade: Grade; accuracy: number; speed: number; speedEff: number; quality: number };
 

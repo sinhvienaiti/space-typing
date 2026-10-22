@@ -2,38 +2,39 @@ import { describe, expect, it } from "vitest";
 import { CAP, STORE } from "../src/td/content/rules";
 import { hashHex } from "../src/td/sim/hash";
 import { STAT } from "../src/td/sim/stats";
+import { NPC_KIND } from "../src/td/sim/stores/npcs";
 import { createWorld, runLog } from "../src/td/sim/world";
 import { send, world } from "./td/fixtures";
 import { fullWorld, loadedWorld, stepCost } from "./td/perf";
 
 /**
- * One simulation step under load (BUILD_NOW §6.1, §7 gate 5: ≤ 0.5 ms on the
- * owner's machine, ≤ 2 ms on CI): 300 enemies, 9 soldiers, 200 shots in
- * flight, 10 buildings, 4 assisted at 1 s on the real vocabulary; then TK
+ * One simulation step under load (BUILD_NOW §6.1, §7 gate 5; BUILD_1A6 §12
+ * gate 3: ≤ 0.5 ms on the owner's machine, ≤ 2 ms on CI): 300 enemies, 9
+ * soldiers, 200 shots in flight, 10 buildings and 4 farms, 9 villagers, 20
+ * marked trees, calls bright on the real vocabulary, at night; then TK
  * 25.12's full load (640 enemies, 64 soldiers, 512 shots, 20 buildings; the
- * 1A caps lifted), held to the same CI bound.
- * The medians are printed; `pnpm td:balance` prints them too.
+ * 1A caps lifted), held to the same CI bound. The medians are printed.
  */
 describe("simulation step cost", () => {
-  it("steps 300 enemies, 9 soldiers, 200 shots, 10 buildings and 4 slots at 1 s in ≤ 2 ms", () => {
+  it("steps 300 enemies, 9 soldiers, 200 shots, 10 buildings, 4 farms, 9 villagers and 20 trees in ≤ 2 ms", () => {
     const w = loadedWorld(300, 200);
     expect(w.enemies.count).toBe(300);
+    expect([w.npcs.live().filter((n) => w.npcs.kind[n] === NPC_KIND.villager).length, w.npcs.live().filter((n) => w.npcs.kind[n] === NPC_KIND.farmer).length]).toEqual([9, 4]);
     const cost = stepCost(w, 300, 100);
     expect(w.projectiles.count).toBeGreaterThanOrEqual(200);
     expect(w.stats[STAT.blocks]).toBeGreaterThan(0);
-    expect(cost.words).toBeGreaterThan(10);
+    expect(cost.calls).toBeGreaterThan(5); // chops, farm work and power calls made under load
     console.log("td sim step (300 enemies): median " + cost.median.toFixed(3) + " ms, p95 " + cost.p95.toFixed(3) + " ms");
     expect(cost.median).toBeLessThanOrEqual(2);
   });
 
-  it("steps TK 25.12's full load (640 enemies, 64 soldiers, 512 shots, 20 buildings, 4 slots at 1 s) in ≤ 2 ms", () => {
+  it("steps TK 25.12's full load (640 enemies, 64 soldiers, 512 shots, 20 buildings) in ≤ 2 ms", () => {
     const w = fullWorld();
     expect(w.enemies.count).toBe(STORE.enemies);
     expect(w.projectiles.count).toBe(STORE.projectiles);
     expect(w.buildings.live(1).length).toBe(20);
     expect(w.units.count).toBe(CAP.soldiers);
     expect(w.units.live().every((s) => w.units.hp[s]! > 0)).toBe(true);
-    expect(w.agents.live().filter((a) => w.agents.at[a]! >= 0).length).toBe(4);
     const cost = stepCost(w, 300, 100);
     expect(w.units.count).toBe(CAP.soldiers);
     expect(w.stats[STAT.blocks]).toBeGreaterThan(0);
