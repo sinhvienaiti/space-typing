@@ -32,3 +32,22 @@ export function spawnEnemies(w: World): void {
     if (next.wave === w.wave && w.waveLeft[next.wave] === 0) w.nextWaveAt = w.tick + ticks(ECONOMY.waveGapS);
   }
 }
+
+/** The sandbox's load test (TK 25.12, __td.flood): n enemies of each kind in turn on the first half of the routes, evenly spaced, in the current wave. */
+export function flood(w: World, n: number): void {
+  const E = w.enemies;
+  const grounds = w.lanes.length - 1;
+  for (let k = 0; k < n; k += 1) {
+    const def = w.c.enemies[k % w.c.enemies.length]!;
+    const route = def.altitude > 0 ? grounds : k % grounds;
+    const spread = def.altitude > 0 ? 1 : Math.max(0, w.map.roadHalfM - def.radius);
+    const slot = E.add(def.index, def.hp, def.altitude, route, w.wave, (((k * 0.618034) % 1) * 2 - 1) * spread);
+    if (slot < 0) return;
+    E.dist[slot] = (w.lanes[route]!.length * (k + 0.5)) / (2 * n);
+    w.lanes[route]!.point(E.dist[slot]!, E.lateral[slot]!, spot);
+    E.x[slot] = spot.x;
+    E.z[slot] = spot.z;
+    w.waveAlive[w.wave] = (w.waveAlive[w.wave] ?? 0) + 1;
+    bump(w.stats, STAT.spawned);
+  }
+}

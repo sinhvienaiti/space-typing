@@ -5,7 +5,7 @@
  * leaves a `rejected` event with the reason. Positions are quarter metres.
  */
 import { ticks } from "../content/compile";
-import { BUILD, ECONOMY, EXPECTED, RALLY } from "../content/rules";
+import { BUILD, ECONOMY, EXPECTED, RALLY, STORE } from "../content/rules";
 import type { Difficulty } from "../content/types";
 import { routeBackspace } from "../typing/router";
 import { tempoOpen } from "../typing/tempo";
@@ -13,6 +13,7 @@ import { CELL } from "./nav/grid";
 import { canPlace } from "./placement";
 import { moveAgent, orderAgent, recallAgent, releaseBuilding, rerouteAgents, slotsOpen } from "./systems/agents";
 import { configureDeck, densestFor, orderGrace, recheckTempos, setTempo, startTempo, stopAll } from "./systems/stream";
+import { flood } from "./systems/spawn";
 import { callWave, startWave } from "./systems/waves";
 import { cancelWords, typeKey } from "./systems/words";
 import type { World } from "./world";
@@ -26,7 +27,8 @@ export type SandboxOp =
   | { op: "vocab"; value: number }
   | { op: "speed"; value: number }
   | { op: "wave" }
-  | { op: "preset" };
+  | { op: "preset" }
+  | { op: "flood"; value: number };
 
 export type CommandBody =
   | { t: "build"; def: number; qx: number; qz: number }
@@ -181,6 +183,10 @@ function sandbox(w: World, op: SandboxOp): string | null {
         const slot = placed.ok ? placeBuilding(w, def, placed.x, placed.z, placed.node, 0) : -1;
         if (slot >= 0) orderAgent(w, agent, slot);
       }
+      return null;
+    case "flood":
+      if (!(Number.isInteger(op.value) && op.value >= 1 && op.value <= STORE.enemies)) return "badValue";
+      flood(w, op.value);
       return null;
   }
 }

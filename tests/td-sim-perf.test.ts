@@ -1,57 +1,61 @@
 import { describe, expect, it } from "vitest";
+import { STORE } from "../src/td/content/rules";
+import { hashHex } from "../src/td/sim/hash";
 import { STAT } from "../src/td/sim/stats";
-import { step } from "../src/td/sim/world";
-import { tempoIndex } from "../src/td/typing/tempo";
-import { arrive, build, enemyAt, ready, send, world } from "./td/fixtures";
-import { realDeck } from "./td/typing";
+import { createWorld, runLog } from "../src/td/sim/world";
+import { send, world } from "./td/fixtures";
+import { loadedWorld, stepCost } from "./td/perf";
 
 /**
  * One simulation step under load (BUILD_NOW §6.1, §7 gate 5: ≤ 0.5 ms on the
  * owner's machine, ≤ 2 ms on CI): 300 enemies, 9 soldiers, 200 shots in
- * flight, 10 buildings, 4 assisted at 1 s on the real vocabulary.
+ * flight, 10 buildings, 4 assisted at 1 s on the real vocabulary; then the
+ * stores full (TK 25.12: 640 enemies, 512 shots), held to the same CI bound.
+ * The medians are printed; `pnpm td:balance` prints them too.
  */
 describe("simulation step cost", () => {
   it("steps 300 enemies, 9 soldiers, 200 shots, 10 buildings and 4 slots at 1 s in ≤ 2 ms", () => {
-    const w = world({ gold: 5000, deck: realDeck() });
-    send(w, { t: "sandbox", op: { op: "keepLevel", value: 4 } });
-    for (const [x, z] of [[-18, -20], [-18, -8], [-8, -16], [-8, -8], [7, -25], [10, -8]] as const) build(w, "archer", x, z);
-    for (const [x, z] of [[2, 18], [8, 12], [-10, 16]] as const) build(w, "barracks", x, z);
-    const mine = build(w, "gold-mine", 26, -30);
-    ready(w);
-    // The Bastion, two archers and the mine deal a word every second.
-    [0, w.buildings.live(1)[0]!, w.buildings.live(1)[1]!, mine].forEach((b, agent) => {
-      send(w, { t: "assignUnit", agent, building: w.buildings.id(b) });
-      send(w, { t: "setTempo", building: w.buildings.id(b), idx: tempoIndex(1) });
-    });
-    arrive(w);
-    w.phase = "battle";
-    w.lives = 1e6;
-    const ids = ["cuong-thi", "ma-troi", "thuong-luong"];
-    for (let index = 0; index < 300; index += 1) {
-      const id = ids[index % 3]!;
-      const route = id === "ma-troi" ? w.lanes.length - 1 : index % 2;
-      const slot = enemyAt(w, id, route, 5 + (index * 0.37) % 90);
-      w.enemies.hp[slot] = 1e7;
-    }
-    for (let index = 0; index < 200; index += 1) {
-      const target = (index * 7) % 300;
-      const shot = w.projectiles.add(0, -40 + (index % 20), -40 + Math.floor(index / 20), w.enemies.id(target), 0, 0, 0.001, 0);
-      w.projectiles.power[shot] = 1;
-    }
+    const w = loadedWorld(300, 200);
     expect(w.enemies.count).toBe(300);
-    const times: number[] = [];
-    for (let tick = 0; tick < 400; tick += 1) {
-      const start = performance.now();
-      step(w);
-      times.push(performance.now() - start);
-    }
+    const cost = stepCost(w, 300, 100);
     expect(w.projectiles.count).toBeGreaterThanOrEqual(200);
     expect(w.stats[STAT.blocks]).toBeGreaterThan(0);
-    expect(w.stats[STAT.streamSpawned]).toBeGreaterThan(10);
-    const sorted = times.slice(100).sort((a, b) => a - b);
-    const median = sorted[sorted.length >> 1]!;
-    const p95 = sorted[Math.floor(sorted.length * 0.95)]!;
-    console.log("td sim step: median " + median.toFixed(3) + " ms, p95 " + p95.toFixed(3) + " ms");
-    expect(median).toBeLessThanOrEqual(2);
+    expect(cost.words).toBeGreaterThan(10);
+    console.log("td sim step (300 enemies): median " + cost.median.toFixed(3) + " ms, p95 " + cost.p95.toFixed(3) + " ms");
+    expect(cost.median).toBeLessThanOrEqual(2);
+  });
+
+  it("steps the stores full (640 enemies, 512 shots in flight) in ≤ 2 ms", () => {
+    const w = loadedWorld(STORE.enemies, STORE.projectiles);
+    expect(w.enemies.count).toBe(STORE.enemies);
+    expect(w.projectiles.count).toBe(STORE.projectiles);
+    const cost = stepCost(w, 300, 100);
+    console.log("td sim step (640 enemies, 512 shots): median " + cost.median.toFixed(3) + " ms, p95 " + cost.p95.toFixed(3) + " ms");
+    expect(cost.median).toBeLessThanOrEqual(2);
+  });
+
+  it("floods the routes on the sandbox's logged command (TK 25.12 __td.flood): kinds in turn on each route's first half, in the wave, replayed alike", () => {
+    const w = world();
+    const refused = [0, STORE.enemies + 1, 2.5].flatMap((value) => send(w, { t: "sandbox", op: { op: "flood", value } }));
+    expect(refused.map((event) => (event.t === "rejected" ? event.reason : event.t))).toEqual(["badValue", "badValue", "badValue"]);
+    expect(send(world({ sandbox: false }), { t: "sandbox", op: { op: "flood", value: 10 } }).map((event) => (event.t === "rejected" ? event.reason : ""))).toEqual(["noSandbox"]);
+    const log = [{ t: "sandbox", op: { op: "flood", value: 300 } }] as const;
+    send(w, ...log);
+    expect(w.enemies.count).toBe(300);
+    expect(w.waveAlive[0]).toBe(300);
+    const E = w.enemies;
+    const kinds = [0, 0, 0];
+    for (const e of E.live()) {
+      kinds[E.def[e]!] = kinds[E.def[e]!]! + 1;
+      const lane = w.lanes[E.route[e]!]!;
+      expect(E.route[e] === w.lanes.length - 1).toBe(E.altitude[e]! > 0);
+      expect(E.dist[e]).toBeGreaterThan(0);
+      expect(E.dist[e]).toBeLessThanOrEqual(lane.length / 2 + 0.1);
+    }
+    expect(kinds).toEqual([100, 100, 100]);
+    const again = createWorld({ seed: 1 });
+    runLog(again, [{ t: "sandbox", op: { op: "flood", value: 0 }, tick: 0 }, { t: "sandbox", op: { op: "flood", value: STORE.enemies + 1 }, tick: 0 }, { t: "sandbox", op: { op: "flood", value: 2.5 }, tick: 0 }, { ...log[0], tick: 3 }], w.tick + 120);
+    for (let k = 0; k < 120; k += 1) send(w);
+    expect(hashHex(again)).toBe(hashHex(w));
   });
 });

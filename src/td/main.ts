@@ -99,21 +99,34 @@ const recent: RareEvent[] = [];
 resize();
 showHud();
 
+/** The last 600 frames' costs in ms (BUILD_NOW §7 gate 5): the steps with the HUD and sound, then the 2D view with the cards. */
+const costs = { update: [] as number[], draw: [] as number[] };
+function timed(list: number[], run: () => void): void {
+  const start = performance.now();
+  run();
+  list.push(performance.now() - start);
+  if (list.length > 600) list.shift();
+}
+
 runFrameLoop({
   update(now) {
-    selection.update();
-    session.paused = selection.paused;
-    session.frame(now);
-    const fresh = world.events.rare.splice(0);
-    cards.read(fresh, world, now);
-    audio.read(fresh, world, now);
-    recent.push(...fresh);
-    if (recent.length > 400) recent.splice(0, recent.length - 400);
-    showHud();
+    timed(costs.update, () => {
+      selection.update();
+      session.paused = selection.paused;
+      session.frame(now);
+      const fresh = world.events.rare.splice(0);
+      cards.read(fresh, world, now);
+      audio.read(fresh, world, now);
+      recent.push(...fresh);
+      if (recent.length > 400) recent.splice(0, recent.length - 400);
+      showHud();
+    });
   },
   draw(now) {
-    view.draw(world, selection);
-    cards.draw(world, now, window.innerWidth, window.innerHeight);
+    timed(costs.draw, () => {
+      view.draw(world, selection);
+      cards.draw(world, now, window.innerWidth, window.innerHeight);
+    });
     painted = true;
   },
   onError() {
@@ -126,6 +139,9 @@ installDevHandle({
   // What a Node replay of log() needs besides the log (scripts/td/replay.ts).
   flags: () => ({ sandbox, seed: world.seed, content: world.c.hash, deck: deck.hash, vocabulary: source }),
   send: (command: CommandBody) => session.send(command),
+  // TK 25.12's load test: n enemies on the routes, through the sandbox's logged command.
+  flood: (n: number) => session.send({ t: "sandbox", op: { op: "flood", value: n } }),
+  costs: () => ({ update: costs.update.slice(), draw: costs.draw.slice() }),
   stats: () => statsObject(world.stats),
   hash: () => hashHex(world),
   defs: () => world.c.buildings.map((building) => building.id),

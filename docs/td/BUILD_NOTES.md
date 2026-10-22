@@ -33,14 +33,14 @@
 
 ### 1.2 Phần cho từng mốc còn lại (ước lượng lại sau review 1A.3; 1A.4 ghi số thật)
 
-Mốc đang làm: **1A.4**. Test `td-boundary` đọc dòng này và cột "Cộng dồn tối đa" của mốc đó, rồi hỏng khi tổng vượt (ngoài trần cứng 5.500). Bắt đầu mốc mới thì đổi dòng trên trước khi viết mã.
+Mốc đang làm: **1A.5**. Test `td-boundary` đọc dòng này và cột "Cộng dồn tối đa" của mốc đó, rồi hỏng khi tổng vượt (ngoài trần cứng 5.500). Bắt đầu mốc mới thì đổi dòng trên trước khi viết mã.
 
 | Mốc | Phần mới (ước lượng theo mã thật đã có) | Tối đa | Cộng dồn tối đa |
 |---|---|---|---|
 | 1A.2 Gõ lõi (xong, gồm sửa review) | 1.703 thật | — | 4.582 |
 | 1A.3 Người và ô (xong, gồm sửa review) | 378 thật: 337 của mốc (mục 1.4: `nav/astar` 107, kho `agents` 36, hệ `agents` 174, `stream` −29, nối `commands` `world` `placement` `compile` `events` `main` +13, vẽ người, đường A*, dây +36) và 41 của bản sửa review 1A.3 (mục 1.6: `nav` +18, hệ `agents` +4, `debug-2d` +17, `cards` +2) | 340 + 41 | 4.960 |
 | 1A.4 Điều khiển, HUD (xong, gồm sửa review) | 496 thật: 499 của mốc (mục 1.7; bản đầu đủ mục 5.3–5.4 dài 822, cắt UI theo mục 1.8) và −3 của bản sửa review 1A.4 (mục 1.10) | 500 | 5.460 |
-| 1A.5 Bot, báo cáo | Bot, chính sách, báo cáo nằm ở `tests/` và `scripts/`; `src/` chỉ thêm móc đo | 40 | 5.500 |
+| 1A.5 Bot, báo cáo (xong) | 41 thật (mục 1.11): op hộp cát `flood` (TK 25.12) ở `spawn.ts` +19 và `commands.ts` +6, đo khung ở `main.ts` +16; bot, chính sách, báo cáo nằm ở `tests/` và `scripts/` | 40 | 5.500 |
 
 Ước lượng lại 1A.4 (review 1A.3, mục 5), tính cả `move` và đốm sáng dọc dây trợ lực mà 1A.3 dời sang, cùng 41 dòng của bản sửa review 1A.3. Bản sửa đó dùng hết 38 dòng dự phòng dưới trần, nên phần của 1A.4 giữ 500 mà phải chứa thêm hai việc. Cắt theo BUILD_NOW §10 (cắt UI trước, không cắt luật, test) trước khi viết mã 1A.4:
 
@@ -229,6 +229,65 @@ Các bản sửa cần 26 dòng; phần của 1A.4 chỉ còn 1. Bù trong mốc
 
 Thấy thêm khi nhìn ảnh: kiểu rê chuột của nút HUD làm nút gọi đợt mất màu (mục 1.9, sửa trong CSS, 0 dòng).
 
+### 1.11 Sau 1A.5
+
+| Nhóm | Sau sửa review 1A.4 | Sau 1A.5 | Đổi |
+|---|---|---|---|
+| Trang, Platform | 87 | 87 | 0 |
+| Nội dung | 573 | 573 | 0 |
+| Gõ thuần | 453 | 453 | 0 |
+| Sim lõi (`sim/*.ts`) | 831 | 837 | +6 (`commands.ts`: op hộp cát `flood`) |
+| Kho, Đường, Hệ chiến đấu | 1.188 | 1.207 | +19 (`spawn.ts`: `flood`) |
+| Hệ gõ (gồm `agents`) | 786 | 786 | 0 |
+| App | 525 | 541 | +16 (`main.ts`: đo giá khung, `__td.flood`, `__td.costs`) |
+| View, UI | 1.013 | 1.013 | 0 |
+| **Tổng** | **5.456** | **5.497** | **+41 / 40** |
+
+Phần của 1A.5 là 40; 1A.4 để dư 4 dòng dưới cột cộng dồn của nó (5.456 / 5.460), nên tổng 5.497 vẫn dưới cột "Cộng dồn tối đa" của 1A.5 (5.500, đúng trần cứng). Không còn dòng dự phòng cho 1A: sửa review 1A.5 phải bù trong chính nó.
+
+Bot, chính sách, báo cáo, test vàng nằm ở `tests/` và `scripts/` (không tính vào ngân sách): `tests/td/{keystrokes,reader,bot,golden,balance,perf}.ts`, `tests/td/policies/{stand,tempo,hero,layouts}.ts`, `tests/td-golden.test.ts`, `tests/td-balance-smoke.test.ts`, `tests/golden/td-1a.json`, `scripts/td/{balance,golden}.ts`, `scripts/visual/scenarios/td-1a-{perf,tour}.mjs`.
+
+### 1.12 Lệch so với BUILD_NOW, TK ở 1A.5 (có lý do)
+
+- **Test vàng đóng băng từ, không đóng băng nội dung.** `tests/golden/td-1a.json` giữ 425 từ cấp 1–3 (chụp từ `shared/vocabulary` lúc làm), seed, mã nội dung, mã bộ từ, mã băm mỗi 60 tick. TK 25.15 nói "nội dung đóng băng `tests/td/fixtures/content-golden.ts`": không làm, vì hằng số `rules.ts` được hệ thống import thẳng (một bản chép `slice-1a.ts` không đóng băng chúng), còn từ vựng chung thì repo cha sinh lại định kỳ ("data: generate trusted vocabulary library") và sẽ làm test vàng đỏ mà repo này không đổi gì. Đổi luật hay số: test báo mã nội dung khác trước tiên, `pnpm td:golden:update` (hay `node --import tsx scripts/td/golden.ts`) làm lại file và in tick đầu tiên mã băm lệch.
+- **Bot của test vàng** là bot Cân bằng 35 WPM, 95 % chơi 3 đợt; thêm một Tháp Cung đặt rồi hoàn tác ở giây 4–5, để nhật ký có cả `sell`. Test đòi nhật ký có `build`, `sell`, `assignUnit`, `setTempo`, `key`, `backspace`, `callWave`, `sandbox`.
+- **Op hộp cát `flood`** (TK 25.12 "Thử tải `__td.flood(400)`"; BUILD_NOW §4 không kể): n quái ba loại lần lượt, rải đều trên nửa đầu mỗi làn (quái bay trên đường bay), lệch ngang theo tỉ lệ vàng (không rút số ngẫu nhiên), tính vào đợt đang chạy. Là lệnh có tick, vào nhật ký, Node chạy lại khớp. Đây là móc đo của 1A.5: kịch bản `td-1a-perf` dùng nó cho cổng 5.
+- **`__td.costs()`**: giá 600 khung gần nhất, tính bằng ms, của phần cập nhật (bước sim, HUD, âm) và phần vẽ (bản 2D và thẻ chữ). Đo ngay trong vòng khung của trang, không phải trang đo riêng.
+- **Hai kịch bản ngoài bảy kịch bản của BUILD_NOW §6.2:** `td-1a-perf.mjs` (cổng 4 và 5, mục 2) và `td-1a-tour.mjs` (bộ ảnh cho chủ dự án, mục 2).
+- **Chỗ của báo cáo:** phần tính và in nằm ở `tests/td/balance.ts`, vì `tsconfig.json` kiểm kiểu `tests/` mà không kiểm `scripts/`; `scripts/td/balance.ts` chỉ đọc tham số và in. `td-sim-perf` chuyển thế giới thử tải sang `tests/td/perf.ts` (báo cáo dùng chung), thêm ca kho đầy (640 quái, 512 đạn) và test op `flood`.
+- **Người đọc giả lập** làm đúng BUILD_NOW §6.3 (nhận ra từ mới sau 0,35–0,6 s, mỗi lúc một từ, từ gấp nhất trước, nhà có quái trong tầm được coi như gấp hơn 1 s) và bỏ qua từ không còn kịp gõ. Bot không bao giờ rời mắt khỏi thẻ để nhìn bản đồ, nên tỉ lệ trúng là mức trần: 35 WPM, 95 %, nhịp 3 s trúng 99 % (mô hình TK 6.16: 92 %).
+- **Bot vặn nhịp từng nhà một, cách nhau 1,5 s.** Đổi nhịp đặt lại lịch của nhà đó (TK 6.2), nên đổi nhiều nhà trong một tick làm các nhà cùng nhịp phát cùng lúc (cách 0,2 s, TK 6.4): ở 35 WPM, từ thứ hai của mỗi cặp không gõ kịp trong tuổi của nó (bản đầu: 2 ô 35 WPM chỉ trúng 66 %). Game có cùng hiện tượng sau "Trả lại nhịp" (`Shift+=`) hay khi đổi độ khó, cấp làm nhiều nhịp bị kiểm lại một lúc. TK không nói; ghi cho chủ dự án và 1B.
+- **Nhịp theo tải** (bot Cân bằng, TK 19.7 "tải 90–110 %") bắt đầu mọi nhà ở Dừng rồi lần lượt dày lên, tháp trước, khi tải còn ≤ 110 %; nhà không vừa nấc nào ở lại Dừng, người ở đó chỉ còn có mặt (TK 6.13 "1 nhà 6 s + có mặt").
+- **Thêm hai dòng báo cáo ngoài BUILD_NOW §6.3:** "Tướng ra trận" (TK 19.4: Draconis không trợ lực, đứng ở khúc nhập ném cầu lửa) và nhà L2, để thấy cách nào qua được đợt 4–6 (mục 1.14).
+- **`pnpm` trong worktree:** `pnpm <script>` chạy kiểm phụ thuộc, kiểm này gọi `pnpm install`, và pnpm từ chối xóa `node_modules` là liên kết tượng trưng (`ERR_PNPM_UNSAFE_MODULES_DIR`). Không có gì bị đổi (đã kiểm `node_modules` của bản checkout chính), nhưng trong worktree hãy gọi thẳng `node --import tsx scripts/td/balance.ts`. Vì vậy cổng 1 (`pnpm check`) chạy từng bước một (mục 1.13).
+
+
+### 1.13 Cổng cứng BUILD_NOW §7 ở cuối 1A.5
+
+| Cổng | Kết quả |
+|---|---|
+| 1. `pnpm check` xanh; V4 chạy | Trong worktree `pnpm check` không chạy được thành một lệnh (pnpm gọi `pnpm install`, mục 1.12); chạy từng bước bằng `node` và `npx`, mọi bước exit 0: `vitest run tests`, `prepare-local-art` (không ghi gì), `check-audio-assets`, `check-background-assets`, `check-expansion-v2`, `check-credit-puzzle-art`, `tsc` cả `tsconfig.json` và `tsconfig.server.json`, `vite build` (có `td.html`), `report-bundle-metrics`, `check-ship-art-integrity`, `check-background-art`; xóa `dist/` sau đó. Khói V4 (`defense.mjs`, halo-garden, không đảo): xây 5 tháp, tới đợt 6, 60 khung/giây (p95 16,7 ms), không lỗi console. |
+| 2. Test mục 6.1 xanh; `credit-*`, `campaign3d-keys`, `defense-frame-error` không sửa | `npx vitest run`: 408 file, 2.666 test đạt, 1 bỏ qua (trước 1A.5: 406 file, 2.654; thêm 4 test `td-golden`, 6 test `td-balance-smoke`, 2 test `td-sim-perf`). Có đủ file của §6.1 (`td-golden`, `td-balance-smoke` mới ở 1A.5). Sáu file test được bảo vệ không đổi từ `1979389f` (`git diff` rỗng), 38 test xanh; `src/defense`, `src/scene3d`, `src/vfx`, `src/audio` không đổi. |
+| 3. Bất biến chữ và tiền | `td-letters` (10.000 tick, 4 ô 1 s, từ vựng thật cấp 1, 1–3, 1–5), `td-stream-schedule` (so le ở 4 nhà × 1 s), `td-sim-economy` (thuộc tính: không chuỗi xây, hoàn tác, cấp hộp cát nào sinh vàng). Thêm ở 1A.5: mọi lượt bot (test vàng, ba bot nhanh, mọi dòng báo cáo) kiểm trần, chữ đầu, từ trùng, OSA ≤ 1 mỗi tick: không vỡ lần nào, không lệnh nào bị từ chối. |
+| 4. Tất định | Test vàng khớp 124 mã băm (7.491 tick); chạy hai lần như nhau; nhật ký chạy lại ra cùng mã băm. Chrome: `td-1a-perf` chạy nhật ký của lượt vàng trong trang, 124 / 124 mã băm bằng của Node; `td-1a-combat`, `-stream`, `-slots`, `-keyboard-only`, `-perf` ghi nhật ký của trang và Node chạy lại ra đúng `__td.hash()`, ở cả hai cỡ. |
+| 5. Hiệu năng | Sim (Node, Apple M4): một bước với 300 quái, 9 lính, 200 đạn, 10 nhà, 4 ô nhịp 1 s, trung vị 0,008–0,013 ms, p95 ≤ 0,06 ms; kho đầy (640 quái, 512 đạn) 0,016–0,017 ms (≤ 0,5 ms; CI ≤ 2 ms). Trong Chrome (`td-1a-perf`, 300 quái trên sân, 4 ô nhịp 1 s, gõ 70 WPM, 600 khung): bản 2D và thẻ chữ trung bình 0,75–0,81 ms, p95 1,4–1,6 ms, chậm nhất 2,6 ms ở cả 1280 × 720 và 1920 × 1080 (cổng ≤ 8 ms; `performance.now()` của Chrome làm tròn 0,1 ms), 60 khung/giây; bước sim cùng HUD và âm trung bình 0,25 ms. |
+| 6. Kịch bản §6.2 đạt, không lỗi console | Bảy kịch bản §6.2 và `td-1a-perf` đạt ở 1280 × 720 và 1920 × 1080 (16 / 16), không lỗi console, không ngoại lệ trang; `td-1a-tour` đạt ở 1280 × 720. Chạy bằng cấu hình Vite của worktree (mục 2): với lệnh `npx vite` thường, phông trả 403 và không có từ vựng thật (đã biết từ 1A.0). |
+| 7. Chủ dự án chơi theo §8 | Chưa: việc của chủ dự án. Bộ ảnh `td-1a-tour` để xem trước. |
+
+### 1.14 Báo cáo bot: điều chủ dự án nên biết trước khi chơi (không là cổng)
+
+Số của `node --import tsx scripts/td/balance.ts` (3 seed, 6 đợt hộp cát, Thường, từ vựng cấp 1–3). Bot tất định: cùng mã cho cùng số, trừ mục 8 (thời gian).
+
+- **Ở L1, gần như mọi cách chơi thua ở đợt 4–6.** Một ô (mọi nhịp, mọi tốc 20–100 WPM), hai ô, bot Cân bằng: thua ở đợt 5 (100 WPM: đợt 6), còn 14–17 mạng sau đợt 3; 4 ô ở 50–70 WPM và 3 ô ở 100 WPM thua 1/3 lượt. Qua đủ 6 đợt cả 3 lượt chỉ có: 4 ô ở 100 WPM (còn 7,7 mạng), 4 ô với nhà L2 ở 35 WPM (15 mạng), và 4 ô ở 35 WPM khi Draconis không trợ lực mà đứng ở khúc nhập đánh (6,3 mạng; cầu lửa 8,9 sát thương/s). Lý do: Thuồng Luồng (320 máu, giáp 60 %) chỉ nhận 40 % sát thương vật lý của tháp L1; cầu lửa phép của Draconis là khắc chế (TK 19.8), mà bot trợ lực thì Draconis không đánh. Mục 8 của BUILD_NOW cho chủ dự án chơi đợt 4–6 với 4 ô: nên thử cả nhà L2 (hộp cát) và để Draconis ra trận.
+- **Ô thêm có giá trị** (TK 19.7 đạt): 2 ô (4 s + 6 s) ×1,29 so với 1 ô 3 s; 2 ô quá tải (127 %) ×1,36. Bảng 1–4 ô: ×1,13–1,67 so với 1 ô, tăng theo tốc gõ; 3–4 ô giữ mạng tốt hơn rõ (sau đợt 3 còn 19–20 so với 14–15).
+- **Nhịp dày không bị phạt đủ:** bot "Nhịp dày ẩu" (mọi nhà nhịp nhanh nhất, 35 WPM) bằng bot Cân bằng (sát thương 103 %, vàng 101 %; TK 19.7 muốn kém hơn). Một ô ở 35 WPM: nhịp 1 s (tải 248 %) trúng 67 % nhưng Phát Chữ vẫn mạnh nhất (6,3 so với 3,3 sát thương/s ở 3 s). Ở 1A, từ tan chỉ mất Nhiệt và Chuỗi, mà hào quang có trần; TK 6.16 nói quá tải không lời.
+- **Đứng Một Chỗ bằng bot Cân bằng** (100 %): 1A chưa có Bùng Nổ, Hợp Tấu, nghỉ lò, nên không có gì kéo Tướng đi.
+- **Nguồn vàng của bot Cân bằng:** hạ quái 54 %, tự sản 19 %, phần thưởng từ 11 % (TK 17.3: 18–28 %), thưởng đợt và gọi sớm 16 % (TK: 5–10 %, vì lượt ngắn và gọi sớm ngay khi sân trống). Tải trung bình 94 % (TK: 85–110 %).
+- **Trúng:** 25 WPM nhịp mặc định 99 % (TK ≥ 85 %); 35 WPM nhịp 3 s 99 % (mô hình TK 6.16: 92 %; bot không nhìn bản đồ). Chuẩn 35 / 98 % và Nhanh ẩu 50 / 85 % gần bằng nhau về Phát Chữ ở 3 s (3,5 và 3,4 sát thương/s; Hoàn hảo 90 % và 55 %).
+- **Nghẽn chữ: 0 %** ở cấp 1, 1–3, 1–5 với 4 ô nhịp 1 s; trần chữ đầy trước (bỏ vì đầy: 537 lần ở cấp 1, 118–131 ở 1–3, 1–5).
+- **Phát cùng lúc sau khi đổi nhiều nhịp một lúc** (mục 1.12): "Trả lại nhịp" và đổi độ khó, cấp đặt lại lịch của mọi nhà trong cùng tick, nên các nhà cùng nhịp phát từ cách nhau 0,2 s. TK 6.4 cho phép; cảm giác "dồn từ" là điều nên để ý khi chơi.
+
+
 ## 2. Chạy cổng trong worktree
 
 Worktree `games/.wt-*` có `node_modules` là liên kết tượng trưng tới bản checkout chính (`games/space-typing`). Với lệnh thường `npx vite --host 127.0.0.1 --port 3110 --strictPort`:
@@ -262,10 +321,19 @@ URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-ru
 URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-keyboard-only.mjs --width=1280 --height=720
 URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-words-dense.mjs --width=1280 --height=720
 URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-ime.mjs --width=1280 --height=720
+URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-perf.mjs --width=1280 --height=720
+URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-tour.mjs --width=1280 --height=720
 MAPS=halo-garden ISLANDS=0 URL=http://127.0.0.1:3110/ OUT_DIR=<thư mục tạm> node scripts/visual/cdp-run.mjs scripts/visual/scenarios/defense.mjs
 ```
 
-Chạy thêm một lần mỗi kịch bản `td-1a-*` với `--width=1920 --height=1080`.
+Chạy thêm một lần mỗi kịch bản `td-1a-*` với `--width=1920 --height=1080` (trừ `td-1a-tour`, bộ ảnh 1280 × 720).
+
+Bot và báo cáo (1A.5), trong worktree gọi thẳng bằng `node` (mục 1.12):
+
+```bash
+node --import tsx scripts/td/balance.ts [--seeds=3] [--waves=6]   # pnpm td:balance
+node --import tsx scripts/td/golden.ts [--check] [--fresh-words]   # pnpm td:golden:update
+```
 
 `td-1a-stream.mjs` gõ đợt 1 ở nhịp 4 s (mỗi lúc một từ), rồi cho tháp sang nhịp 1 s trong 12 s: đòi ≥ 2 từ sống cùng lúc và một lần đổi khóa mềm cố ý, chụp thêm `td-1a-stream-dense`. Tầng 2 cần 3–4 nhà bận nên để `td-1a-slots` (1A.3) kiểm.
 
@@ -284,3 +352,7 @@ Chạy thêm một lần mỗi kịch bản `td-1a-*` với `--width=1920 --heig
 ```bash
 node --import tsx scripts/td/replay.ts <thư mục tạm>/td-1a-combat-replay-1280x720.json
 ```
+
+`td-1a-perf.mjs` (1A.5, BUILD_NOW §7 cổng 4 và 5): "Đặt sẵn 4 ô", đợi bốn người tới, cả bốn nhà nhịp 1 s (vặn từng nhà, cách 0,35 s), gọi đợt 1, rồi `__td.flood(300)`; gõ thật 70 WPM qua CDP trong 10 s và đọc `__td.costs()` của đúng các khung trong cửa sổ đó (đếm khung bằng một vòng `requestAnimationFrame` riêng). Cổng: phần vẽ (bản 2D và thẻ chữ) p95 ≤ 8 ms trên ≥ 200 khung, quái trên sân ≥ 240 suốt cửa sổ, bốn nhà cùng phát; Node làm lại lượt vàng (`scripts/td/golden.ts --check --log`), rồi trang chạy đúng nhật ký đó bằng chính các module `/src` mà Vite phục vụ, mỗi mã băm 60 tick phải bằng của Node; nhật ký của trang (gồm `flood`) chạy lại trên Node ra đúng `__td.hash()`. Ảnh `td-1a-perf`.
+
+`td-1a-tour.mjs` (1A.5): bộ ảnh cho chủ dự án ở 1280 × 720, một lượt, từ vựng thật, gõ thật, bảng hộp cát ẩn (F9) trừ ảnh của nó: `1-placement` (menu xây, nhà mờ cạnh đường, vòng tầm), `2-tempo-card` (thẻ nhà có núm nhịp, đặt 2 s), `3-one-slot` (một Tháp Cung, Draconis trên mái, hai từ bay), `4-three-slots` (ba nhà phát, E = 55), `5-four-slots` (bốn nhà, Gạch ở mỏ bên kia suối), `6-sandbox` (bảng hộp cát), `7-wave` (đợt 4: hai Thuồng Luồng, lính, đạn). Cổng: mỗi ảnh chụp đúng trạng thái của nó, không lệnh nào bị từ chối, không lỗi console.
