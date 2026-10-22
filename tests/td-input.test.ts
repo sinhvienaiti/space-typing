@@ -3,7 +3,8 @@ import { installKeys, KEY_ACTIONS, keyAction } from "../src/td/app/input";
 import { Selection } from "../src/td/app/selection";
 import type { CommandBody } from "../src/td/sim/commands";
 import { BUILD } from "../src/td/content/rules";
-import { canPlace, freeSpots } from "../src/td/sim/placement";
+import { canPlace, nextSpot, spotCandidates } from "../src/td/sim/placement";
+import { CELL } from "../src/td/sim/nav/grid";
 import { MODE } from "../src/td/sim/stores/agents";
 import { spawnWord } from "../src/td/sim/systems/words";
 import { STOP } from "../src/td/typing/tempo";
@@ -28,7 +29,7 @@ describe("keys by event.code (BUILD_NOW §5.4)", () => {
       [{ key: "Enter", code: "Enter" }, "send"], [{ key: "Enter", code: "NumpadEnter" }, "send"], [{ key: "Enter", code: "Enter", shiftKey: true }, "wave"],
       [{ key: "-", code: "Minus" }, "slower"], [{ key: "=", code: "Equal" }, "denser"], [{ key: "-", code: "NumpadSubtract" }, "slower"],
       [{ key: "+", code: "NumpadAdd" }, "denser"], [{ key: "_", code: "Minus", shiftKey: true }, "stopAll"], [{ key: "+", code: "Equal", shiftKey: true }, "restore"],
-      [{ key: "Insert", code: "Insert" }, "build"], [{ key: "Escape", code: "Escape" }, "escape"], [{ key: "Pause", code: "Pause" }, "pause"],
+      [{ key: "Insert", code: "Insert" }, "build"], [{ key: "Delete", code: "Delete" }, "undo"], [{ key: "Escape", code: "Escape" }, "escape"], [{ key: "Pause", code: "Pause" }, "pause"],
       [{ key: "F9", code: "F9" }, "sandbox"], [{ key: " ", code: "Space" }, ""], [{ key: "ArrowLeft", code: "ArrowLeft" }, "pan:1:0"],
       [{ key: "ArrowDown", code: "ArrowDown" }, "pan:0:-1"], [{ key: "Backspace", code: "Backspace" }, "backspace"],
     ];
@@ -97,7 +98,7 @@ function hand(options: Parameters<typeof world>[0] = {}) {
 describe("a keyboard path for every task in a wave (BUILD_NOW §5.4, TK 6.14)", () => {
   it("every in-wave action has a key", () => {
     const keyed = new Set(Object.values(KEY_ACTIONS).map((action) => action.split(":")[0]));
-    for (const action of ["pick", "cycle", "recall", "next", "prev", "send", "wave", "slower", "denser", "stopAll", "restore", "build", "escape", "pause", "pan"]) expect(keyed.has(action), action).toBe(true);
+    for (const action of ["pick", "cycle", "recall", "next", "prev", "send", "wave", "slower", "denser", "stopAll", "restore", "build", "undo", "escape", "pause", "pan"]) expect(keyed.has(action), action).toBe(true);
   });
 
   it("Insert opens the build menu at the first suggested spot; Enter builds there; digits pick the kind and Tab the next spot", () => {
@@ -119,7 +120,7 @@ describe("a keyboard path for every task in a wave (BUILD_NOW §5.4, TK 6.14)", 
     expect(w.buildings.live(1).map((b) => w.c.buildings[w.buildings.def[b]!]!.id)).toEqual(["archer", "barracks", "gold-mine"]);
   });
 
-  it("Tab focuses buildings from the nearest to the agent; Enter sends the agent; −/= step the tempo, sent only on a change; Shift+−/= stop and restore all", () => {
+  it("Tab focuses buildings from the nearest to the selected agent; Enter sends the agent; −/= step the tempo, sent only on a change; Shift+−/= stop and restore all", () => {
     const { w, sel, sent, keys } = hand({ gold: 1000 });
     const near = build(w, "archer", -8, 12);
     const far = build(w, "cannon", 26, -6);
@@ -129,6 +130,15 @@ describe("a keyboard path for every task in a wave (BUILD_NOW §5.4, TK 6.14)", 
     keys("next");
     expect(w.buildings.slotOf(sel.focus)).toBe(near);
     keys("next", "prev", "next");
+    expect(w.buildings.slotOf(sel.focus)).toBe(far);
+    // Away from the Bastion the order follows the hero, not the Bastion: the cannon, the archer, then the Bastion.
+    keys("escape");
+    send(w, { t: "move", agent: 0, qx: q(24), qz: q(-14) });
+    run(w, 900);
+    expect([w.agents.x[0], w.agents.z[0], w.agents.mode[0]]).toEqual([24, -14, MODE.stand]);
+    const order = [1, 2, 3].map(() => (keys("next"), w.buildings.slotOf(sel.focus)));
+    expect(order).toEqual([far, near, 0]);
+    keys("prev", "prev");
     expect(w.buildings.slotOf(sel.focus)).toBe(far);
     expect(keys("send").find((event) => event.t === "agentOrdered")).toMatchObject({ agent: 0, building: w.buildings.id(far) });
     const tempo = w.buildings.tempo[far]!;
@@ -181,22 +191,61 @@ describe("a keyboard path for every task in a wave (BUILD_NOW §5.4, TK 6.14)", 
     expect(sel.paused).toBe(true);
   });
 
-  it("an open card or build menu holds the order grace (TK 6.14), asked once a menu opens and ended once all close", () => {
+  it("the build menu, by Insert or a click, and a card a click opened hold the order grace (TK 6.14): asked once, ended once all close", () => {
     const { w, sel, sent, keys } = hand();
-    sel.act("next");
-    sel.act("next");
+    const graced = () => w.tick < w.typing.graceUntil;
+    sel.act("next"); // Tab: the Bastion's card, highlighted only
     sel.act("build");
     sel.act("pick:2");
+    sel.act("next"); // Tab in the build menu: the next spot
     expect(sent.filter((command) => command.t === "uiFocus")).toEqual([{ t: "uiFocus", on: true }]);
+    expect(keys().find((event) => event.t === "rejected")).toBeUndefined();
+    expect(graced()).toBe(true);
     keys("escape");
-    expect(w.tick < w.typing.graceUntil).toBe(false);
-    expect(sent).toEqual([]);
-    keys("next");
-    expect(w.tick < w.typing.graceUntil).toBe(false); // opened again within 3 s: no grace
+    expect(graced()).toBe(false);
+    sel.click({ x: -8, z: 12 }, false); // the build menu by a click on open ground, within 3 s: no grace
     keys("escape");
+    expect(graced()).toBe(false);
     run(w, 180);
-    keys("next");
-    expect(w.tick < w.typing.graceUntil).toBe(true);
+    sel.click({ x: 0, z: 40 }, false); // a click on the Bastion: its card, the hand on the mouse
+    keys();
+    expect(graced()).toBe(true);
+    keys("next"); // Tab: the hand is back on the keys, the grace ends
+    expect([w.buildings.slotOf(sel.focus), graced()]).toEqual([0, false]);
+  });
+
+  it("Tab never holds the grace: a word that runs out on a card Tab opened costs heat and chain; on one a click opened it costs nothing", () => {
+    const { w, sel, keys } = hand({ deck: smallDeck(["cat", "dog", "fish"]) });
+    keys("wave");
+    const runOut = (open: () => void): number[] => {
+      spawnWord(w, 0, 0, 1);
+      const s = w.words.live()[0]!;
+      w.typing.chain = 10;
+      w.buildings.heat[0] = 3000;
+      w.words.expire[s] = w.tick + 2;
+      open();
+      run(w, 3);
+      expect(w.words.used[s]).toBe(0);
+      return [w.typing.chain, w.buildings.heat[0]! / 1000];
+    };
+    expect(runOut(() => keys("next"))).toEqual([8, 2]); // TK 6.8: −2 untouched; TK 6.7: −1 heat
+    keys("escape");
+    run(w, 400);
+    expect(runOut(() => (sel.click({ x: 0, z: 40 }, false), keys()))).toEqual([10, 3]);
+  });
+
+  it("Delete undoes the building whose card is open within its 5 s; it never touches the Bastion or anything with no card open", () => {
+    const { w, sel, keys } = hand({ gold: 1000 });
+    keys("wave");
+    const archer = build(w, "archer", -8, 12);
+    const none = keys("undo"); // no card open
+    sel.click({ x: 0, z: 40 }, false);
+    const bastion = keys("undo"); // the Bastion's card
+    expect([...none, ...bastion].filter((event) => event.t === "rejected" || event.t === "sold")).toEqual([]);
+    sel.click({ x: -8, z: 12 }, false);
+    expect(w.buildings.slotOf(sel.focus)).toBe(archer);
+    expect(keys("undo").find((event) => event.t === "sold")).toMatchObject({ refund: 70 });
+    expect([w.gold, sel.focus]).toEqual([1000 * 1000, -1]);
   });
 });
 
@@ -213,7 +262,16 @@ describe("the mouse and the commands it sends", () => {
     expect(sel.building).toBe(false);
   });
 
-  it("right on a building sends the selected agent; right on the ground moves it; a helper may not stand in the water", () => {
+  it("a right click while the build menu is open only closes it", () => {
+    const { w, sel, sent, keys } = hand({ gold: 1000 });
+    sel.click({ x: -8, z: 12 }, false);
+    expect(sel.building).toBe(true);
+    sel.click({ x: -8, z: 12 }, true);
+    keys();
+    expect([sel.building, sent, w.buildings.live(1)]).toEqual([false, [], []]);
+  });
+
+  it("right on a building sends the selected agent; right on the ground moves it: Draconis flies anywhere on the field, a helper may not stand in the water", () => {
     const { w, sel, keys } = hand({ gold: 1000 });
     const archer = build(w, "archer", -8, 12);
     ready(w);
@@ -225,6 +283,14 @@ describe("the mouse and the commands it sends", () => {
     keys();
     run(w, 600);
     expect([w.agents.x[0], w.agents.z[0], w.agents.at[0], w.agents.mode[0]]).toEqual([20, 20, -1, MODE.stand]);
+    sel.click({ x: -24, z: 0 }, true); // over the stream
+    expect(w.grid.cells[w.grid.cell(-24, 0)]).toBe(CELL.water);
+    expect(keys().find((event) => event.t === "rejected")).toBeUndefined();
+    run(w, 900);
+    expect([w.agents.x[0], w.agents.z[0], w.agents.mode[0]]).toEqual([-24, 0, MODE.stand]);
+    expect(send(w, { t: "move", agent: 0, qx: q(-8), qz: q(12) }).find((event) => event.t === "rejected")).toBeUndefined(); // onto the archer's roof (a right click there sends him to assist it)
+    run(w, 900);
+    expect([w.agents.x[0], w.agents.z[0], w.agents.at[0]]).toEqual([-8, 12, -1]);
     keys("sb:keepLevel:2");
     keys("agent:1");
     sel.click({ x: -24, z: 0 }, true);
@@ -248,16 +314,45 @@ describe("the sandbox preset and the suggested spots", () => {
     expect(B.live(1).length).toBe(4);
   });
 
-  it("offers mines the free nodes, and others the places by the road canPlace allows (gold aside), nearest a bend first", () => {
-    const w = world({ gold: 0 });
+  it("offers mines the free nodes, and others the places by the road canPlace allows (gold aside), nearest a bend first, both ways round", () => {
+    const w = world({ gold: 1000 });
+    build(w, "archer", -8, 12);
+    w.gold = 0; // spots leave gold aside
+    const offered = (kind: number, dir: 1 | -1) => {
+      const candidates = spotCandidates(w, kind);
+      const seen: number[] = [];
+      for (let k = nextSpot(w, kind, candidates, dir > 0 ? 0 : candidates.length - 1, dir); k >= 0 && !seen.includes(k); k = nextSpot(w, kind, candidates, (k + dir + candidates.length) % candidates.length, dir)) seen.push(k);
+      return { candidates, spots: seen.map((k) => candidates[k]!) };
+    };
     const archer = def(w, "archer");
-    const spots = freeSpots(w, archer);
+    const { candidates, spots } = offered(archer, 1);
     expect(spots.length).toBeGreaterThan(40);
-    for (const spot of spots) expect(canPlace(w, archer, q(spot.x), q(spot.z), true).ok).toBe(true);
+    expect(spots).toEqual(candidates.filter((p) => canPlace(w, archer, q(p.x), q(p.z), true).ok));
+    expect(spots.length).toBeLessThan(candidates.length); // the road's clearance, the Bastion's ring, the archer already there
+    expect(offered(archer, -1).spots).toEqual(spots.slice().reverse());
     const bend = (p: { x: number; z: number }) => Math.min(...w.map.routes.flatMap((route) => route.slice(1, -1)).map(([x, z]) => Math.sqrt((x - p.x) ** 2 + (z - p.z) ** 2)));
     expect(bend(spots[0]!)).toBeLessThanOrEqual(BUILD.roadClearM + 2 + 2 + 2);
     for (let k = 1; k < spots.length; k += 1) expect(bend(spots[k]!)).toBeGreaterThanOrEqual(bend(spots[k - 1]!) - 1e-9);
-    const mines = freeSpots(w, def(w, "gold-mine"));
+    const mines = offered(def(w, "gold-mine"), 1).spots;
     expect([mines.length, mines]).toEqual([3, expect.arrayContaining(w.map.nodes.map((node) => ({ x: node.x, z: node.z })))]);
+  });
+
+  it("Insert and Tab check spots only as far as they go: about one path search a press, not one per spot (~40 ms)", () => {
+    const { w, sel, keys } = hand({ gold: 1000 });
+    keys("sb:preset");
+    let searches = 0;
+    const stamp = w.grid.stamp.bind(w.grid);
+    w.grid.stamp = (x, z, r, flag, on) => {
+      if (flag === CELL.probe && on) searches += 1;
+      stamp(x, z, r, flag, on);
+    };
+    const presses: number[] = [];
+    for (const action of ["build", "next", "next", "next", "prev", "pick:3", "next", "pick:2", "prev", "escape", "build"]) {
+      searches = 0;
+      sel.act(action);
+      presses.push(searches);
+    }
+    expect(presses.every((n) => n <= 3)).toBe(true);
+    expect(sel.ghost()?.reason).toBe("");
   });
 });

@@ -29,7 +29,7 @@ function cardHtml(w: World, sel: Selection, b: number): string {
     `<p>${assist >= 0 ? agentView(w, assist).name + " trợ lực" : "Chưa ai trợ lực"}</p>` +
     `<p><small>Nhịp: một từ mỗi N giây <kbd>−</kbd><kbd>=</kbd></small></p><div class="td-row">${knob.join("")}</div><div class="td-row">` +
     (assist === sel.agent || w.agents.goal[sel.agent] === b ? "" : button("send", "Gửi " + agentView(w, sel.agent).name, "Enter")) +
-    (b > 0 && (w.phase === "prep" || undoLeft > 0) ? button("undo", "Hoàn tác" + (w.phase === "prep" ? "" : " · " + undoLeft + " s")) : "") +
+    (b > 0 && (w.phase === "prep" || undoLeft > 0) ? button("undo", "Hoàn tác" + (w.phase === "prep" ? "" : " · " + undoLeft + " s"), "Del") : "") +
     `</div>` +
     (w.sandbox && b > 0 ? seg("Cấp", "sb:level", ["1", "2", "3"], ["L1", "L2", "L3"], String(B.level[b])) : "") +
     (hint === 0 ? "" : `<p class="td-hint">Bạn bắt ${Math.round((100 * B.hits[b]!) / B.resolved[b]!)} %. Thử ${TEMPO[stepTempo(B.tempo[b]!, hint < 0 ? -1 : 1, densest, w.difficulty)]!.periodS} s?</p>`)

@@ -1,11 +1,12 @@
 /**
  * What the player has in hand (docs/td/TYPING_DEFENSE_DESIGN.md 25.7: app
  * state, never in the sim). Keys and buttons name the same actions, so every
- * task in a wave has a keyboard path (BUILD_NOW §5.4). While a building's card
- * or the build menu is open the sim holds the order grace (TK 6.14).
+ * task in a wave has a keyboard path (BUILD_NOW §5.4). The sim holds the order
+ * grace (TK 6.14) while the build menu is open, or a card a click opened: a
+ * mouse order takes the hand off the keys, while Tab only highlights.
  */
 import type { CommandBody } from "../sim/commands";
-import { canPlace, freeSpots, type Point } from "../sim/placement";
+import { canPlace, nextSpot, spotCandidates, type Point } from "../sim/placement";
 import { slotsOpen } from "../sim/systems/agents";
 import { densestFor } from "../sim/systems/stream";
 import type { World } from "../sim/world";
@@ -22,12 +23,14 @@ export class Selection {
   focus = -1;
   building = false;
   kind = 1;
-  /** The build ghost stands at the mouse once it moves over the field, else at a suggested spot. */
+  /** The build ghost stands at the mouse once it moves over the field, else at `spots[spot]` (−1: none free). */
   mouse: Point | null = null;
   spots: Point[] = [];
-  spot = 0;
+  spot = -1;
   paused = false;
   panel = true;
+  /** A click on the map came after the last Tab. */
+  private clicked = false;
   private graced = false;
 
   constructor(private readonly w: World, private readonly send: (command: CommandBody) => void) {}
@@ -47,7 +50,7 @@ export class Selection {
     stopAll: () => this.send({ t: "setAllTempo", stop: true }),
     restore: () => this.send({ t: "setAllTempo", stop: false }),
     build: () => this.choose(this.kind, null),
-    undo: () => this.send({ t: "sell", building: this.focus }),
+    undo: () => this.w.buildings.slotOf(this.focus) > 0 && this.send({ t: "sell", building: this.focus }), // the card's button; Delete
     close: () => this.close(),
     escape: () => this.escape(),
     pause: () => (this.paused = !this.paused),
@@ -66,7 +69,7 @@ export class Selection {
   update(): void {
     if (this.w.buildings.slotOf(this.focus) < 0) this.focus = -1;
     if (this.agent >= slotsOpen(this.w)) this.agent = 0;
-    const open = this.building || this.focus >= 0;
+    const open = this.building || (this.focus >= 0 && this.clicked);
     if (open !== this.graced) this.send({ t: "uiFocus", on: open });
     this.graced = open;
   }
@@ -85,9 +88,10 @@ export class Selection {
   private next(dir: 1 | -1): void {
     if (this.building) {
       this.mouse = null;
-      this.spot = (this.spot + dir + this.spots.length) % Math.max(1, this.spots.length);
+      this.spot = nextSpot(this.w, this.kind, this.spots, (this.spot + dir + this.spots.length) % this.spots.length, dir);
       return;
     }
+    this.clicked = false;
     const B = this.w.buildings;
     const from = { x: this.w.agents.x[this.agent]!, z: this.w.agents.z[this.agent]! };
     const order = B.live().sort((p, r) => dist2(B.x[p]!, B.z[p]!, from) - dist2(B.x[r]!, B.z[r]!, from) || p - r);
@@ -102,8 +106,8 @@ export class Selection {
     this.building = true;
     this.kind = kind;
     this.mouse = at;
-    this.spots = freeSpots(this.w, kind);
-    this.spot = 0;
+    this.spots = spotCandidates(this.w, kind);
+    this.spot = nextSpot(this.w, kind, this.spots, 0, 1);
   }
 
   /** Where the build ghost stands (a mine on the node it would take) and, in words, why it may not ("" when it may). */
@@ -128,6 +132,7 @@ export class Selection {
 
   /** TK 8.3: right sends the agent to a building or to stand at the point; left builds, opens a building's card or the build menu. */
   click(p: Point, right: boolean): void {
+    this.clicked = true;
     const B = this.w.buildings;
     const hit = B.live().find((b) => dist2(B.x[b]!, B.z[b]!, p) <= (this.w.c.buildings[B.def[b]!]!.radius + 0.3) ** 2);
     const b = hit === undefined ? -1 : B.id(hit);

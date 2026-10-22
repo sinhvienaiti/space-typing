@@ -91,6 +91,3 @@ export const TIERS = {
   medium: { gold: [12, 25], leak: [2, 3], weight: [1, 2] },
   heavy: { gold: [25, 35], leak: [3, 4], weight: [2, 2] },
 } as const;
-
-/** The flying route's height (TK 10.4: "low" is up to 3.5 m). */
-export const FLIGHT = { lowMaxM: 3.5 } as const;

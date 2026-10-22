@@ -28,8 +28,7 @@ export class TypingAudio {
   resume(): void {
     if (this.ctx === null) {
       this.ctx = new AudioContext();
-      this.out = this.ctx.createGain();
-      this.out.gain.value = 0.6;
+      this.out = new GainNode(this.ctx, { gain: 0.6 });
       this.out.connect(this.ctx.destination);
       this.noise = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.4, this.ctx.sampleRate);
       const data = this.noise.getChannelData(0);

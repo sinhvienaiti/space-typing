@@ -29,6 +29,9 @@ export function startWave(w: World): void {
   w.events.rare.push({ t: "waveStart", tick: w.tick, wave });
 }
 
+/** The gold a call on this tick pays, for whole seconds left: the flag button shows this number. */
+export const earlyCallBonus = (w: World): number => Math.min(ECONOMY.earlyCall.goldCap, Math.floor((w.nextWaveAt - w.tick) / TICK_HZ) * ECONOMY.earlyCall.goldPerS);
+
 /** The early call (Shift+Enter, the flag button): during preparation or the count between waves. */
 export function callWave(w: World): boolean {
   if (w.phase === "prep") {
@@ -36,7 +39,7 @@ export function callWave(w: World): boolean {
     return true;
   }
   if (w.phase !== "battle" || w.nextWaveAt < 0) return false;
-  const bonus = Math.min(ECONOMY.earlyCall.goldCap, Math.floor((w.nextWaveAt - w.tick) / TICK_HZ) * ECONOMY.earlyCall.goldPerS);
+  const bonus = earlyCallBonus(w);
   w.gold += bonus * 1000;
   bump(w.stats, STAT.goldEarly, bonus * 1000);
   w.events.rare.push({ t: "waveCalled", tick: w.tick, wave: w.wave + 1, bonus });

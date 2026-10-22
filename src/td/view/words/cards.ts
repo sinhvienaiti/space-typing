@@ -37,11 +37,8 @@ type Card = {
 type Stamp = { el: HTMLElement; at: number; x: number; y: number; half: number };
 
 function element(root: HTMLElement, className: string, html = ""): HTMLElement {
-  const el = document.createElement("div");
-  el.className = className;
-  el.innerHTML = html;
+  const el = root.appendChild(Object.assign(document.createElement("div"), { className, innerHTML: html }));
   el.style.opacity = "0";
-  root.append(el);
   return el;
 }
 

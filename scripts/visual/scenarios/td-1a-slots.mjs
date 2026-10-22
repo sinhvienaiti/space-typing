@@ -12,7 +12,9 @@
 // within 60 s in all), until a pair is on screen, for at most 120 s: picture
 // td-1a-tier2, both cards of the pair underlining two letters (TK 6.5). Every
 // sample checks the cards: no two overlap, text ≥ 18 px, inside the screen's
-// safe area and clear of the HUD chip, first letters never ambiguous. Picture
+// safe area and clear of the HUD chip, first letters never ambiguous; since the
+// 1A.4 review, also how much of a card lies over each HUD panel (cards draw over
+// the HUD, docs/td/BUILD_NOTES.md 1.9): at zoom 1 none may. Picture
 // td-1a-four-slots: words up at all four buildings. A Node replay of the run's
 // log must reach the browser's hash (§7 gate 4).
 //   URL=http://127.0.0.1:3110/ OUT_DIR=… node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-slots.mjs --width=1280 --height=720
@@ -67,8 +69,10 @@ const LOOK = td(`
     .filter((el) => Number(el.style.opacity) > 0.05 && !el.classList.contains("is-ash") && live.has(el.children[1].textContent))
     .map((el) => { const r = el.getBoundingClientRect(); return { text: el.children[1].textContent, left: r.left, top: r.top, right: r.right, bottom: r.bottom, font: parseFloat(getComputedStyle(el).fontSize), underlined: el.children[1].querySelectorAll(".l").length }; });
   const chip = document.querySelector(".td-chip").getBoundingClientRect();
+  const panels = [...document.querySelectorAll(".td-panel")].map((el) => [el.className.replace("td-panel ", ""), el.getBoundingClientRect()])
+    .filter(([, r]) => r.width > 0 && r.height > 0).map(([name, r]) => ({ name, left: r.left, top: r.top, right: r.right, bottom: r.bottom }));
   const s = t.state();
-  return { words, cards, chip: { left: chip.left, top: chip.top, right: chip.right, bottom: chip.bottom }, gach: s.agents[3], phase: s.phase, wave: s.wave, nextWaveAt: s.nextWaveAt, tick: s.tick,
+  return { words, cards, chip: { left: chip.left, top: chip.top, right: chip.right, bottom: chip.bottom }, panels, gach: s.agents[3], phase: s.phase, wave: s.wave, nextWaveAt: s.nextWaveAt, tick: s.tick,
     width: innerWidth, height: innerHeight };`);
 
 export default async function (page) {
@@ -112,6 +116,8 @@ export default async function (page) {
   let minFont = Infinity;
   let keys = 0;
   let calls = 0;
+  /** Per HUD panel: the largest card area over it (px²), and in how many looks. */
+  const overHud = {};
   // "waves" until wave 2 ends, "dense" for 10 s at 1 s, "tier2" until a pair is on screen, then "done".
   let phase = "waves";
   let phaseUntil = 0;
@@ -122,7 +128,7 @@ export default async function (page) {
     const tickAt = Date.now();
     const look = await page.eval(LOOK);
     if (look === null) break;
-    const { words, cards, chip, gach } = look;
+    const { words, cards, chip, panels, gach } = look;
     samples += 1;
     // Gạch: on a bridge wherever he is over the stream; his path ahead crosses only on bridges.
     if (gach.x >= STREAM.x0 && gach.x <= STREAM.x1 && !onBridge(gach.z)) gachInWater = true;
@@ -149,6 +155,11 @@ export default async function (page) {
       const inside = card.left >= 8 - 0.5 && card.right <= look.width - 8 + 0.5 && card.top >= 0 && card.bottom <= look.height - 8 + 0.5;
       const underChip = card.left < chip.right && card.right > chip.left && card.top < chip.bottom && card.bottom > chip.top;
       if ((!inside || underChip) && problems.length < 12) problems.push("outside the safe area: " + JSON.stringify(card));
+      for (const panel of panels) {
+        const area = Math.max(0, Math.min(card.right, panel.right) - Math.max(card.left, panel.left)) * Math.max(0, Math.min(card.bottom, panel.bottom) - Math.max(card.top, panel.top));
+        if (area <= 0) continue;
+        overHud[panel.name] = { px2: Math.max(overHud[panel.name]?.px2 ?? 0, Math.round(area)), looks: (overHud[panel.name]?.looks ?? 0) + 1 };
+      }
     }
     for (let i = 0; i < cards.length; i += 1) {
       for (let j = i + 1; j < cards.length; j += 1) {
@@ -217,6 +228,7 @@ export default async function (page) {
     twoWavesTyped: wave2Ended && final?.state?.phase !== "defeat",
     tier2PairOnScreen: tier2 > 0 && tier2Card?.underlined.every((n) => n === 2) === true,
     cardsNeverOverlapOrLeaveSafeArea: problems.filter((p) => !p.startsWith("ambiguous")).length === 0,
+    cardsClearOfHudPanels: Object.keys(overHud).length === 0,
     cardText18px: minFont >= 18,
     firstLettersDistinct: problems.filter((p) => p.startsWith("ambiguous")).length === 0,
     realKeysReachedTheGame: (stats.keys ?? 0) >= keys * 0.95,
@@ -240,6 +252,7 @@ export default async function (page) {
     samplesWithTier2: tier2,
     tier2Card,
     minCardFontPx: minFont,
+    cardsOverHud: overHud,
     stats: { streamSpawned: stats.streamSpawned, streamDone: stats.streamDone, streamMissed: stats.streamMissed, keys: stats.keys, keyErrors: stats.keyErrors, wordShots: stats.wordShots, kills: stats.kills, damageHero: stats.damageHero, goldWord: stats.goldWord, wavesCleared: stats.wavesCleared },
     typing: final?.typing,
     lives: final?.state?.lives,

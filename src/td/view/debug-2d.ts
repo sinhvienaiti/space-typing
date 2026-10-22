@@ -26,6 +26,8 @@ const FONT = '"Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif';
 const MARK_TICKS = 24;
 /** Draconis from above, nose up: a body and two swept wings, in metres. */
 const DRAGON = new Path2D("M0 -1.15L0.35 -0.15L1.3 0.7L0.27 0.4L0 0.85L-0.27 0.4L-1.3 0.7L-0.35 -0.15Z");
+/** The rally flag: a pole up from the point, a pennant at its top. */
+const FLAG = new Path2D("M0 0V-1.6L1.1 -1.25L0 -0.9Z");
 
 type Mark = { kind: number; x: number; z: number; value: number; tick: number };
 /** The player's hand (app/selection.ts): the selected agent, the building in focus by id, the build menu's kind and ghost. */
@@ -119,13 +121,22 @@ export class DebugView {
     }
   }
 
-  private text(label: string, x: number, z: number, sizePx: number, color: string, weight = 800): void {
+  /** A label in screen pixels at a world point; with `edge`, on a paper chip edged in that colour (TK 12.5's reason chip). */
+  private text(label: string, x: number, z: number, sizePx: number, color: string, weight = 800, edge = ""): void {
     const { ctx } = this;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.font = weight + " " + Math.round(sizePx * this.ratio) + "px " + FONT;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    if (edge !== "") {
+      const half = ctx.measureText(label).width / 2 + 0.6 * sizePx * this.ratio;
+      ctx.beginPath();
+      ctx.roundRect(this.ox + x * this.scale - half, this.oy + z * this.scale - 0.85 * sizePx * this.ratio, half * 2, 1.7 * sizePx * this.ratio, 6 * this.ratio);
+      Object.assign(ctx, { fillStyle: COLOR.paper, strokeStyle: edge, lineWidth: 2 * this.ratio });
+      ctx.fill();
+      ctx.stroke();
+    }
     ctx.fillStyle = color;
     ctx.fillText(label, this.ox + x * this.scale, this.oy + z * this.scale);
     ctx.restore();
@@ -167,12 +178,9 @@ export class DebugView {
       ctx.fillRect(rect.x0 - 0.3, rect.z0, rect.x1 - rect.x0 + 0.6, rect.z1 - rect.z0);
       ctx.strokeStyle = COLOR.ink;
       ctx.lineWidth = this.px(1);
-      for (let x = rect.x0 + 0.5; x < rect.x1; x += 0.75) {
-        ctx.beginPath();
-        ctx.moveTo(x, rect.z0);
-        ctx.lineTo(x, rect.z1);
-        ctx.stroke();
-      }
+      ctx.beginPath();
+      for (let x = rect.x0 + 0.5; x < rect.x1; x += 0.75) ctx.rect(x, rect.z0, 0, rect.z1 - rect.z0);
+      ctx.stroke();
     }
     // The flying route: a faint dashed line.
     const fly = w.lanes[w.lanes.length - 1]!;
@@ -183,16 +191,11 @@ export class DebugView {
     for (let index = 0; index < fly.xs.length; index += 8) ctx.lineTo(fly.xs[index]!, fly.zs[index]!);
     ctx.stroke();
     // No building inside this ring around the Bastion.
-    ctx.strokeStyle = "rgba(43, 33, 24, 0.55)";
-    ctx.beginPath();
-    ctx.arc(w.map.keep[0], w.map.keep[1], BUILD.keepClearM, 0, Math.PI * 2);
-    ctx.stroke();
+    this.disc(w.map.keep[0], w.map.keep[1], BUILD.keepClearM, null, "rgba(43, 33, 24, 0.55)");
     ctx.setLineDash([]);
     this.disc(w.map.gate[0], w.map.gate[1], 2.4, "#3e2766", COLOR.ink, 2);
     w.map.nodes.forEach((node, index) => {
-      let taken = false;
-      for (let b = 1; b < w.buildings.top; b += 1) if (w.buildings.used[b] === 1 && w.buildings.node[b] === index) taken = true;
-      if (taken) return;
+      if (w.buildings.live(1).some((b) => w.buildings.node[b] === index)) return; // a mine stands on it
       this.disc(node.x, node.z, BUILD.footprintR.L, "rgba(201, 138, 46, 0.25)", COLOR.ore, 2);
       this.text("★".repeat(node.richness), node.x, node.z, 12, COLOR.ore);
     });
@@ -209,10 +212,7 @@ export class DebugView {
       const level = B.level[b]!;
       const building = w.tick < B.readyTick[b]!;
       if (B.id(b) === hand.focus) this.disc(x, z, r + 0.7, "rgba(127, 245, 224, 0.35)", COLOR.jade, 3);
-      if (spec.attack !== null && !building) {
-        const reach = spec.attack.levels[level - 1]!.range;
-        this.disc(x, z, reach, null, "rgba(43, 33, 24, 0.22)", 1);
-      }
+      if (spec.attack !== null && !building) this.disc(x, z, spec.attack.levels[level - 1]!.range, null, "rgba(43, 33, 24, 0.22)", 1);
       if (building) this.ctx.setLineDash([this.px(4), this.px(3)]);
       this.disc(x, z, r, building ? "rgba(255, 244, 214, 0.6)" : spec.def.view.color, COLOR.ink, 2);
       this.ctx.setLineDash([]);
@@ -231,30 +231,29 @@ export class DebugView {
       this.text(tempo === 0 ? "Dừng" : tempo + "s", x + r + 0.9, z + r * 0.6, 10, COLOR.ink, 700);
       if (B.assist[b]! >= 0 && B.waiting[b] === 1) this.text("…", x, z - r - 1.7, 14, COLOR.ink);
       if (spec.hp[0] > 0 && B.hp[b]! < spec.hp[level - 1]!) this.bar(x, z + r + 0.5, r * 2, B.hp[b]! / spec.hp[level - 1]!, COLOR.buildingHp);
-      if (spec.barracks !== null) this.flag(B.rallyX[b]!, B.rallyZ[b]!);
+      if (spec.barracks !== null) this.shape(FLAG, B.rallyX[b]!, B.rallyZ[b]!, COLOR.soldier);
       if (spec.mine !== null && B.pile[b]! > 0) this.text("+" + Math.floor(B.pile[b]! / 1000), x + r + 1.2, z, 11, "#7a4f12");
     }
   }
 
-  /** The build ghost (TK 12.5): the kind's disc and reach; a red ring with the reason under it where it may not stand. */
+  /** The build ghost (TK 12.5): the kind's disc and reach; where it may not stand, a red ring and the reason on a chip under it. */
   private ghost(w: World, hand: Hand): void {
     const g = hand.ghost();
     const spec = w.c.buildings[hand.kind]!;
     if (g === null) return;
     if (spec.attack !== null) this.disc(g.x, g.z, spec.attack.levels[0]!.range, null, "rgba(43, 33, 24, 0.35)", 1);
     this.disc(g.x, g.z, spec.radius, spec.def.view.color + "99", g.reason === "" ? COLOR.ink : COLOR.enemyHp, 3);
-    if (g.reason !== "") this.text(g.reason, g.x, g.z + spec.radius + this.px(14), 14, COLOR.ink);
+    if (g.reason !== "") this.text(g.reason, g.x, g.z + spec.radius + this.px(18), 14, COLOR.ink, 800, COLOR.ink);
   }
 
-  /** The rally flag: a pole from the point, a pennant at its top. */
-  private flag(x: number, z: number): void {
+  /** A shape drawn in metres about (x, z), filled and edged in ink. */
+  private shape(path: Path2D, x: number, z: number, fill: string): void {
     const { ctx } = this;
-    const flag = new Path2D("M" + x + " " + (z - 1.6) + "L" + (x + 1.1) + " " + (z - 1.25) + "L" + x + " " + (z - 0.9) + "Z");
-    ctx.fillStyle = COLOR.soldier;
-    ctx.fill(flag);
-    ctx.strokeStyle = COLOR.ink;
-    ctx.lineWidth = this.px(1.5);
-    ctx.stroke(new Path2D("M" + x + " " + z + "V" + (z - 1.6)));
+    ctx.translate(x, z);
+    Object.assign(ctx, { fillStyle: fill, strokeStyle: COLOR.ink, lineWidth: this.px(1.5) });
+    ctx.fill(path);
+    ctx.stroke(path);
+    ctx.translate(-x, -z);
   }
 
   private soldiers(w: World): void {
@@ -284,9 +283,9 @@ export class DebugView {
     }
   }
 
-  private polyline(points: ArrayLike<number>, color: string, dash: number): void {
+  private polyline(points: ArrayLike<number>, color: string, dash: number, widthPx = 3): void {
     const { ctx } = this;
-    Object.assign(ctx, { strokeStyle: color, lineWidth: this.px(3) });
+    Object.assign(ctx, { strokeStyle: color, lineWidth: this.px(widthPx) });
     ctx.setLineDash(dash > 0 ? [this.px(dash), this.px(dash * 0.7)] : []);
     ctx.beginPath();
     for (let k = 0; k < points.length; k += 2) ctx.lineTo(points[k]!, points[k + 1]!);
@@ -296,7 +295,6 @@ export class DebugView {
 
   /** The assist line; a walker's path ahead, dashed; Thư Đồng as lettered discs, Draconis a winged triangle over its shadow. */
   private agents(w: World, hand: Hand): void {
-    const { ctx } = this;
     const A = w.agents;
     const B = w.buildings;
     for (let a = 0; a < A.top; a += 1) {
@@ -335,16 +333,11 @@ export class DebugView {
         continue;
       }
       if (up > 0) this.disc(x + 0.9 * up, z + 1.4 * up, 0.9, "rgba(43, 33, 24, 0.25)", null);
-      ctx.translate(x, z - 0.8 * up);
-      Object.assign(ctx, { fillStyle: view.color, strokeStyle: COLOR.ink, lineWidth: this.px(1.5) });
-      ctx.fill(DRAGON);
-      ctx.stroke(DRAGON);
-      ctx.translate(-x, 0.8 * up - z);
+      this.shape(DRAGON, x, z - 0.8 * up, view.color);
     }
   }
 
   private shots(w: World): void {
-    const { ctx } = this;
     const P = w.projectiles;
     for (let p = 0; p < P.top; p += 1) {
       if (P.used[p] === 0) continue;
@@ -362,14 +355,8 @@ export class DebugView {
       }
       const dx = P.tx[p]! - x;
       const dz = P.tz[p]! - z;
-      const d = Math.sqrt(dx * dx + dz * dz) || 1;
-      const length = kind === PROJECTILE.bolt ? 1.4 : 1.1;
-      ctx.strokeStyle = kind === PROJECTILE.bolt ? COLOR.paper : COLOR.ink;
-      ctx.lineWidth = this.px(kind === PROJECTILE.bolt ? 3 : 2);
-      ctx.beginPath();
-      ctx.moveTo(x - (dx / d) * length, z - (dz / d) * length);
-      ctx.lineTo(x, z);
-      ctx.stroke();
+      const back = (kind === PROJECTILE.bolt ? 1.4 : 1.1) / (Math.sqrt(dx * dx + dz * dz) || 1);
+      this.polyline([x - dx * back, z - dz * back, x, z], kind === PROJECTILE.bolt ? COLOR.paper : COLOR.ink, 0, kind === PROJECTILE.bolt ? 3 : 2);
     }
   }
 

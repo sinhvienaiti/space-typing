@@ -5,6 +5,8 @@
 // right) are in the mix. Every sample measures the cards on screen: no two
 // overlap, a building's column is at most 240 px tall, all cards together
 // cover at most 6 % of the screen, text ≥ 18 px, inside the viewport. Must pass.
+// Since the 1A.4 review it also reports how much of a card lies over each HUD
+// panel (cards draw over the HUD, docs/td/BUILD_NOTES.md 1.9): at zoom 1 none may.
 // Pictures td-1a-dense-easy and td-1a-dense-normal, at the most cards seen.
 //   URL=http://127.0.0.1:3110/ OUT_DIR=… node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-words-dense.mjs --width=1280 --height=720
 import { DEV_URL, out } from "./common.mjs";
@@ -21,7 +23,9 @@ const LOOK = td(`
   const cards = [...document.querySelectorAll(".td-card")]
     .filter((el) => Number(el.style.opacity) > 0.05 && !el.classList.contains("is-ash") && live.has(el.children[1].textContent))
     .map((el) => { const r = el.getBoundingClientRect(); return { text: el.children[1].textContent, building: live.get(el.children[1].textContent).building, left: r.left, top: r.top, right: r.right, bottom: r.bottom, font: parseFloat(getComputedStyle(el).fontSize) }; });
-  return { words, cards, width: innerWidth, height: innerHeight };`);
+  const panels = [...document.querySelectorAll(".td-panel")].map((el) => [el.className.replace("td-panel ", ""), el.getBoundingClientRect()])
+    .filter(([, r]) => r.width > 0 && r.height > 0).map(([name, r]) => ({ name, left: r.left, top: r.top, right: r.right, bottom: r.bottom }));
+  return { words, cards, panels, width: innerWidth, height: innerHeight };`);
 
 async function letter(page, ch) {
   const vk = ch.toUpperCase().charCodeAt(0);
@@ -68,6 +72,8 @@ export default async function (page) {
   const shots = [];
   const phases = [];
   let samples = 0;
+  /** Per HUD panel: the largest card area over it (px²), and in how many looks. */
+  const overHud = {};
   for (const [difficulty, expected, wpm] of PHASES) {
     await page.eval(td(`t.send({ t: "sandbox", op: { op: "difficulty", value: "${difficulty}" } }); t.send({ t: "sandbox", op: { op: "expected", value: ${expected} } }); return true;`));
     const keyMs = 60000 / (wpm * 5);
@@ -93,6 +99,11 @@ export default async function (page) {
       for (const card of cards) {
         minFont = Math.min(minFont, card.font);
         if ((card.left < 0 || card.top < 0 || card.right > look.width || card.bottom > look.height) && problems.length < 12) problems.push(difficulty + " off screen: " + card.text);
+        for (const panel of look.panels) {
+          const area = Math.max(0, Math.min(card.right, panel.right) - Math.max(card.left, panel.left)) * Math.max(0, Math.min(card.bottom, panel.bottom) - Math.max(card.top, panel.top));
+          if (area <= 0) continue;
+          overHud[panel.name] = { px2: Math.max(overHud[panel.name]?.px2 ?? 0, Math.round(area)), looks: (overHud[panel.name]?.looks ?? 0) + 1 };
+        }
       }
       for (const id of new Set(cards.map((card) => card.building))) {
         const column = cards.filter((card) => card.building === id);
@@ -128,10 +139,11 @@ export default async function (page) {
     columnsAtMost240px: phases.every((phase) => phase.tallestColumnPx <= 240),
     cardsAtMost6PctOfScreen: phases.every((phase) => phase.cardAreaPct <= 6),
     cardText18px: phases.every((phase) => phase.minFontPx >= 18),
+    cardsClearOfHudPanels: Object.keys(overHud).length === 0,
     noConsoleErrors: page.logs.filter((line) => line.startsWith("error")).length === 0,
     noExceptions: page.exceptions.length === 0,
   };
   const pass = Object.values(checks).every(Boolean);
   if (!pass) process.exitCode = 1;
-  return { pass, checks, fourth, buildings: ids, spanM: +span.toFixed(1), samples, phases, problems, shots };
+  return { pass, checks, fourth, buildings: ids, spanM: +span.toFixed(1), samples, phases, cardsOverHud: overHud, problems, shots };
 }

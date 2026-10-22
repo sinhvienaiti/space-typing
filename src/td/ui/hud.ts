@@ -3,8 +3,9 @@
  * when its HTML changes. A button runs its action on press, so a re-render
  * cannot swallow the click, and never takes focus: Enter and Space stay the game's.
  */
-import { ECONOMY, TICK_HZ } from "../content/rules";
+import { TICK_HZ } from "../content/rules";
 import { chainTier } from "../sim/systems/chain";
+import { earlyCallBonus } from "../sim/systems/waves";
 import type { World } from "../sim/world";
 import { wordText } from "../typing/decks";
 
@@ -16,6 +17,7 @@ export const REASON: Readonly<Record<string, string>> = {
   water: "Không xây trên nước", road: "Sát đường quá", keep: "Trong vòng 11 m quanh Lũy", overlap: "Chạm nhà khác", rally: "Trại Lính phải gần đường",
   path: "Chặn lối đi", gold: "Thiếu vàng", noSlot: "Ô này còn khóa", tempoClosed: "Nhịp này chưa mở", notCounting: "Chưa gọi đợt được",
   undoWindow: "Hết 5 s hoàn tác", blocked: "Không đứng được ở đó", rallyFar: "Xa trại quá", rallyOffRoad: "Điểm tập kết phải ở đường",
+  noBuilding: "Không có nhà đó", noBarracks: "Không phải Trại Lính", badValue: "Giá trị không hợp lệ", noSandbox: "Chỉ có trong hộp cát", badKey: "Phím không hợp lệ",
 };
 
 export const button = (act: string, label: string, key = "", attrs = ""): string => `<button data-act="${act}"${attrs}>${label}${key === "" ? "" : `<kbd>${key}</kbd>`}</button>`;
@@ -25,11 +27,12 @@ export const seg = (label: string, act: string, values: readonly string[], label
 
 const stat = (label: string, value: string): string => `<span class="td-stat"><small>${label}</small><b>${value}</b></span>`;
 
-/** Pause and sound; lives, gold, the wave and the count to the next; the early call pays a gold a second left, at most 30 (TK 18.3). */
+/** Pause and sound; lives, gold, the wave (n/N, n alone in the sandbox's endless waves past the list) and the count to the next; the early call's gold (TK 18.3). */
 export function statusHtml(w: World, sandbox: boolean, paused: boolean, muted: boolean, notices: readonly string[]): string {
   const left = w.nextWaveAt >= 0 ? Math.ceil((w.nextWaveAt - w.tick) / TICK_HZ) : -1;
-  const call = w.phase === "prep" ? "Bắt đầu đợt 1" : left >= 0 ? `Gọi đợt ${w.wave + 1} sớm · +${Math.min(ECONOMY.earlyCall.goldCap, left)} vàng` : "";
-  const wave = w.wave + "/" + w.c.content.waves.list.length + (left >= 0 ? ` <small>${left} s</small>` : "");
+  const call = w.phase === "prep" ? "Bắt đầu đợt 1" : left >= 0 ? `Gọi đợt ${w.wave + 1} sớm · +${earlyCallBonus(w)} vàng` : "";
+  const listed = w.c.content.waves.list.length;
+  const wave = w.wave + (w.wave > listed ? "" : "/" + listed) + (left >= 0 ? ` <small>${left} s</small>` : "");
   return (
     `<div class="td-row"><span class="td-title"><b>Typing Defense</b>${sandbox ? "<small>Hộp cát · bản thử 1A</small>" : ""}</span>` +
     button("pause", paused ? "▶" : "Ⅱ", "", ' class="td-x" title="Tạm dừng (Pause)"') + button("mute", muted ? "<s>Âm</s>" : "Âm", "", ' class="td-x"') + (sandbox ? button("sandbox", "F9", "", ' class="td-x" title="Hộp cát"') : "") + "</div>" +

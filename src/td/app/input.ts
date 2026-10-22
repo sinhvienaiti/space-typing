@@ -13,7 +13,7 @@ export const KEY_ACTIONS: Readonly<Record<string, string>> = {
   Digit1: "pick:1", Digit2: "pick:2", Digit3: "pick:3", Digit4: "pick:4", Digit0: "recall", Backquote: "cycle",
   Tab: "next", ShiftTab: "prev", Enter: "send", NumpadEnter: "send", ShiftEnter: "wave",
   Minus: "slower", Equal: "denser", NumpadSubtract: "slower", NumpadAdd: "denser", ShiftMinus: "stopAll", ShiftEqual: "restore",
-  Insert: "build", Escape: "escape", Pause: "pause", F9: "sandbox", Space: "",
+  Insert: "build", Delete: "undo", Escape: "escape", Pause: "pause", F9: "sandbox", Space: "",
   ArrowLeft: "pan:1:0", ArrowRight: "pan:-1:0", ArrowUp: "pan:0:1", ArrowDown: "pan:0:-1",
 };
 
@@ -65,9 +65,8 @@ export function installPointer(canvas: HTMLCanvasElement, camera: Camera, hand: 
     if (down !== null && !down.drag && down.button !== 1) hand.click(camera.unproject(event.clientX, event.clientY), down.button === 2);
     down = null;
   });
-  const wheel = (event: WheelEvent): void => {
+  canvas.addEventListener("wheel", (event) => {
     event.preventDefault();
     camera.zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.15 : 1 / 1.15);
-  };
-  canvas.addEventListener("wheel", wheel, { passive: false });
+  }, { passive: false });
 }

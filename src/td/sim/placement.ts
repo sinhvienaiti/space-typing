@@ -93,13 +93,12 @@ export function canPlace(w: World, def: number, qx: number, qz: number, free = f
 }
 
 /**
- * Where Insert offers to build `def` (BUILD_NOW §5.4): a mine's free nodes; else the points of a 2 m grid within
- * 2 m of the road's clearance that canPlace allows (gold aside), nearest a bend of the road first.
+ * Where Insert may offer to build `def` (BUILD_NOW §5.4), from the map alone: a mine's nodes; else the points of a
+ * 2 m grid within 2 m of the road's clearance, nearest a bend of the road first. nextSpot picks those canPlace allows.
  */
-export function freeSpots(w: World, def: number): Point[] {
+export function spotCandidates(w: World, def: number): Point[] {
   const spec = w.c.buildings[def]!;
-  const fits = (p: Point): boolean => canPlace(w, def, Math.round(p.x / BUILD.snapM), Math.round(p.z / BUILD.snapM), true).ok;
-  if (spec.placement === "node") return w.map.nodes.map((node) => ({ x: node.x, z: node.z })).filter(fits);
+  if (spec.placement === "node") return w.map.nodes.map((node) => ({ x: node.x, z: node.z }));
   const reach = BUILD.roadClearM + spec.radius + 2;
   const spots: Point[] = [];
   for (let x = -w.map.buildHalfM; x <= w.map.buildHalfM; x += 2) {
@@ -107,5 +106,13 @@ export function freeSpots(w: World, def: number): Point[] {
   }
   const bends = w.map.routes.flatMap((route) => route.slice(1, -1));
   const bend = (p: Point): number => Math.min(...bends.map(([x, z]) => (x - p.x) * (x - p.x) + (z - p.z) * (z - p.z)));
-  return spots.filter(fits).sort((p, q) => bend(p) - bend(q) || p.x - q.x || p.z - q.z);
+  return spots.sort((p, q) => bend(p) - bend(q) || p.x - q.x || p.z - q.z);
+}
+
+/** The first of `spots` from `k` on, going `dir` round, that `def` may take (gold aside), −1 none: a few canPlace a press, not ~500 (~40 ms). */
+export function nextSpot(w: World, def: number, spots: readonly Point[], k: number, dir: 1 | -1): number {
+  for (let n = 0; n < spots.length; n += 1, k = (k + dir + spots.length) % spots.length) {
+    if (canPlace(w, def, Math.round(spots[k]!.x / BUILD.snapM), Math.round(spots[k]!.z / BUILD.snapM), true).ok) return k;
+  }
+  return -1;
 }
