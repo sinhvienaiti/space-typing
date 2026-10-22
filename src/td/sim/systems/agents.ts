@@ -9,7 +9,7 @@ import { AGENT, TICK_HZ } from "../../content/rules";
 import { findPath, nearestOpen, pullPath } from "../nav/astar";
 import { socketCell, type Point } from "../placement";
 import { SOURCE } from "../stats";
-import { NPC_KIND } from "../stores/npcs";
+import { NPC_KIND, TASK } from "../stores/npcs";
 import { MODE, PATH_MAX, type Walkers } from "../stores/walkers";
 import { PROJECTILE } from "../stores/projectiles";
 import type { World } from "../world";
@@ -150,7 +150,8 @@ export function heroAttack(w: World): void {
 
 /**
  * A building went down (TK 25.9): a walker it covers steps to the centre of the nearest open cell that still
- * leads to its goal, and walkers find their way again. Farmers walk inside their farm, off the grid.
+ * leads to its goal, and walkers find their way again; an NPC at work stays standing where it is put (review R1).
+ * Farmers walk inside their farm, off the grid.
  */
 export function reroute(w: World): void {
   const grid = w.grid;
@@ -163,7 +164,8 @@ export function reroute(w: World): void {
         S.x[k] = grid.centerX(to);
         S.z[k] = grid.centerZ(to);
       }
-      if (covered || S.mode[k] === MODE.walk) plan(w, S, k);
+      if (S === w.npcs && w.npcs.task[k] === TASK.working) S.mode[k] = MODE.stand;
+      else if (covered || S.mode[k] === MODE.walk) plan(w, S, k);
     }
   }
 }

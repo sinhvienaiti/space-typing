@@ -6,7 +6,7 @@
  * Positions are quarter metres.
  */
 import { ticks } from "../content/compile";
-import { BUILD, ECONOMY, EXPECTED, FARM, PRESET, RALLY, STORE, VILLAGERS } from "../content/rules";
+import { BUILD, ECONOMY, EXPECTED, FARM, MODES, PRESET, RALLY, STORE, VILLAGERS } from "../content/rules";
 import type { Mode } from "../content/types";
 import { routeBackspace } from "../typing/router";
 import { CELL } from "./nav/grid";
@@ -156,6 +156,7 @@ function run(w: World, command: Command): string | null {
       const t = command.tree;
       if (!(Number.isInteger(t) && t >= 0 && t < w.trees.count) || w.trees.standing[t] === 0) return "noTree";
       w.trees.marked[t] = 1 - w.trees.marked[t]!;
+      if (w.trees.worker[t] === -2) w.trees.worker[t] = -1; // a tree left for want of a way is tried again
       return null;
     }
     case "hire": {
@@ -220,6 +221,8 @@ function sandbox(w: World, op: SandboxOp): string | null {
     }
     case "mode":
       if (!MODE_IDS.includes(op.value)) return "badValue";
+      // The running day takes the new mode's length, the time gone kept (review R1).
+      if (w.phase === "day") w.phaseEnd = Math.max(w.tick + 1, w.phaseEnd + ticks(MODES[op.value].dayS) - ticks(MODES[w.mode].dayS));
       w.mode = op.value;
       configureDeck(w); // E's floor follows the mode
       return null;
@@ -250,13 +253,14 @@ function sandbox(w: World, op: SandboxOp): string | null {
   }
 }
 
-/** §10 "Đặt sẵn": the Bastion at level 3, the map's preset put down built and free, 5 villagers, the 8 standing trees nearest the Bastion marked. */
+/** §10 "Đặt sẵn": the Bastion at level 3, the map's preset put down built and free (a farm's plots at every stage), 5 villagers, the 8 standing trees nearest the Bastion marked. */
 function preset(w: World): void {
   setLevel(w, 0, Math.max(PRESET.keepLevel, w.buildings.level[0]!), 4);
   for (const [id, x, z] of w.map.preset ?? []) {
     const def = w.c.buildingIndex(id);
     const placed = canPlace(w, def, Math.round(x / BUILD.snapM), Math.round(z / BUILD.snapM), true);
-    if (placed.ok) placeBuilding(w, def, placed.x, placed.z, placed.node, true);
+    const b = placed.ok ? placeBuilding(w, def, placed.x, placed.z, placed.node, true) : -1;
+    if (b >= 0 && w.c.buildings[def]!.farm) PRESET.plots.forEach(([stage, work], p) => ([w.buildings.plot[b * FARM.plots + p], w.buildings.plotWork[b * FARM.plots + p]] = [stage, work]));
   }
   while (countNpcs(w, NPC_KIND.villager) < PRESET.villagers) addVillager(w);
   const [kx, kz] = w.map.keep;

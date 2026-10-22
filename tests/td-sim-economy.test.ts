@@ -7,6 +7,8 @@ import { STAT } from "../src/td/sim/stats";
 import { PLOT } from "../src/td/sim/stores/buildings";
 import { CALL_KIND } from "../src/td/sim/stores/calls";
 import { NPC_KIND, TASK } from "../src/td/sim/stores/npcs";
+import { CELL } from "../src/td/sim/nav/grid";
+import { MODE } from "../src/td/sim/stores/walkers";
 import { damageEnemy } from "../src/td/sim/systems/combat";
 import { countNpcs } from "../src/td/sim/systems/economy";
 import { step, type World } from "../src/td/sim/world";
@@ -72,6 +74,20 @@ describe("day, night and dawn (§2)", () => {
       expect([w.phase, w.wave]).toEqual(["night", 1]);
       expect(send(w, { t: "callNight" }).find((event) => event.t === "rejected")).toMatchObject({ reason: "notDay" });
     }
+  });
+
+  it("the sandbox's mode, changed by day, gives the running day the new length, the time gone kept (review R1)", () => {
+    const w = world();
+    run(w, T(10));
+    send(w, { t: "sandbox", op: { op: "mode", value: "relax" } });
+    expect(w.phaseEnd).toBe(T(MODES.relax.dayS));
+    run(w, T(80));
+    send(w, { t: "sandbox", op: { op: "mode", value: "challenge" } }); // 50 s, 90 s gone: the night falls next
+    expect(w.phaseEnd).toBe(w.tick);
+    run(w, 1);
+    expect(w.phase).toBe("night");
+    send(w, { t: "sandbox", op: { op: "mode", value: "balanced" } });
+    expect(w.phaseEnd).toBe(-1);
   });
 
   it("the sandbox's night falls at once, or brings one more wave to a night", () => {
@@ -188,6 +204,29 @@ describe("villagers and trees (§4.2)", () => {
     w.trees.standing[5] = 0;
     expect(send(w, { t: "markTree", tree: 5 }).find((event) => event.t === "rejected")).toMatchObject({ reason: "noTree" });
     expect(send(w, { t: "markTree", tree: 99 }).find((event) => event.t === "rejected")).toMatchObject({ reason: "noTree" });
+  });
+
+  it("a tree with no way to it is left (no chopping from afar), until it is marked again (review R1)", () => {
+    const w = world();
+    const t = 24; // north-east, far from everyone
+    const [x, z] = w.map.trees[t]!;
+    w.grid.stamp(x, z, 5, CELL.building, true);
+    w.grid.stamp(x, z, 3, CELL.building, false); // a closed ring around it
+    send(w, { t: "markTree", tree: t });
+    run(w, 3);
+    expect(w.trees.worker[t]).toBe(-2);
+    expect(w.npcs.live().some((n) => w.npcs.job[n] === t)).toBe(false);
+    expect(w.npcs.live().filter((n) => w.npcs.kind[n] === NPC_KIND.villager).every((n) => w.npcs.task[n] === TASK.going)).toBe(true); // off to other trees
+    send(w, { t: "markTree", tree: t }, { t: "markTree", tree: t });
+    expect([w.trees.worker[t], w.trees.marked[t]]).toEqual([-1, 1]); // a villager free next tries it again
+  });
+
+  it("a villager at work that a new building covers is put on open ground and stays standing at work (review R1)", () => {
+    const w = world();
+    const n = w.npcs.live().find((k) => w.npcs.kind[k] === NPC_KIND.villager)!;
+    until(w, () => w.npcs.task[n] === TASK.working, T(30));
+    built(w, "archer", Math.round(w.npcs.x[n]!), Math.round(w.npcs.z[n]!));
+    expect([w.npcs.task[n], w.npcs.mode[n], w.grid.cells[w.grid.cell(w.npcs.x[n]!, w.npcs.z[n]!)]]).toEqual([TASK.working, MODE.stand, 0]);
   });
 
   it("hiring costs 25 gold and 5 food, up to 3 / 5 / 7 / 9 villagers by Bastion level; 10 food sells for 10 gold", () => {

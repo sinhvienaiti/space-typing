@@ -43,6 +43,8 @@ body.is-paused .td-words { filter: blur(6px); }
 .td-row > button { flex: 1; min-width: 0; padding: 3px 2px; }
 .td-row > .td-x { flex: none; padding: 2px 8px; }
 .td-row > small:first-child { flex: 0 0 4.4em; }
+.td-row.td-wide { flex-wrap: wrap; row-gap: 4px; }
+.td-row.td-wide > small:first-child { flex-basis: 100%; }
 .td-row > span:first-child { flex: 1; }
 .td-actions { padding: 6px; }
 .td-stat { display: flex; flex: 1; flex-direction: column; }
@@ -60,6 +62,8 @@ body.is-paused .td-words { filter: blur(6px); }
 .td-agent.is-locked { display: grid; align-content: center; background: #d8d2c4; color: var(--td-muted); box-shadow: none; font-size: 1.2em; }
 .td-word { font-size: clamp(28px, 2.2em, 34px); font-weight: 800; }
 .td-word span, .td-hint { color: var(--td-jade); }
+.td-mean { margin-left: 10px; color: var(--td-jade) !important; font-size: 1em !important; }
+.td-learn b { font-variant-numeric: tabular-nums; }
 .td-chain b { font-size: 1.35em; font-variant-numeric: tabular-nums; }
 .td-chain i { width: 8px; height: 8px; border: 1.5px solid var(--td-ink); border-radius: 50%; }
 .td-chain i.on { background: var(--td-jade); }
@@ -79,6 +83,14 @@ body.is-paused .td-words { filter: blur(6px); }
 .td-card .l { font-weight: 800; text-decoration: underline 2px var(--fam); text-underline-offset: 3px; }
 .td-card .t { color: var(--td-jade); }
 .td-card .p { background: #ffd3d3; }
+.td-card::before { content: attr(data-icon); margin-right: 5px; font-size: 0.8em; }
+.td-card-pips { margin-left: 6px; color: var(--fam); font-size: 0.6em; letter-spacing: 1px; vertical-align: 0.2em; -webkit-text-stroke: 0.6px var(--td-ink); }
+.td-card-pips:empty, .td-card-mean:empty { display: none; }
+.td-card-mean { display: block; margin-top: 2px; color: var(--td-jade); font-size: 0.75em; font-weight: 800; text-align: center; }
+.td-card.is-quiz { border-color: var(--fam); }
+.td-card.is-quiz .m { color: var(--fam); font-weight: 800; }
+.td-card.is-mean { background: #e7f7f2; border-color: var(--td-jade); box-shadow: 2px 2px 0 var(--td-jade); }
+.td-card.is-mean::before { content: none; }
 .td-card-dot { position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; border: 1.5px solid var(--td-ink); border-radius: 50%; background: var(--agent); }
 .td-card-bar { position: absolute; left: 6px; right: 6px; bottom: 1px; height: 3px; border-radius: 2px; background: rgba(43, 33, 24, 0.35); transform-origin: 0 50%; }
 .td-card.is-locked { z-index: 1; border-color: var(--td-jade); box-shadow: 2px 2px 0 var(--td-jade); }

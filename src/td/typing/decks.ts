@@ -4,11 +4,13 @@
  * each word's start, length and vocabulary level: the simulation never holds
  * a word as a string. A band is the words of a length range up to a level;
  * its A (letters that start at least 3 of its words) sets the stream cap.
+ * Each word also keeps its Vietnamese meaning and IPA (BUILD_1A6 §7): the
+ * view reads them, the simulation and the hash never do.
  */
 import { CAP, EMIT, LENGTH_BY_E, LETTERS } from "../content/rules";
 
 /** One vocabulary word, already reduced to a–z (typingText). Order matters: it is the deck order. */
-export type DeckEntry = { id: string; text: string; level: number };
+export type DeckEntry = { id: string; text: string; level: number; vi?: string; ipa?: string };
 
 export type Deck = {
   readonly count: number;
@@ -17,6 +19,9 @@ export type Deck = {
   readonly len: Uint8Array;
   readonly level: Uint8Array;
   readonly ids: readonly string[];
+  /** Meaning and IPA ("" when the source has none): the view's only. */
+  readonly vi: readonly string[];
+  readonly ipa: readonly string[];
   /** FNV-1a of the letters and levels: a replay checks it has the same deck. */
   readonly hash: string;
 };
@@ -50,7 +55,19 @@ export function compileDeck(entries: readonly DeckEntry[]): Deck {
     }
     hash = Math.imul(hash ^ (32 + entry.level), 0x01000193);
   });
-  return { count: kept.length, letters, start, len, level, ids: kept.map((entry) => entry.id), hash: (hash >>> 0).toString(16).padStart(8, "0") };
+  return {
+    count: kept.length, letters, start, len, level, ids: kept.map((entry) => entry.id), vi: kept.map((entry) => entry.vi ?? ""), ipa: kept.map((entry) => entry.ipa ?? ""),
+    hash: (hash >>> 0).toString(16).padStart(8, "0"),
+  };
+}
+
+/** A short meaning for a card: notes in brackets left out, the first sense, then more while it stays within 22 letters (BUILD_1A6 §7). */
+export function gloss(deck: Deck, word: number): string {
+  const senses = (deck.vi[word] ?? "").replace(/\s*\([^)]*\)/g, "").split(";").map((sense) => sense.trim());
+  const [first = "", ...rest] = senses.filter((sense) => sense !== "");
+  let out = first;
+  for (const sense of rest) if (out.length + sense.length + 2 <= 22) out += "; " + sense;
+  return out.length > 26 ? out.slice(0, 25) + "…" : out;
 }
 
 export const wordText = (deck: Deck, word: number): string =>

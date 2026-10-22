@@ -178,15 +178,15 @@ describe("the AttentionDirector (§5.3)", () => {
     expect(open(w, [mine!])).toEqual([1]);
   });
 
-  it("at night opens no quiz and one economy call at a time", () => {
+  it("at night opens one economy call at a time, and a quiz ends with its day (§7)", () => {
     const w = world({ deck, mode: "challenge" });
     w.phase = "night";
     const list = calls(w, [CALL_KIND.quiz, CALL_KIND.chop, CALL_KIND.harvest, CALL_KIND.build]);
     step(w);
-    expect(open(w, list)).toEqual([0, 1, 0, 1]);
+    expect(open(w, list)).toEqual([-1, 1, 0, 1]);
     w.phase = "day";
     step(w);
-    expect(open(w, list)).toEqual([1, 1, 1, 1]);
+    expect(open(w, list)).toEqual([-1, 1, 1, 1]);
   });
 
   it("the cap counts bright calls only: dim calls nobody answers never keep a call in a ring waiting (review R1)", () => {

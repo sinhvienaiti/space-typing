@@ -5,9 +5,14 @@ import { TICK_HZ } from "../src/td/content/rules";
 import { PLACE_CHECKS } from "../src/td/sim/placement";
 import { CALL_KIND } from "../src/td/sim/stores/calls";
 import { makeCall } from "../src/td/sim/systems/calls";
-import { REASON, statusHtml } from "../src/td/ui/hud";
+import { Selection } from "../src/td/app/selection";
+import { review } from "../src/td/sim/systems/calls";
+import { compileDeck } from "../src/td/typing/decks";
+import { dockHtml } from "../src/td/ui/build-menu";
+import { actionsHtml, REASON, statusHtml, stripHtml } from "../src/td/ui/hud";
 import { teamHtml } from "../src/td/ui/team-bar";
-import { run, send, world } from "./td/fixtures";
+import { built, run, send, world } from "./td/fixtures";
+import { callWord, type } from "./td/typing";
 
 /**
  * The HUD's words and numbers (docs/td/BUILD_NOW.md §5.3, BUILD_1A6 §9): what
@@ -61,5 +66,60 @@ describe('the "Đang gọi" chip (BUILD_1A6 §9)', () => {
     expect(chip()).toEqual([3, 3]);
     send(w, { t: "sandbox", op: { op: "mode", value: "challenge" } });
     expect(chip()).toEqual([4, 4]);
+  });
+});
+
+describe("learning in the HUD (BUILD_1A6 §7)", () => {
+  const deck = compileDeck([{ id: "g", text: "good", level: 1, vi: "tốt; hay", ipa: "/ɡʊd/" }, { id: "c", text: "cold", level: 1, vi: "lạnh; rét", ipa: "/koʊld/" }]);
+
+  it("the status counts knowledge and the review book once there are any", () => {
+    const w = world({ deck });
+    expect(status(w)).not.toContain("Tri thức");
+    review(w, 1, true);
+    expect(status(w)).toContain("Tri thức <b>0</b> · Sổ ôn <b>1</b>");
+  });
+
+  it("the strip hides a quiz's word past what is typed, under its meaning; the learn mode adds meaning and IPA; other modes neither", () => {
+    const w = world({ deck });
+    callWord(w, 0, 1, CALL_KIND.quiz);
+    type(w, "g", 60, true);
+    expect(stripHtml(w, "")).toContain('<b class="td-word"><span>g</span>___</b><small class="td-mean">tốt; hay</small>');
+    type(w, "o", 60, true);
+    expect(stripHtml(w, "")).toContain("<span>go</span>__</b>");
+    for (const [mode, mean] of [["learn", '<small class="td-mean">lạnh; rét /koʊld/</small>'], ["balanced", ""]] as const) {
+      const other = world({ deck, mode });
+      callWord(other, 1);
+      type(other, "c", 60, true);
+      expect(stripHtml(other, "")).toContain('<b class="td-word"><span>c</span>old</b>' + mean + "<span");
+    }
+  });
+});
+
+describe("cards and buttons (BUILD_1A6 §8–§9)", () => {
+  it("the farm's card: plots by stage, seeds, a pack, the auto-buy; the Bastion's: villagers, builders, food, hire, sale; a tower's: power charges", () => {
+    const w = world({ gold: 1000 });
+    const sel = new Selection(w, () => undefined);
+    send(w, { t: "sandbox", op: { op: "preset" } });
+    const card = (id: string) => {
+      sel.focus = w.buildings.id(w.buildings.live().find((b) => w.c.buildings[w.buildings.def[b]!]!.id === id)!);
+      return dockHtml(w, sel);
+    };
+    const farm = card("farm");
+    for (const text of ["Chín <b>1</b> · Lớn <b>2</b> · Trống <b>1</b>", "Hạt giống <b>", "Mua 4 hạt · 30 vàng", 'class="is-on">Tự mua hạt']) expect(farm).toContain(text);
+    for (const text of ["Dân <b>5/7</b> · Thợ xây <b>3</b> · Lúa <b>0</b>", "Thuê dân · 25 vàng, 5 lúa", "Bán 10 Lúa · +10 vàng"]) expect(card("keep")).toContain(text);
+    expect(card("archer")).toContain("Lượt mạnh <b>0/5</b>");
+  });
+
+  it("the card of a dim call Tab is on names it and sends the agent; the actions bar has Space only where the mode pauses", () => {
+    const w = world({ gold: 1000 });
+    const mine = built(w, "gold-mine", 26, -30);
+    [w.buildings.haulAt[mine], w.buildings.pile[mine]] = [1e9, 31000];
+    run(w, 1);
+    const sel = new Selection(w, () => undefined);
+    sel.call = w.calls.id(w.buildings.call[mine]!);
+    expect(dockHtml(w, sel)).toMatch(/⛏️ Đào.*2 từ · đang mờ.*Gửi Draconis/s);
+    expect(actionsHtml(w, false)).not.toContain("Space");
+    send(w, { t: "sandbox", op: { op: "mode", value: "relax" } });
+    expect([actionsHtml(w, false), actionsHtml(w, true)].map((html) => /data-act="space">([^<]+)/.exec(html)?.[1])).toEqual(["Tạm dừng", "Chạy tiếp"]);
   });
 });

@@ -8,11 +8,11 @@
 import { isComposingKey, typedLetter, vietnameseInputSign } from "../../scene3d/keys";
 import type { CommandBody } from "../sim/commands";
 
-/** Command keys by event.code, "Shift" + code with Shift held; "" swallows the key (BUILD_1A6 §8: no tempo keys). */
+/** Command keys by event.code, "Shift" + code with Shift held (BUILD_1A6 §8: no tempo keys; Space pauses only in relax and learn, else it is swallowed). */
 export const KEY_ACTIONS: Readonly<Record<string, string>> = {
   Digit1: "pick:1", Digit2: "pick:2", Digit3: "pick:3", Digit4: "pick:4", Digit5: "pick:5", Digit0: "recall", Backquote: "cycle",
   Tab: "next", ShiftTab: "prev", Enter: "send", NumpadEnter: "send", ShiftEnter: "night",
-  Insert: "build", Backslash: "build", ShiftInsert: "hire", ShiftBackslash: "hire", Delete: "undo", Escape: "escape", Pause: "pause", F9: "sandbox", Space: "",
+  Insert: "build", Backslash: "build", ShiftInsert: "hire", ShiftBackslash: "hire", Delete: "undo", Escape: "escape", Pause: "pause", F9: "sandbox", Space: "space",
   ArrowLeft: "pan:1:0", ArrowRight: "pan:-1:0", ArrowUp: "pan:0:1", ArrowDown: "pan:0:-1",
 };
 
@@ -34,15 +34,15 @@ export function installKeys(target: Window, keys: { send(command: CommandBody): 
     event.preventDefault();
     if (typeof action === "number") keys.send({ t: "key", letter: action, atMs: event.timeStamp });
     else if (action === "backspace") keys.send({ t: "backspace", atMs: event.timeStamp });
-    else if (action !== "") keys.act(action);
+    else keys.act(action);
   });
 }
 
 type Spot = { x: number; z: number };
 type Camera = { panBy(dx: number, dy: number): void; zoomAt(x: number, y: number, factor: number): void; unproject(x: number, y: number): Spot };
 
-/** On the map a press that moves under 6 px is a click; a left or middle drag pans, the wheel zooms. */
-export function installPointer(canvas: HTMLCanvasElement, camera: Camera, hand: { pointer(p: Spot): void; click(p: Spot, right: boolean): void }): void {
+/** On the map a press that moves under 6 px is a click (at a field point and a screen point); a left or middle drag pans, the wheel zooms. */
+export function installPointer(canvas: HTMLCanvasElement, camera: Camera, hand: { pointer(p: Spot): void; click(p: Spot, right: boolean, screen: { x: number; y: number }): void }): void {
   let down: { x: number; y: number; button: number; drag: boolean } | null = null;
   canvas.addEventListener("contextmenu", (event) => event.preventDefault());
   canvas.addEventListener("pointerdown", (event) => {
@@ -61,7 +61,7 @@ export function installPointer(canvas: HTMLCanvasElement, camera: Camera, hand: 
     down.y = event.clientY;
   });
   canvas.addEventListener("pointerup", (event) => {
-    if (down !== null && !down.drag && down.button !== 1) hand.click(camera.unproject(event.clientX, event.clientY), down.button === 2);
+    if (down !== null && !down.drag && down.button !== 1) hand.click(camera.unproject(event.clientX, event.clientY), down.button === 2, { x: event.clientX, y: event.clientY });
     down = null;
   });
   canvas.addEventListener("wheel", (event) => {

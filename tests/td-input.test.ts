@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { installKeys, KEY_ACTIONS, keyAction } from "../src/td/app/input";
 import { Selection } from "../src/td/app/selection";
+import { Session } from "../src/td/app/session";
 import type { CommandBody } from "../src/td/sim/commands";
 import { BUILD } from "../src/td/content/rules";
 import { canPlace, nextSpot, spotCandidates } from "../src/td/sim/placement";
@@ -8,6 +9,7 @@ import { CELL } from "../src/td/sim/nav/grid";
 import { FARM } from "../src/td/content/rules";
 import { MODE } from "../src/td/sim/stores/agents";
 import { PLOT } from "../src/td/sim/stores/buildings";
+import { CALL_STATE } from "../src/td/sim/stores/calls";
 import { NPC_KIND } from "../src/td/sim/stores/npcs";
 import { stand } from "../src/td/sim/systems/agents";
 import { countNpcs, plotAt } from "../src/td/sim/systems/economy";
@@ -33,7 +35,7 @@ describe("keys by event.code (BUILD_NOW §5.4)", () => {
       [{ key: "5", code: "Digit5" }, "pick:5"], [{ key: "Insert", code: "Insert" }, "build"], [{ key: "\\", code: "Backslash" }, "build"],
       [{ key: "Insert", code: "Insert", shiftKey: true }, "hire"], [{ key: "|", code: "Backslash", shiftKey: true }, "hire"],
       [{ key: "Delete", code: "Delete" }, "undo"], [{ key: "Escape", code: "Escape" }, "escape"], [{ key: "Pause", code: "Pause" }, "pause"],
-      [{ key: "F9", code: "F9" }, "sandbox"], [{ key: " ", code: "Space" }, ""], [{ key: "ArrowLeft", code: "ArrowLeft" }, "pan:1:0"],
+      [{ key: "F9", code: "F9" }, "sandbox"], [{ key: " ", code: "Space" }, "space"], [{ key: "ArrowLeft", code: "ArrowLeft" }, "pan:1:0"],
       [{ key: "ArrowDown", code: "ArrowDown" }, "pan:0:-1"], [{ key: "Backspace", code: "Backspace" }, "backspace"],
     ];
     for (const [event, action] of expected) expect(press(event), JSON.stringify(event)).toBe(action);
@@ -58,13 +60,14 @@ describe("keys by event.code (BUILD_NOW §5.4)", () => {
       { key: "a", code: "KeyA", isComposing: true }, { key: "Process", code: "KeyA", keyCode: 229 }, { key: "Enter", code: "Enter", isComposing: true },
       { key: "1", code: "Digit1", keyCode: 229 }, { key: "a", code: "KeyA", repeat: true }, { key: "Tab", code: "Tab", repeat: true },
       { key: "Backspace", code: "Backspace", repeat: true }, { key: "a", code: "KeyA", ctrlKey: true }, { key: "1", code: "Digit1", altKey: true },
-      { key: "Enter", code: "Enter", metaKey: true }, { key: "a", code: "KeyA", isTrusted: false },
+      { key: "Enter", code: "Enter", metaKey: true }, { key: "a", code: "KeyA", isTrusted: false }, { key: " ", code: "Space", isComposing: true },
+      { key: "Process", code: "Space", keyCode: 229 }, { key: " ", code: "Space", repeat: true }, { key: "|", code: "Backslash", shiftKey: true, isComposing: true },
     ]) expect(press(event), JSON.stringify(event)).toBeNull();
     expect(press({ key: "ArrowUp", code: "ArrowUp", repeat: true })).toBe("pan:0:1");
     expect(press({ key: "a", code: "KeyA", isTrusted: false }, true)).toBe(0);
   });
 
-  it("installKeys: letters and Backspace become commands with the key's time, actions go to the selection, Space is only swallowed, a Vietnamese sign is reported", () => {
+  it("installKeys: letters and Backspace become commands with the key's time, actions (Space too) go to the selection, a Vietnamese sign is reported", () => {
     const sent: CommandBody[] = [];
     const acts: string[] = [];
     let vietnamese = 0;
@@ -81,23 +84,25 @@ describe("keys by event.code (BUILD_NOW §5.4)", () => {
     expect(fire({ key: "Process", code: "KeyA", keyCode: 229 })).toBe(false);
     expect(fire({ key: "F5", code: "F5" })).toBe(false);
     expect(sent).toEqual([{ t: "key", letter: 0, atMs: 10 }, { t: "backspace", atMs: 10 }]);
-    expect(acts).toEqual(["next"]);
+    expect(acts).toEqual(["space", "next"]);
     expect(vietnamese).toBe(2);
   });
 });
 
-/** A world, its selection, and a step that applies what the selection sent (like a frame). */
+/** A world, its selection, and a step that applies what the selection sent (like a frame); `applied` is what the last step took. */
 function hand(options: Parameters<typeof world>[0] = {}) {
   const w = world(options);
   const sent: CommandBody[] = [];
+  const applied: CommandBody[] = [];
   const sel = new Selection(w, (command) => sent.push(command));
   const keys = (...actions: string[]) => {
     for (const action of actions) sel.act(action);
+    applied.splice(0, applied.length, ...sent);
     const events = send(w, ...sent.splice(0));
     sel.update();
     return events;
   };
-  return { w, sel, sent, keys };
+  return { w, sel, sent, applied, keys };
 }
 
 describe("a keyboard path for every task (BUILD_NOW §5.4, BUILD_1A6 §8)", () => {
@@ -265,6 +270,86 @@ describe("the mouse and the commands it sends", () => {
   });
 });
 
+describe("the tactical pause (BUILD_1A6 §8)", () => {
+  it("Space pauses the relax and learn modes and goes on again; elsewhere it does nothing; a mode without it ends it", () => {
+    for (const mode of ["relax", "learn"] as const) {
+      const { sel, keys } = hand({ mode });
+      keys("space");
+      expect([sel.tactical, sel.halted, sel.paused]).toEqual([true, true, false]);
+      keys("space");
+      expect([sel.tactical, sel.halted]).toEqual([false, false]);
+    }
+    for (const mode of ["balanced", "challenge"] as const) {
+      const { sel, keys } = hand({ mode });
+      keys("space");
+      expect([sel.tactical, sel.halted]).toEqual([false, false]);
+    }
+    const { sel, keys } = hand({ mode: "learn" });
+    keys("space", "pause");
+    expect([sel.tactical, sel.paused]).toEqual([false, false]); // the HUD's ▶ goes on
+    keys("space", "sb:mode:balanced");
+    expect(sel.tactical).toBe(false);
+  });
+
+  it("paused, the session steps nothing and holds what the hand sends; it acts on the next tick once the game runs again", () => {
+    const session = new Session({ seed: 1, mode: "relax" });
+    const sel = new Selection(session.world, (command) => session.send(command));
+    session.frame(0);
+    sel.act("space");
+    session.paused = sel.halted;
+    sel.act("seeds"); // a farm card's button, pressed while paused
+    sel.act("build");
+    sel.act("send");
+    expect([session.frame(1000), session.world.tick, session.log, sel.building]).toEqual([0, 0, [], false]);
+    sel.act("space");
+    session.paused = sel.halted;
+    expect(session.frame(1017)).toBe(1);
+    expect(session.log.map((command) => [command.t, command.tick])).toEqual([["buySeeds", 0], ["build", 0]]);
+    expect([session.world.seeds, session.world.buildings.live(1).length]).toEqual([8, 1]);
+  });
+});
+
+describe("Tab and clicks to calls (BUILD_1A6 §8)", () => {
+  /** A ready mine on N1 whose pile calls for help; the hero by the Bastion, too far to light it. */
+  function dimMine() {
+    const h = hand({ gold: 1000 });
+    const mine = built(h.w, "gold-mine", 26, -30);
+    [h.w.buildings.haulAt[mine], h.w.buildings.pile[mine]] = [1e9, 31000];
+    run(h.w, 1);
+    const c = h.w.buildings.call[mine]!;
+    expect([h.w.calls.state[c], h.w.calls.bright[c]]).toEqual([CALL_STATE.open, 0]);
+    return { ...h, mine, c };
+  }
+
+  it("Tab goes through the buildings, then the dim calls, each nearest the agent first; Enter sends the agent by the call's building", () => {
+    const { w, sel, keys, mine, c } = dimMine();
+    const seen = [1, 2, 3, 4].map(() => (keys("next"), [sel.focus, sel.call]));
+    expect(seen).toEqual([[w.buildings.id(0), -1], [w.buildings.id(mine), -1], [-1, w.calls.id(c)], [w.buildings.id(0), -1]]);
+    keys("prev");
+    expect([sel.focus, sel.call]).toEqual([-1, w.calls.id(c)]);
+    expect(keys("send").find((event) => event.t === "agentOrdered")).toMatchObject({ agent: 0, building: w.buildings.id(mine) });
+    keys("escape");
+    expect(sel.call).toBe(-1);
+  });
+
+  it("a click on an NPC sends the agent: by its call, by its farm, or where it stands; a call's bubble (toCall) the same way", () => {
+    const { w, sel, keys, applied, mine, c } = dimMine();
+    const farm = built(w, "farm", -17, 40);
+    const farmer = w.buildings.farmer[farm]!;
+    sel.click({ x: w.npcs.x[farmer]! + 0.3, z: w.npcs.z[farmer]! }, false);
+    expect(keys().find((event) => event.t === "agentOrdered")).toMatchObject({ building: w.buildings.id(farm) });
+    const villager = w.npcs.live().find((n) => w.npcs.kind[n] === NPC_KIND.villager)!;
+    const [x, z] = [w.npcs.x[villager]!, w.npcs.z[villager]!];
+    sel.click({ x, z }, false);
+    keys();
+    expect(applied).toEqual([{ t: "move", agent: 0, qx: q(x), qz: q(z) }]);
+    sel.toCall(w.calls.id(c));
+    expect(keys().find((event) => event.t === "agentOrdered")).toMatchObject({ building: w.buildings.id(mine) });
+    sel.toCall(-1); // a call gone: nothing
+    expect(keys().filter((event) => event.t === "agentOrdered")).toEqual([]);
+  });
+});
+
 describe("clicks on trees and plots (BUILD_1A6 §8)", () => {
   it("a click on a standing tree marks it, again unmarks it; a click on a ripe plot asks the farmer for it first", () => {
     const { w, sel, keys } = hand({ gold: 1000 });
@@ -299,6 +384,8 @@ describe("the sandbox preset and the suggested spots", () => {
     expect(countNpcs(w, NPC_KIND.villager)).toBe(5);
     expect(countNpcs(w, NPC_KIND.builder)).toBe(3);
     expect(countNpcs(w, NPC_KIND.farmer)).toBe(1);
+    const farm = B.live().find((b) => w.c.buildings[B.def[b]!]!.farm)!;
+    expect([0, 1, 2, 3].map((p) => [B.plot[farm * FARM.plots + p], Math.round(B.plotWork[farm * FARM.plots + p]! * 100) / 100])).toEqual([[PLOT.ripe, 0], [PLOT.growing, 0.7], [PLOT.growing, 0.3], [PLOT.empty, 0]]); // every stage at once
     expect(w.trees.marked.reduce((sum, m) => sum + m, 0)).toBe(8);
     keys("sb:preset");
     expect([B.live(1).length, countNpcs(w, NPC_KIND.villager), w.trees.marked.reduce((sum, m) => sum + m, 0)]).toEqual([5, 5, 8]);

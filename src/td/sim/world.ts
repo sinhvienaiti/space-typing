@@ -50,13 +50,13 @@ export type PendingShot = { b: number; power: number; crit: boolean; word: numbe
 /**
  * The typing state of a run (TK 25.8): bags by the band's top length (a power
  * word takes a shorter band); the chain; the shots words asked for this tick;
- * and a ring of the last 20 s, 1 for each tick with a lock, with its sum
- * (BUILD_1A6 §5.3).
+ * a ring of the last 20 s, 1 for each tick with a lock, with its sum
+ * (BUILD_1A6 §5.3); the review book, deck words oldest first (§7).
  */
 function createTyping(deck: Deck) {
   return {
     deck, letters: new Letters(), router: { lock: -1, group: -1 } as Router, bags: [] as (Bag | undefined)[],
-    chain: 0, shots: [] as PendingShot[], typed: new Uint8Array(ticks(CALL.windowS)), typedSum: 0,
+    chain: 0, shots: [] as PendingShot[], typed: new Uint8Array(ticks(CALL.windowS)), typedSum: 0, review: new Int32Array(CALL.review), reviewN: 0,
   };
 }
 
@@ -188,7 +188,7 @@ export function step(w: World, commands: readonly Command[] = []): void {
   meleeStep(w); // 7: melee
   projectilesStep(w); // 8
   statusStep(w); // 9
-  economyStep(w); // 10: farms, trees, sites, mines, power calls
+  economyStep(w); // 10: farms, trees, sites, mines, power calls, quizzes
   attentionStep(w); // 11: calls open, light, get words
   deathsStep(w); // 15
   phaseStep(w); // 17

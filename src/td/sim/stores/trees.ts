@@ -1,7 +1,7 @@
 /**
  * The map's trees (BUILD_1A6 §4.2), by map index: standing until felled (a
  * stump after, which blocks nothing), marked for the villagers, chopped by at
- * most one villager (`worker`, −1 none); `progress` 0–1 of the chop.
+ * most one villager (`worker`, −1 none, −2 no way there); `progress` 0–1 of the chop.
  */
 export class TreeStore {
   readonly standing: Uint8Array;

@@ -62,26 +62,36 @@ function act(action: string): void {
 const hud = new Hud(byId("tdHud"), act);
 for (const type of ["pointerdown", "keydown"]) window.addEventListener(type, () => audio.resume());
 installKeys(window, {
-  // Paused, nothing is typed: words wait behind the blur.
+  // Paused (Esc, or Space's tactical pause), nothing is typed: words wait.
   send: (command) => {
-    if (!selection.paused) session.send(command);
+    if (!selection.halted) session.send(command);
   },
   act,
   onVietnamese: () => (imeWarning = true),
   allowUntrusted: params.get("untrusted") === "1",
 });
-installPointer(canvas, view, selection);
+installPointer(canvas, view, {
+  pointer: (p) => selection.pointer(p),
+  // A call's bubble (a word card, or a dim one on the map) sends the agent there (BUILD_1A6 §8).
+  click: (p, right, at) => {
+    const call = right || selection.building ? -1 : Math.max(cards.callAt(at.x, at.y), view.callAt(at.x, at.y));
+    if (call >= 0) selection.toCall(call);
+    else selection.click(p, right);
+  },
+});
 
 function showHud(): void {
   const refused = [...recent].reverse().find((event) => event.t === "rejected" && world.tick - event.tick < 150);
-  const notices = [imeWarning ? "Tắt bộ gõ tiếng Việt để gõ" : "", source === "fallback" ? "Từ dự phòng (máy chủ không có từ vựng)" : ""];
+  const notices = [
+    selection.tactical ? "Tạm dừng chiến thuật · Space để chạy tiếp" : "", imeWarning ? "Tắt bộ gõ tiếng Việt để gõ" : "", source === "fallback" ? "Từ dự phòng (máy chủ không có từ vựng)" : "",
+  ];
   hud.update([
-    statusHtml(world, sandbox, selection.paused, audio.muted, notices.filter((notice) => notice !== "")),
+    statusHtml(world, sandbox, selection.halted, audio.muted, notices.filter((notice) => notice !== "")),
     sandbox && selection.panel ? sandboxHtml(world) : "",
     teamHtml(world, selection.agent),
     stripHtml(world, refused?.t === "rejected" ? (REASON[refused.reason] ?? refused.reason) : ""),
     dockHtml(world, selection),
-    actionsHtml(),
+    actionsHtml(world, selection.tactical),
   ]);
   document.body.classList.toggle("is-paused", selection.paused);
 }
@@ -112,7 +122,7 @@ runFrameLoop({
   update(now) {
     timed(costs.update, () => {
       selection.update();
-      session.paused = selection.paused;
+      session.paused = selection.halted;
       session.frame(now);
       const fresh = world.events.rare.splice(0);
       cards.read(fresh, world, now);
@@ -157,7 +167,7 @@ installDevHandle({
     }));
   },
   typing: () => ({ chain: world.typing.chain, lock: world.typing.router.lock, typedTicks: world.typing.typedSum }),
-  ui: () => ({ agent: selection.agent, focus: selection.focus, building: selection.building, kind: selection.kind, paused: selection.paused, panel: selection.panel }),
+  ui: () => ({ agent: selection.agent, focus: selection.focus, call: selection.call, building: selection.building, kind: selection.kind, paused: selection.paused, tactical: selection.tactical, panel: selection.panel }),
   // Agents: hero first; mode as MODE in sim/stores/walkers.ts; goal a building id (−1 none); path: x, z, x, z… ahead. Calls: kind as CALL_KIND.
   state: () => {
     const { buildings: B, units: U, agents: A, npcs: N, calls: C } = world;
@@ -175,7 +185,8 @@ installDevHandle({
         path: Array.from(A.path.subarray((a * PATH_MAX + A.next[a]!) * 2, (a * PATH_MAX + A.pathN[a]!) * 2)),
       })),
       npcs: N.live().map((n) => ({ kind: N.kind[n]!, task: N.task[n]!, job: N.job[n]!, x: N.x[n]!, z: N.z[n]! })),
-      calls: C.live().map((c) => ({ id: C.id(c), kind: C.kind[c]!, open: C.state[c] === 1, bright: C.bright[c] === 1, words: C.words[c]!, done: C.done[c]!, x: C.x[c]!, z: C.z[c]! })),
+      calls: C.live().map((c) => ({ id: C.id(c), kind: C.kind[c]!, open: C.state[c] === 1, bright: C.bright[c] === 1, words: C.words[c]!, done: C.done[c]!, x: C.x[c]!, z: C.z[c]!, agent: C.agent[c]! })),
+      review: Array.from(world.typing.review.subarray(0, world.typing.reviewN), (word) => wordText(deck, word)),
       trees: world.map.trees.map(([x, z], t) => ({ x, z, standing: world.trees.standing[t] === 1, marked: world.trees.marked[t] === 1 })),
     };
   },

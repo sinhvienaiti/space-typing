@@ -1,20 +1,22 @@
 /**
  * The AttentionDirector (BUILD_1A6 §5.3; 25.6 step 11), inside the sim so a
  * replay sees what the player saw. Each tick: the ticks typed in the last
- * 20 s (a tick with a lock is a typing tick); calls that ran out close (the
- * locked one waits for its word); open calls follow their maker, and a
+ * 20 s (a tick with a lock is a typing tick); calls that ran out, and
+ * quizzes once the day is over, close (the locked one waits for its word);
+ * open calls follow their maker, and a
  * bright one that leaves every help ring dims and gives its word back (the
  * locked one stays bright). The cap counts
  * bright calls only: a dim call holds nothing, so calls nobody answers never
  * keep others waiting. While fewer than the mode's cap are bright, queued
  * calls open and open calls in a ring light, by priority (power, build, then
  * harvest = chop = mine, then quiz; older first): over the typing budget only
- * power and build, at night no quiz and one economy call bright at a time.
- * Last, every bright call without a word gets one.
+ * power and build, at night no quiz and one economy call bright at a time. At
+ * the cap a quiz nobody is typing dims for another call in a ring. Last,
+ * every bright call without a word gets one.
  */
 import { ticks } from "../../content/compile";
 import { CALL, MODES } from "../../content/rules";
-import { CALL_RANK, CALL_STATE } from "../stores/calls";
+import { CALL_KIND, CALL_RANK, CALL_STATE } from "../stores/calls";
 import type { World } from "../world";
 import { closeCall, dropWord, giveWord, lit, placeCall } from "./calls";
 
@@ -41,7 +43,7 @@ export function attentionStep(w: World): void {
   let economy = 0;
   for (let c = 0; c < C.top; c += 1) {
     if (C.used[c] === 0) continue;
-    if (c !== locked && C.expire[c]! >= 0 && w.tick >= C.expire[c]!) {
+    if (c !== locked && ((C.expire[c]! >= 0 && w.tick >= C.expire[c]!) || (C.kind[c] === CALL_KIND.quiz && w.phase !== "day"))) {
       closeCall(w, c);
       continue;
     }
@@ -53,17 +55,27 @@ export function attentionStep(w: World): void {
   }
   const mode = MODES[w.mode];
   const over = T.typedSum > ticks(mode.typeS);
-  // Each round opens a queued call or lights one in a ring, so it ends; at the cap new calls wait queued (CHỜ).
-  while (bright < mode.open) {
+  // Each round opens a queued call or lights one in a ring, so it ends; at the cap new calls wait queued (CHỜ),
+  // except that a quiz no one is typing gives its place to another call in a ring (a quiz may be skipped: §4.5 of
+  // the plan; helpers' quizzes, always in their own ring, would otherwise hold the cap).
+  for (;;) {
+    const full = bright >= mode.open;
+    let quiz = -1;
+    for (let c = 0; full && c < C.top; c += 1) if (C.used[c] === 1 && C.bright[c] === 1 && C.kind[c] === CALL_KIND.quiz && c !== locked) quiz = c;
+    if (full && quiz < 0) break;
     let best = -1;
     for (let c = 0; c < C.top; c += 1) {
-      if (C.used[c] === 0 || C.bright[c] === 1 || (C.state[c] === CALL_STATE.open && !lit(w, c, locked))) continue;
+      if (C.used[c] === 0 || C.bright[c] === 1 || ((full || C.state[c] === CALL_STATE.open) && !lit(w, c, locked))) continue;
       const rank = CALL_RANK[C.kind[c]!]!;
-      if ((over && rank >= ECONOMY_RANK) || (night && (rank === QUIZ_RANK || (rank === ECONOMY_RANK && economy >= CALL.nightEconomy)))) continue;
+      if ((full && rank === QUIZ_RANK) || (over && rank >= ECONOMY_RANK) || (night && (rank === QUIZ_RANK || (rank === ECONOMY_RANK && economy >= CALL.nightEconomy)))) continue;
       const bestRank = best < 0 ? 99 : CALL_RANK[C.kind[best]!]!;
       if (rank < bestRank || (rank === bestRank && C.born[c]! < C.born[best]!)) best = c;
     }
     if (best < 0) break;
+    if (full) {
+      light(w, quiz, false);
+      bright -= 1;
+    }
     if (C.state[best] === CALL_STATE.queued) {
       C.state[best] = CALL_STATE.open;
       w.events.rare.push({ t: "call", tick: w.tick, call: C.id(best), kind: C.kind[best]!, state: "open" });

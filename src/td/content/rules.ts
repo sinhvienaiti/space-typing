@@ -52,11 +52,12 @@ export const CHAIN = {
 
 /**
  * §5.1: words a call asks for (build by footprint, an upgrade 3), what a sloppy word's share of the work keeps,
- * the power call's life. §5.3: the attention window, and how many economy calls the night keeps open.
+ * the power call's life. §5.3: the attention window, and how many economy calls the night keeps open. §6–§7: a
+ * helper's quiz every 25 s by day; the review book holds 20 words, a word with 2 errors goes in like a sloppy one.
  */
 export const CALL = {
   words: { harvest: 3, chop: 4, mine: 2, power: 1, quiz: 1, upgrade: 3, build: { S: 2, M: 3, L: 4, XL: 4 } },
-  sloppy: 0.6, powerLifeS: 6, windowS: 20, nightEconomy: 1,
+  sloppy: 0.6, powerLifeS: 6, windowS: 20, nightEconomy: 1, quizEveryS: 25, review: 20, reviewErrors: 2,
 } as const;
 /** A power word's Word Shot (TK 6.11): D̄ × (0.8 + 1.2·Q) × lenF, lenF = clamp((len + 1)/6; 0.8; 1.2). */
 export const REWARD = { lenDiv: 6, lenMin: 0.8, lenMax: 1.2, shotQ: [0.8, 1.2] } as const;
@@ -101,8 +102,8 @@ export const BUILD = {
 /** TK 13. Soldiers walk at `speed` m/s (not in the design; a starting number); §4.6: a respawn eats 1 food, or takes twice as long without. */
 export const SOLDIER = { respawnS: 10, engageM: 3, leashM: 5, regenPctS: 0.05, regenDelayS: 3, maxPerEnemy: 3, spacingM: 1.2, speed: 4.0, contactM: 0.5, food: 1 } as const;
 export const RALLY = { radiusM: 12, roadMaxM: 3 } as const;
-/** §10 "Đặt sẵn": Bastion level, villagers, and how many trees nearest the Bastion are marked. */
-export const PRESET = { keepLevel: 3, villagers: 5, marks: 8 } as const;
+/** §10 "Đặt sẵn": Bastion level, villagers, how many trees nearest the Bastion are marked; the farm's plots (stage, work) so it shows every stage at once. */
+export const PRESET = { keepLevel: 3, villagers: 5, marks: 8, plots: [[2, 0], [1, 0.7], [1, 0.3], [0, 0]] } as const;
 
 /** TK 14.2: what each tier's gold and leak may be. */
 export const TIERS = {

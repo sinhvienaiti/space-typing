@@ -3,11 +3,11 @@
  * layout. A building's words stack in a column above its roof, newest at the
  * bottom: height is the clock (120 px over the word's life), each card at
  * least 40 px above the one below it, the column at most 240 px. Columns that
- * overlap side by side push each other sideways only (up to 160 px each) and
- * stay inside the safe area. Screen pixels throughout, so zoom never changes
- * the spacing.
+ * overlap side by side push each other sideways only (up to 240 px each: four
+ * call bubbles over villagers at neighbouring trees, BUILD_1A6 §9) and stay
+ * inside the safe area. Screen pixels throughout, so zoom never changes the spacing.
  */
-export const COLUMN = { rise: 120, gap: 40, max: 240, push: 160, clear: 10 } as const;
+export const COLUMN = { rise: 120, gap: 40, max: 240, push: 240, clear: 10 } as const;
 
 /** Heights (px above the roof) of a column's cards, newest first: `ages` and `lives` in seconds; `gap` at least 40 px. */
 export function columnHeights(ages: readonly number[], lives: readonly number[], out: number[], gap: number = COLUMN.gap): number[] {

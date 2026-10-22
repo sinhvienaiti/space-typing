@@ -35,7 +35,7 @@ describe("the column rule", () => {
 describe("the lane spreader", () => {
   const box = (x: number, top = 100, bottom = 300, half = 50): LaneBox => ({ x, top, bottom, half });
 
-  it("pushes overlapping columns apart sideways, the left one left, at most 160 px each", () => {
+  it("pushes overlapping columns apart sideways, the left one left, at most COLUMN.push (240 px) each", () => {
     const out = spreadLanes([box(640), box(660)], 0, 1280, []);
     expect(out[0]).toBeLessThan(0);
     expect(out[1]).toBeGreaterThan(0);

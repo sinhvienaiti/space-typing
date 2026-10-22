@@ -2,7 +2,8 @@
  * The workers (BUILD_1A6 §4; 25.6 step 10), day and night alike. Farmers
  * sow, wait and harvest; villagers chop trees; builders put up sites; mines
  * fill their pile and the miner hauls a basket every 10 s; at night towers
- * with an enemy in reach call for power. Work that starts makes its call,
+ * with an enemy in reach call for power; by day the helpers ask quizzes from
+ * the review book. Work that starts makes its call,
  * whose words push the same work (calls.ts): a job ends whichever way gets
  * there first, and a worker within 6 m of a helper works ×1.5.
  */
@@ -16,7 +17,7 @@ import { addAt, DONE } from "../stores/slots";
 import { NPC_KIND, TASK } from "../stores/npcs";
 import { MODE } from "../stores/walkers";
 import type { World } from "../world";
-import { passive, stand, toward, walk, walkTo } from "./agents";
+import { passive, slotsOpen, stand, toward, walk, walkTo } from "./agents";
 import { closeCall, endWork, makeCall } from "./calls";
 import { selectTargets } from "./combat";
 
@@ -143,7 +144,7 @@ function chooseTree(w: World, n: number): number {
   let bestD = Infinity;
   for (const marked of [1, 0]) {
     for (let t = 0; t < T.count; t += 1) {
-      if (T.standing[t] === 0 || T.worker[t]! >= 0 || T.marked[t] !== marked) continue;
+      if (T.standing[t] === 0 || T.worker[t] !== -1 || T.marked[t] !== marked) continue;
       const [fx, fz] = marked === 1 ? [w.npcs.x[n]!, w.npcs.z[n]!] : [kx, kz];
       const d = (trees[t]![0] - fx) * (trees[t]![0] - fx) + (trees[t]![1] - fz) * (trees[t]![1] - fz);
       if (d < bestD && (marked === 1 || d <= TREE.nearKeepM * TREE.nearKeepM)) {
@@ -156,7 +157,7 @@ function chooseTree(w: World, n: number): number {
   return -1;
 }
 
-/** §4.2: an idle villager walks (A*) to its tree, chops it in 20 s (a 4-word call); it falls for 8 wood at once. */
+/** §4.2: an idle villager walks (A*) to its tree, chops it in 20 s (a 4-word call); it falls for 8 wood at once. A tree with no way to it is left (−2) until marked again. */
 function villager(w: World, n: number): void {
   const N = w.npcs;
   const T = w.trees;
@@ -166,10 +167,11 @@ function villager(w: World, n: number): void {
     const [x, z] = w.map.trees[t]!;
     const spot = socketCell(w, x, z, TREE.radiusM);
     const open = spot >= 0 && w.grid.cells[spot] === 0;
-    T.worker[t] = n;
+    walkTo(w, N, n, open ? w.grid.centerX(spot) : x, open ? w.grid.centerZ(spot) : z);
+    T.worker[t] = N.mode[n] === MODE.walk || (N.x[n] === N.gx[n] && N.z[n] === N.gz[n]) ? n : -2;
+    if (T.worker[t] === -2) return;
     N.job[n] = t;
     N.task[n] = TASK.going;
-    walkTo(w, N, n, open ? w.grid.centerX(spot) : x, open ? w.grid.centerZ(spot) : z);
   }
   const t = N.job[n]!;
   if (N.task[n] === TASK.going) {
@@ -266,6 +268,19 @@ function power(w: World, b: number): void {
   B.call[b] = makeCall(w, CALL_KIND.power, CALL.words.power, -1, b, -1, -1, ticks(CALL.powerLifeS));
 }
 
+/** §6, §7: by day each helper out asks a quiz (1 word, at the helper) every 25 s while the review book holds more words than quizzes ask. */
+function quizzes(w: World): void {
+  const A = w.agents;
+  const C = w.calls;
+  if (w.phase !== "day" || w.typing.reviewN === 0) return;
+  for (let a = 1; a < slotsOpen(w); a += 1) {
+    const asked = C.live().filter((c) => C.kind[c] === CALL_KIND.quiz);
+    if (w.tick < A.quizAt[a]! || asked.length >= w.typing.reviewN || asked.some((c) => C.agent[c] === a)) continue;
+    A.quizAt[a] = w.tick + ticks(CALL.quizEveryS);
+    makeCall(w, CALL_KIND.quiz, CALL.words.quiz, -1, -1, -1, -1, -1, a);
+  }
+}
+
 export function economyStep(w: World): void {
   const B = w.buildings;
   for (let b = 0; b < B.top; b += 1) {
@@ -281,4 +296,5 @@ export function economyStep(w: World): void {
     if (N.kind[n] === NPC_KIND.villager) villager(w, n);
     else if (N.kind[n] === NPC_KIND.builder) builder(w, n);
   }
+  quizzes(w);
 }

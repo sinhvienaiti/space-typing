@@ -21,7 +21,7 @@ export function sandboxHtml(w: World): string {
     seg("Lũy", "sb:keepLevel", ["1", "2", "3", "4"], ["1", "2", "3", "4"], String(w.buildings.level[0])) +
     `<div class="td-row"><small>Kho</small>${button("sb:gold:100", "+100 vàng")}${button("sb:gold:1000", "+1000")}${button("sb:wood:50", "+50 gỗ")}</div>` +
     `<div class="td-row"><small>Tốc E</small>${[-5, -1, 1, 5].map((d) => button("sb:expected:" + Math.max(12, Math.min(140, w.expected + d)), (d > 0 ? "+" : "−") + Math.abs(d))).join("")}<b>${w.expected}</b></div>` +
-    seg("Chế độ", "sb:mode", MODE_IDS, ["Thư giãn", "Cân bằng", "Thử thách", "Học"], w.mode) +
+    seg("Chế độ", "sb:mode", MODE_IDS, ["Thư giãn", "Cân bằng", "Thử thách", "Học"], w.mode, true) +
     seg("Từ vựng", "sb:vocab", ["1", "3", "5"], ["Cấp 1", "1–3", "1–5"], String(w.vocab)) +
     seg("Tốc game", "sb:speed", ["0.75", "1", "2"], ["0,75×", "1×", "2×"], String(w.speed)) +
     `<div class="td-row">${button("sb:preset", "Đặt sẵn")}${button("sb:night", "Sinh đêm")}</div>`

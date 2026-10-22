@@ -49,17 +49,18 @@ function bagFor(w: World, power: boolean): Bag {
   return (w.typing.bags[hi] ??= createBag(bandWords(w.typing.deck, w.vocab, lo, hi)));
 }
 
-/** A call follows whoever makes it: its NPC, else its building. */
+/** A call follows whoever makes it: its NPC, its helper (a quiz), else its building. */
 export function placeCall(w: World, c: number): void {
   const C = w.calls;
   const npc = C.npc[c]!;
-  C.x[c] = npc >= 0 ? w.npcs.x[npc]! : w.buildings.x[C.b[c]!]!;
-  C.z[c] = npc >= 0 ? w.npcs.z[npc]! : w.buildings.z[C.b[c]!]!;
+  const a = C.agent[c]!;
+  C.x[c] = npc >= 0 ? w.npcs.x[npc]! : a >= 0 ? w.agents.x[a]! : w.buildings.x[C.b[c]!]!;
+  C.z[c] = npc >= 0 ? w.npcs.z[npc]! : a >= 0 ? w.agents.z[a]! : w.buildings.z[C.b[c]!]!;
 }
 
-/** A new call, queued; `life` ticks to live (−1: no end). Returns its slot (−1: none free). */
-export function makeCall(w: World, kind: number, words: number, npc: number, b: number, tree: number, plot: number, life = -1): number {
-  const c = w.calls.add(kind, words, npc, b, tree, plot, w.tick, life < 0 ? -1 : w.tick + life);
+/** A new call, queued; `life` ticks to live (−1: no end); a quiz names its helper. Returns its slot (−1: none free). */
+export function makeCall(w: World, kind: number, words: number, npc: number, b: number, tree: number, plot: number, life = -1, agent = -1): number {
+  const c = w.calls.add(kind, words, npc, b, tree, plot, w.tick, life < 0 ? -1 : w.tick + life, agent);
   if (c < 0) return -1;
   placeCall(w, c);
   bump(w.stats, STAT.calls);
@@ -67,13 +68,22 @@ export function makeCall(w: World, kind: number, words: number, npc: number, b: 
   return c;
 }
 
-/** Gives bright call c its next word (tier 1 only: one first letter a live word), on the `call` kind's letters. */
+/** A quiz's word (§7): the oldest in the review book whose first letter is free and that no live word is (nor one edit from); −1 none yet. */
+function quizWord(w: World): number {
+  const T = w.typing;
+  const free = T.letters.free(w.tick, w.vocab);
+  for (let k = 0; k < T.reviewN; k += 1) if (T.letters.claim(T.deck, w.words, T.review[k]!, KIND.call, w.tick, w.vocab, -1, free) === 1) return T.review[k]! * 4 + 1;
+  return -1;
+}
+
+/** Gives bright call c its next word (tier 1 only: one first letter a live word), on the `call` kind's letters; a quiz waits for a word of the book quietly. */
 export function giveWord(w: World, c: number): void {
   const T = w.typing;
   const C = w.calls;
-  const pick = pickWord(bagFor(w, C.kind[c] === CALL_KIND.power), T.deck, T.letters, w.words, KIND.call, w.tick, w.vocab, C.last[c]!, w.rng.words);
+  const quiz = C.kind[c] === CALL_KIND.quiz;
+  const pick = quiz ? quizWord(w) : pickWord(bagFor(w, C.kind[c] === CALL_KIND.power), T.deck, T.letters, w.words, KIND.call, w.tick, w.vocab, C.last[c]!, w.rng.words);
   if (pick < 0 || (pick & 3) !== 1) {
-    bump(w.stats, STAT.jams);
+    if (!quiz) bump(w.stats, STAT.jams);
     return;
   }
   const word = pick >> 2;
@@ -204,7 +214,20 @@ function work(w: World, c: number, share: number, word: number, len: number, qua
   }
 }
 
-/** Word s is typed: scored, the chain moved, the work pushed; the call goes on locked, or ends. */
+/**
+ * The review book (§7), oldest first: a word typed sloppy or with 2 errors goes in (to the end if it was there),
+ * at most 20, the oldest out; a quiz typed right takes its word out.
+ */
+export function review(w: World, word: number, add: boolean): void {
+  const T = w.typing;
+  const at = T.review.subarray(0, T.reviewN).indexOf(word);
+  if (at >= 0) T.review.copyWithin(at, at + 1, T.reviewN--);
+  if (!add) return;
+  if (T.reviewN === T.review.length) T.review.copyWithin(0, 1, T.reviewN--);
+  T.review[T.reviewN++] = word;
+}
+
+/** Word s is typed: scored, the chain moved, the review book kept, the work pushed; the call goes on locked, or ends. */
 function finishWord(w: World, s: number): void {
   const W = w.words;
   const C = w.calls;
@@ -213,6 +236,8 @@ function finishWord(w: World, s: number): void {
   const len = w.typing.deck.len[word]!;
   const score = scoreWord(len, W.errors[s]!, W.life[s]!, w.tick - W.born[s]!, expectedE(w), WORD_D.known);
   const top = score.grade === "flash" || score.grade === "perfect";
+  const missed = score.grade === "sloppy" || W.errors[s]! >= CALL.reviewErrors;
+  if (missed || C.kind[c] === CALL_KIND.quiz) review(w, word, missed);
   chainStep(w, score.grade);
   if (!top) C.perfect[c] = 0;
   C.done[c] = C.done[c]! + 1;

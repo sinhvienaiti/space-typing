@@ -3,11 +3,12 @@
  * when its HTML changes. A button runs its action on press, so a re-render
  * cannot swallow the click, and never takes focus: Enter and Space stay the game's.
  */
-import { TICK_HZ } from "../content/rules";
+import { MODES, TICK_HZ } from "../content/rules";
+import { CALL_KIND } from "../sim/stores/calls";
 import { chainTier } from "../sim/systems/chain";
 import { earlyCallBonus } from "../sim/systems/waves";
 import type { World } from "../sim/world";
-import { wordText } from "../typing/decks";
+import { gloss, wordText } from "../typing/decks";
 
 /** In update() order; td-chip is the status panel the scenarios look for. */
 export const PANELS = ["chip", "sandbox", "team", "strip", "dock", "actions"] as const;
@@ -23,12 +24,13 @@ export const REASON: Readonly<Record<string, string>> = {
 
 export const button = (act: string, label: string, key = "", attrs = ""): string => `<button data-act="${act}"${attrs}>${label}${key === "" ? "" : `<kbd>${key}</kbd>`}</button>`;
 
-export const seg = (label: string, act: string, values: readonly string[], labels: readonly string[], current: string): string =>
-  `<div class="td-row"><small>${label}</small>${values.map((value, k) => button(act + ":" + value, labels[k]!, "", value === current ? ' class="is-on"' : "")).join("")}</div>`;
+/** A row of choices; `wide` puts the label over them (long names: the mode). */
+export const seg = (label: string, act: string, values: readonly string[], labels: readonly string[], current: string, wide = false): string =>
+  `<div class="td-row${wide ? " td-wide" : ""}"><small>${label}</small>${values.map((value, k) => button(act + ":" + value, labels[k]!, "", value === current ? ' class="is-on"' : "")).join("")}</div>`;
 
 const stat = (label: string, value: string): string => `<span class="td-stat"><small>${label}</small><b>${value}</b></span>`;
 
-/** Pause and sound; the resources and lives (BUILD_1A6 §9); "Ngày 2 · 0:41", "Đêm 2 · còn 12 quái" or dawn; the early night call's gold (§2). */
+/** Pause and sound; the resources and lives (BUILD_1A6 §9); "Ngày 2 · 0:41", "Đêm 2 · còn 12 quái" or dawn; knowledge and the review book once there are any (§7); the early night call's gold (§2). */
 export function statusHtml(w: World, sandbox: boolean, paused: boolean, muted: boolean, notices: readonly string[]): string {
   const left = Math.max(0, Math.ceil((w.phaseEnd - w.tick) / TICK_HZ));
   const clock = Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0");
@@ -39,25 +41,36 @@ export function statusHtml(w: World, sandbox: boolean, paused: boolean, muted: b
     button("pause", paused ? "▶" : "Ⅱ", "", ' class="td-x" title="Tạm dừng (Pause)"') + button("mute", muted ? "<s>Âm</s>" : "Âm", "", ' class="td-x"') + (sandbox ? button("sandbox", "F9", "", ' class="td-x" title="Hộp cát"') : "") + "</div>" +
     `<div class="td-row">${stat("Vàng", String(Math.floor(w.gold / 1000)))}${stat("Gỗ", String(w.wood))}${stat("Lúa", String(w.food))}${stat("Hạt", String(w.seeds))}${stat("Mạng", String(w.lives))}</div>` +
     `<p class="td-phase"><b>${phase}</b></p>` +
+    (w.knowledge > 0 || w.typing.reviewN > 0 ? `<p class="td-learn">Tri thức <b>${w.knowledge}</b> · Sổ ôn <b>${w.typing.reviewN}</b></p>` : "") +
     (w.phase === "defeat" ? `<p class="td-warn">Lũy đã mất hết mạng</p>` : w.phase === "day" ? button("night", `Gọi đêm sớm · +${earlyCallBonus(w)} vàng`, "⇧ Enter", ' class="td-call"') : "") +
     notices.map((notice) => `<p class="td-warn">${notice}</p>`).join("")
   );
 }
 
-/** The compact word strip (TK 23.4): the locked word, its typed part in jade, or a note; the chain and its tier. */
+/**
+ * The compact word strip (TK 23.4): the locked word, its typed part in jade, or a note; the chain and its tier. A
+ * quiz's word stays hidden past what is typed (its first letter shown) under its meaning; the learn mode adds the
+ * meaning and the IPA (BUILD_1A6 §7).
+ */
 export function stripHtml(w: World, note: string): string {
   const { router, deck, chain } = w.typing;
   const word = router.lock >= 0 ? wordText(deck, w.words.word[router.lock]!) : "";
   const typed = router.lock >= 0 ? w.words.typed[router.lock]! : 0;
+  const quiz = router.lock >= 0 && w.calls.kind[w.words.call[router.lock]!] === CALL_KIND.quiz;
+  const shown = quiz ? word.slice(0, Math.max(1, typed)) + "_".repeat(word.length - Math.max(1, typed)) : word;
+  const item = router.lock >= 0 ? w.words.word[router.lock]! : -1;
+  const mean = item < 0 || !(quiz || w.mode === "learn") ? "" : gloss(deck, item) + (quiz || deck.ipa[item] === "" ? "" : " " + deck.ipa[item]);
   let main = `<em>Gõ chữ đầu của một thẻ để khóa từ</em>`;
   if (note !== "") main = `<em class="td-warn">${note}</em>`;
-  else if (router.lock >= 0) main = `<b class="td-word"><span>${word.slice(0, typed)}</span>${word.slice(typed)}</b>`;
+  else if (router.lock >= 0) main = `<b class="td-word"><span>${shown.slice(0, typed)}</span>${shown.slice(typed)}</b>` + (mean === "" ? "" : `<small class="td-mean">${mean}</small>`);
   else if (router.group >= 0) main = `<b class="td-word">${String.fromCharCode(97 + router.group)}…</b>`;
   const pips = [1, 2, 3, 4].map((tier) => `<i${tier <= chainTier(chain) ? ' class="on"' : ""}></i>`).join("");
   return main + `<span class="td-chain" title="Bậc Chuỗi ${chainTier(chain)}">Chuỗi <b>${chain}</b>${pips}</span>`;
 }
 
-export const actionsHtml = (): string => button("build", "Xây", "Insert / \\") + button("hire", "Thuê dân", "⇧ \\");
+/** Build and hire; the tactical pause where the mode has it (§8). */
+export const actionsHtml = (w: World, tactical: boolean): string =>
+  button("build", "Xây", "Insert / \\") + button("hire", "Thuê dân", "⇧ \\") + (MODES[w.mode].pause ? button("space", tactical ? "Chạy tiếp" : "Tạm dừng", "Space") : "");
 
 export class Hud {
   private readonly panels: HTMLElement[];

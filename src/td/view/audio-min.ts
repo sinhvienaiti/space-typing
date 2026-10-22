@@ -1,10 +1,11 @@
 /**
  * Typing sounds made in code (docs/td/BUILD_NOW.md §5.5, TK 24.6), no files:
- * a call's new word ticks softly in its kind's pitch (at most 6 a second), a
- * right key clicks a semitone higher per letter, a wrong or stray key thocks
- * 12 dB lower, a finished word plays a pentatonic note by chain tier
- * (Perfect and Flash add a ting), Word Shots and blasts hiss with a sweep.
- * One mute switch. Each call kind's own alert is R2 (BUILD_1A6 §9).
+ * a call that lights up rings its kind's short alert (BUILD_1A6 §9: harvest a
+ * high bell, chop a low wood knock, build two hammer taps, mine a clink,
+ * power a short horn, quiz a bird's chirp; at most 3 a second), a right key
+ * clicks a semitone higher per letter, a wrong or stray key thocks 12 dB
+ * lower, a finished word plays a pentatonic note by chain tier (Perfect and
+ * Flash add a ting), Word Shots and blasts hiss with a sweep. One mute switch.
  */
 import { FX, type RareEvent } from "../sim/events";
 import { PROJECTILE } from "../sim/stores/projectiles";
@@ -14,14 +15,24 @@ import { chainTier } from "../sim/systems/chain";
 
 /** C major pentatonic from C5, one step per chain tier. */
 const PENTATONIC = [523.25, 587.33, 659.25, 783.99, 880, 1046.5];
-const TICKS_PER_S = 6;
+const ALERTS_PER_S = 3;
+type Voice = [seconds: number, gain: number, freq: number, type?: OscillatorType, sweepTo?: number, cutoff?: number, filter?: BiquadFilterType, delay?: number];
+/** By call kind (CALL_KIND): power, build, harvest, chop, mine, quiz. */
+const ALERT: readonly (readonly Voice[])[] = [
+  [[0.3, 0.05, 233, "sawtooth", 262, 0, "lowpass"], [0.3, 0.03, 349, "square", 392]],
+  [[0.05, 0.12, 0, "sine", 0, 1800, "bandpass"], [0.05, 0.12, 0, "sine", 0, 1800, "bandpass", 0.13]],
+  [[0.45, 0.07, 1568], [0.3, 0.03, 3136, "sine", 0, 0, "lowpass", 0.01]],
+  [[0.08, 0.14, 0, "sine", 0, 420, "bandpass"], [0.07, 0.08, 165, "triangle"]],
+  [[0.14, 0.05, 2637, "triangle"], [0.1, 0.04, 3520, "triangle", 0, 0, "lowpass", 0.06]],
+  [[0.08, 0.05, 2600, "sine", 3900], [0.07, 0.04, 3000, "sine", 4200, 0, "lowpass", 0.11]],
+];
 
 export class TypingAudio {
   muted = false;
   private ctx: AudioContext | null = null;
   private out: GainNode | null = null;
   private noise: AudioBuffer | null = null;
-  private ticks: number[] = [];
+  private alerts: number[] = [];
   private cursor = 0;
 
   /** Browsers start audio only from a gesture: call on the first key or click. */
@@ -36,10 +47,10 @@ export class TypingAudio {
     } else if (this.ctx.state === "suspended") void this.ctx.resume();
   }
 
-  /** One voice: an oscillator (`freq` > 0, swept to `sweepTo`) or filtered noise (`cutoff`), with a 3 ms attack and an exponential fall. */
-  private voice(seconds: number, gain: number, freq: number, type: OscillatorType = "sine", sweepTo = 0, cutoff = 0, filter: BiquadFilterType = "lowpass"): void {
+  /** One voice: an oscillator (`freq` > 0, swept to `sweepTo`) or filtered noise (`cutoff`), with a 3 ms attack and an exponential fall, `delay` s from now. */
+  private voice(seconds: number, gain: number, freq: number, type: OscillatorType = "sine", sweepTo = 0, cutoff = 0, filter: BiquadFilterType = "lowpass", delay = 0): void {
     const ctx = this.ctx!;
-    const t = ctx.currentTime;
+    const t = ctx.currentTime + delay;
     const env = ctx.createGain();
     env.gain.setValueAtTime(0.0001, t);
     env.gain.exponentialRampToValueAtTime(gain, t + 0.003);
@@ -71,12 +82,11 @@ export class TypingAudio {
     this.cursor = ring.written;
     if (this.ctx === null || this.muted) return;
     for (const event of events) {
-      if (event.t === "wordSpawn") {
-        while (this.ticks.length > 0 && now - this.ticks[0]! > 1000) this.ticks.shift();
-        if (this.ticks.length >= TICKS_PER_S) continue;
-        this.ticks.push(now);
-        const c = w.calls.slotOf(event.call);
-        this.voice(0.035, 0.04, 990 + 165 * (c >= 0 ? w.calls.kind[c]! : 0), "triangle");
+      if (event.t === "call" && event.state === "bright") {
+        while (this.alerts.length > 0 && now - this.alerts[0]! > 1000) this.alerts.shift();
+        if (this.alerts.length >= ALERTS_PER_S) continue;
+        this.alerts.push(now);
+        for (const voice of ALERT[event.kind] ?? []) this.voice(...voice);
       } else if (event.t === "wordKey") {
         const s = w.words.slotOf(event.word);
         if (event.result === KEY.wrong || event.result === KEY.stray) {
