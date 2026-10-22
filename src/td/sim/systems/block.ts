@@ -87,6 +87,7 @@ const far = (dx: number, dz: number, limit: number) => dx * dx + dz * dz > limit
 /**
  * The nearest ground enemy around the flag that still needs a blocker; with
  * none, the nearest that fewer than 3 soldiers fight (to help); −1 none.
+ * Equal distances go to the lower id (TK 25.5).
  */
 function pick(w: World, s: number, rx: number, rz: number): number {
   const E = w.enemies;
@@ -101,11 +102,11 @@ function pick(w: World, s: number, rx: number, rz: number): number {
     const dz = E.z[e]! - w.units.z[s]!;
     const d2 = dx * dx + dz * dz;
     if (E.engaged[e]! < w.c.enemies[E.def[e]!]!.weight) {
-      if (d2 < needD2) {
+      if (d2 < needD2 || (d2 === needD2 && E.id(e) < E.id(need))) {
         needD2 = d2;
         need = e;
       }
-    } else if (d2 < helpD2) {
+    } else if (d2 < helpD2 || (d2 === helpD2 && E.id(e) < E.id(help))) {
       helpD2 = d2;
       help = e;
     }

@@ -74,7 +74,7 @@ runFrameLoop({
 
 installDevHandle({
   ready: () => painted,
-  flags: () => ({ sandbox }),
+  flags: () => ({ sandbox, seed: world.seed, content: world.c.hash }),
   send: (command) => session.send(command),
   stats: () => statsObject(world.stats),
   hash: () => hashHex(world),

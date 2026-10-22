@@ -4,6 +4,7 @@ import { STAT } from "../src/td/sim/stats";
 import { soldiersStep } from "../src/td/sim/systems/block";
 import { meleeStep } from "../src/td/sim/systems/combat";
 import { moveEnemies } from "../src/td/sim/systems/move";
+import type { Lane } from "../src/td/sim/lanes";
 import { step, type World } from "../src/td/sim/world";
 import { build, enemyAt, enemyPoint, ready, run, world } from "./td/fixtures";
 
@@ -102,6 +103,27 @@ describe("blocking (TK 13)", () => {
     expect(w.enemies.engaged[serpent]).toBe(3);
   });
 
+  it("a free soldier takes the nearest enemy; at equal distance, the lower id (TK 25.5), not the lower slot", () => {
+    const { w, b, soldiers } = barracksWorld();
+    const s = soldiers[0]!;
+    for (const other of soldiers.slice(1)) {
+      w.units.hp[other] = 0;
+      w.units.respawnAt[other] = 1e9;
+    }
+    w.buildings.rallyX[b] = 0;
+    w.buildings.rallyZ[b] = 12;
+    w.units.x[s] = 0;
+    w.units.z[s] = 12;
+    const gone = enemyPoint(w, "cuong-thi", 0, 0);
+    const older = enemyPoint(w, "cuong-thi", -1, 12);
+    w.enemies.release(gone);
+    const reused = enemyPoint(w, "cuong-thi", 1, 12); // the freed lower slot, a later generation: the higher id
+    expect(reused).toBeLessThan(older);
+    expect(w.enemies.id(reused)).toBeGreaterThan(w.enemies.id(older));
+    soldiersStep(w);
+    expect(w.units.target[s]).toBe(older);
+  });
+
   it("a soldier lets go of an enemy more than 5 m from its flag", () => {
     const { w, soldiers, rx, rz } = barracksWorld();
     const serpent = enemyPoint(w, "thuong-luong", rx + 1, rz);
@@ -154,5 +176,52 @@ describe("blocking (TK 13)", () => {
     expect(w.units.hp[s]).toBe(30);
     run(w, 61);
     expect(w.units.hp[s]).toBe(33);
+  });
+});
+
+describe("ground routes (BUILD_NOW §3.1)", () => {
+  /** Distance from (x, z) to the lane's sampled centre line. */
+  function toLine(lane: Lane, x: number, z: number): number {
+    let best = Infinity;
+    for (let index = 0; index < lane.xs.length - 1; index += 1) {
+      const x0 = lane.xs[index]!;
+      const z0 = lane.zs[index]!;
+      const dx = lane.xs[index + 1]! - x0;
+      const dz = lane.zs[index + 1]! - z0;
+      const f = Math.max(0, Math.min(1, ((x - x0) * dx + (z - z0) * dz) / (dx * dx + dz * dz)));
+      best = Math.min(best, Math.hypot(x0 + dx * f - x, z0 + dz * f - z));
+    }
+    return best;
+  }
+  const sampleNear = (lane: Lane, x: number, z: number) => {
+    let best = 0;
+    for (let index = 1; index < lane.xs.length; index += 1) if (Math.hypot(lane.xs[index]! - x, lane.zs[index]! - z) < Math.hypot(lane.xs[best]! - x, lane.zs[best]! - z)) best = index;
+    return best;
+  };
+
+  it("west and east trace one centre line where they share the road and part only between the fork and the merge", () => {
+    const w = world();
+    const [fork, merge] = [[6, -34], [0, 12]] as const;
+    const spread = w.map.roadHalfM - w.c.enemies[w.c.enemyIndex("cuong-thi")]!.radius;
+    let parted = 0;
+    for (const [lane, other] of [[w.lanes[0]!, w.lanes[1]!], [w.lanes[1]!, w.lanes[0]!]] as const) {
+      const from = sampleNear(lane, ...fork);
+      const to = sampleNear(lane, ...merge);
+      const step = lane.length / (lane.xs.length - 1);
+      for (let index = 0; index < lane.xs.length; index += 1) {
+        const gap = toLine(other, lane.xs[index]!, lane.zs[index]!);
+        if (index > from && index < to) parted = Math.max(parted, gap);
+        else expect(gap, "sample " + index).toBeLessThan(0.05);
+      }
+      // A Cương Thi at its widest, on a shared stretch, walks inside the other route's road too.
+      for (let dist = 0; dist <= lane.length; dist += 0.5) {
+        if (dist > from * step && dist < to * step) continue;
+        for (const side of [-spread, spread]) {
+          const p = lane.point(dist, side, { x: 0, z: 0 });
+          expect(toLine(other, p.x, p.z), "dist " + dist).toBeLessThan(w.map.roadHalfM);
+        }
+      }
+    }
+    expect(parted).toBeGreaterThan(10);
   });
 });

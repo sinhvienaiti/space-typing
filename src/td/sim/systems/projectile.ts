@@ -1,13 +1,19 @@
 /**
  * Shots fly and land (TK 25.6 step 8). A shot follows its target while it
  * lives, then flies on to the last point it saw. On arrival a blast hurts
- * every ground and low enemy in its radius, from full damage at the centre
- * down to the rim's share (cannon: 50 %), times the enemy's blast multiplier
- * (Ma Trơi ×1.5); a single shot hurts its target if it still lives.
+ * its target at whatever height the attack aimed (Draconis hits high
+ * flyers), and every other enemy in its radius at a height blasts reach
+ * (COMBAT.splashHits, TK 10.4: ground and low), from full damage at the
+ * centre down to the rim's share (cannon: 50 %), times the enemy's blast
+ * multiplier (Ma Trơi ×1.5); a single shot hurts its target if it still lives.
  */
+import { ALTITUDES } from "../../content/compile";
+import { COMBAT } from "../../content/rules";
 import { FX } from "../events";
 import type { World } from "../world";
 import { damageEnemy } from "./combat";
+
+const BLAST_REACHES = ALTITUDES.map((altitude) => (COMBAT.splashHits as readonly string[]).includes(altitude));
 
 export function projectilesStep(w: World): void {
   const P = w.projectiles;
@@ -35,7 +41,7 @@ export function projectilesStep(w: World): void {
     if (splash > 0) {
       const fade = 1 - P.edge[p]!;
       for (let e = 0; e < E.top; e += 1) {
-        if (E.used[e] === 0 || E.dying[e] !== 0 || E.altitude[e]! > 1) continue;
+        if (E.used[e] === 0 || E.dying[e] !== 0 || (e !== t && !BLAST_REACHES[E.altitude[e]!])) continue;
         const ex = E.x[e]! - x;
         const ez = E.z[e]! - z;
         const d2 = ex * ex + ez * ez;

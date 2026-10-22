@@ -135,6 +135,18 @@ describe("waves (TK 18.3, 17.2)", () => {
     expect(w.waveEnded[2]).toBe(0); // still spawning
   });
 
+  it("each wave's end pays 10 + 2 × its number: 12, 14, 16", () => {
+    const w = world();
+    send(w, { t: "callWave" });
+    const ends: { wave: number; bonus: number }[] = [];
+    for (let tick = 0; tick < 150 * 60 && ends.length < 3; tick += 1) {
+      for (let e = 0; e < w.enemies.top; e += 1) if (w.enemies.used[e] === 1) damageEnemy(w, e, 1000, 2, 0);
+      for (const event of send(w)) if (event.t === "waveEnd") ends.push({ wave: event.wave, bonus: event.bonus });
+    }
+    expect(ends).toEqual([{ wave: 1, bonus: 12 }, { wave: 2, bonus: 14 }, { wave: 3, bonus: 16 }]);
+    expect(w.stats[STAT.goldWave]).toBe((12 + 14 + 16) * 1000);
+  });
+
   it("packs take the two ground routes in turn", () => {
     const w = world({ seed: 3 });
     send(w, { t: "callWave" });
@@ -165,7 +177,7 @@ describe("no money loop (TK 11.12)", () => {
 
   it("no sequence of builds, undos and free sandbox levels makes gold (property)", () => {
     const seen = { built: 0, sold: 0, levelSet: 0 };
-    const spots = [[-18, -20], [-18, -8], [-8, -16], [-8, -8], [8, -26], [10, -8], [20, -22], [2, 18], [8, 12], [-10, 16], N1, N2, N3];
+    const spots = [[-18, -20], [-18, -8], [-8, -16], [-8, -8], [7, -25], [10, -8], [20, -22], [2, 18], [8, 12], [-10, 16], N1, N2, N3];
     for (let seed = 1; seed <= 40; seed += 1) {
       const pick = createRng(seed).ai;
       const w = world({ seed, gold: 600 });

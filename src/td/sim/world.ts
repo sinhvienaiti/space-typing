@@ -13,7 +13,7 @@ import { SLICE_1A } from "../content/slice-1a";
 import type { Content, Difficulty, MapDef } from "../content/types";
 import { applyCommand, placeBuilding, type Command } from "./commands";
 import { Events } from "./events";
-import { Lane } from "./lanes";
+import { groundLanes, Lane } from "./lanes";
 import { WalkGrid } from "./nav/grid";
 import { createStats } from "./stats";
 import { BuildingStore } from "./stores/buildings";
@@ -99,7 +99,7 @@ export function createWorld(options: WorldOptions): World {
     waveAlive: [],
     waveEnded: [],
     spawnQueue: [],
-    lanes: [...map.routes, map.flyRoute].map((points) => new Lane(points)),
+    lanes: [...groundLanes(map.routes), new Lane(map.flyRoute)],
     grid,
     keepCell: grid.cell(map.keep[0], map.keep[1]),
     enemies: new EnemyStore(STORE.enemies),

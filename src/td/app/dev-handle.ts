@@ -24,7 +24,8 @@ export type TdState = {
 export type TdDevHandle = {
   /** The page has booted and drawn its first frame. */
   ready(): boolean;
-  flags(): { sandbox: boolean };
+  /** What a Node replay of log() needs besides the log: the seed and the content hash. */
+  flags(): { sandbox: boolean; seed: number; content: string };
   /** Queues a command for the next tick, as the player's input does. */
   send(command: CommandBody): void;
   stats(): Record<StatName, number>;

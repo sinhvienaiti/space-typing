@@ -21,7 +21,7 @@ function collect(w: World, b: number): void {
 }
 
 export function collectPiles(w: World): void {
-  for (let b = 0; b < w.buildings.top; b += 1) if (w.buildings.used[b] === 1) collect(w, b);
+  for (const b of w.buildings.live()) collect(w, b);
 }
 
 export function productionStep(w: World): void {

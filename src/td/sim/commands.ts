@@ -66,6 +66,7 @@ function run(w: World, command: Command): string | null {
     case "rally": {
       const slot = w.buildings.slotOf(command.building);
       if (slot < 0 || w.c.buildings[w.buildings.def[slot]!]!.barracks === null) return "noBarracks";
+      if (!Number.isInteger(command.qx) || !Number.isInteger(command.qz)) return "bounds";
       const x = command.qx * BUILD.snapM;
       const z = command.qz * BUILD.snapM;
       const dx = x - w.buildings.x[slot]!;
@@ -126,7 +127,7 @@ function setLevel(w: World, slot: number, level: number, max: number): string | 
   if (def.hp[0] > 0) B.hp[slot] = def.hp[level - 1]!;
   if (def.barracks !== null) {
     const hp = def.barracks.levels[level - 1]!.hp;
-    for (let s = 0; s < w.units.top; s += 1) if (w.units.used[s] === 1 && w.units.barracks[s] === slot && w.units.hp[s]! > 0) w.units.hp[s] = hp;
+    for (const s of w.units.live()) if (w.units.barracks[s] === slot && w.units.hp[s]! > 0) w.units.hp[s] = hp;
   }
   w.events.rare.push({ t: "levelSet", tick: w.tick, building: B.id(slot), level });
   return null;
@@ -139,19 +140,15 @@ export function placeBuilding(w: World, def: number, x: number, z: number, node:
   if (slot < 0) return -1;
   if (spec.placement !== "fixed") w.grid.stamp(x, z, spec.radius, CELL.building, true);
   if (spec.barracks !== null) {
-    const rally = { x, z };
+    const point = { x, z };
     let best = Infinity;
     for (const lane of w.lanes.slice(0, -1)) {
-      const point = lane.nearest(x, z, { x: 0, z: 0 });
-      const d2 = (point.x - x) * (point.x - x) + (point.z - z) * (point.z - z);
-      if (d2 < best) {
-        best = d2;
-        rally.x = point.x;
-        rally.z = point.z;
-      }
+      const d2 = lane.gap2(x, z, point);
+      if (d2 >= best) continue;
+      best = d2;
+      w.buildings.rallyX[slot] = point.x;
+      w.buildings.rallyZ[slot] = point.z;
     }
-    w.buildings.rallyX[slot] = rally.x;
-    w.buildings.rallyZ[slot] = rally.z;
     // Soldiers wait inside until construction ends (soldiersStep stands them up).
     for (let post = 0; post < spec.barracks.soldiers; post += 1) {
       const unit = w.units.add(slot, post, 0, x, z);
@@ -164,7 +161,7 @@ export function placeBuilding(w: World, def: number, x: number, z: number, node:
 
 function removeBuilding(w: World, slot: number): void {
   const spec = w.c.buildings[w.buildings.def[slot]!]!;
-  for (let s = 0; s < w.units.top; s += 1) if (w.units.used[s] === 1 && w.units.barracks[s] === slot) w.units.release(s);
+  for (const s of w.units.live()) if (w.units.barracks[s] === slot) w.units.release(s);
   w.grid.stamp(w.buildings.x[slot]!, w.buildings.z[slot]!, spec.radius, CELL.building, false);
   w.buildings.release(slot);
 }

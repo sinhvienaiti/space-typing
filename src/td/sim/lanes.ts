@@ -5,9 +5,40 @@
  *
  * Copied from Rift Defense V4 (src/defense/rules/path.ts, RoadPath), which
  * Typing Defense may not import (TK 25.1 rule 3). Changes: Math.hypot became
- * Math.sqrt (the rules' allowed maths, TK 25.5) and the atan2 heading is gone.
+ * Math.sqrt (the rules' allowed maths, TK 25.5), the atan2 heading is gone,
+ * and the curve is in Hermite form so that routes can share tangents
+ * (groundLanes).
  */
 export type Point2 = { x: number; z: number };
+type Knot = readonly [number, number];
+
+/**
+ * Lanes for routes that share points (a fork, a merge). A knot's tangent is
+ * the mean of its Catmull-Rom tangents over every route through it, so where
+ * routes split or join they still trace one curve on the shared stretch and
+ * each bends off it smoothly; elsewhere the mean is the plain tangent.
+ */
+export function groundLanes(routes: readonly (readonly Knot[])[]): Lane[] {
+  const sums = new Map<string, [number, number, number]>();
+  for (const points of routes) {
+    points.forEach((p, i) => {
+      const [mx, mz] = catmullTangent(points, i);
+      const [x, z, n] = sums.get(p.join()) ?? [0, 0, 0];
+      sums.set(p.join(), [x + mx, z + mz, n + 1]);
+    });
+  }
+  return routes.map((points) => new Lane(points, points.map((p) => {
+    const [x, z, n] = sums.get(p.join())!;
+    return [x / n, z / n] as const;
+  })));
+}
+
+/** Half the step from the previous knot to the next (one-sided at the ends). */
+const catmullTangent = (points: readonly Knot[], i: number): Knot => {
+  const a = points[Math.max(0, i - 1)]!;
+  const b = points[Math.min(points.length - 1, i + 1)]!;
+  return [(b[0] - a[0]) / 2, (b[1] - a[1]) / 2];
+};
 
 export class Lane {
   readonly length: number;
@@ -15,16 +46,16 @@ export class Lane {
   readonly zs: Float64Array;
   private readonly step: number;
 
-  constructor(points: readonly (readonly [number, number])[], samplesPerSegment = 24) {
+  constructor(points: readonly Knot[], tangents: readonly Knot[] = points.map((_, i) => catmullTangent(points, i)), samplesPerSegment = 24) {
     const raw: Point2[] = [];
     for (let index = 0; index < points.length - 1; index += 1) {
-      const p0 = points[Math.max(0, index - 1)]!;
       const p1 = points[index]!;
       const p2 = points[index + 1]!;
-      const p3 = points[Math.min(points.length - 1, index + 2)]!;
+      const m1 = tangents[index]!;
+      const m2 = tangents[index + 1]!;
       for (let sample = 0; sample < samplesPerSegment; sample += 1) {
         const t = sample / samplesPerSegment;
-        raw.push({ x: catmull(p0[0], p1[0], p2[0], p3[0], t), z: catmull(p0[1], p1[1], p2[1], p3[1], t) });
+        raw.push({ x: hermite(p1[0], m1[0], p2[0], m2[0], t), z: hermite(p1[1], m1[1], p2[1], m2[1], t) });
       }
     }
     const last = points[points.length - 1]!;
@@ -71,32 +102,21 @@ export class Lane {
     return out;
   }
 
-  /** Squared distance from (x, z) to the nearest sample of the centre line. */
-  gap2(x: number, z: number): number {
+  /** Squared distance from (x, z) to the nearest sample of the centre line; that sample goes to `out`. */
+  gap2(x: number, z: number, out?: Point2): number {
     let best = Infinity;
     for (let index = 0; index < this.xs.length; index += 1) {
       const dx = this.xs[index]! - x;
       const dz = this.zs[index]! - z;
       const d2 = dx * dx + dz * dz;
-      if (d2 < best) best = d2;
-    }
-    return best;
-  }
-
-  /** The centre-line sample nearest to (x, z). */
-  nearest(x: number, z: number, out: Point2): Point2 {
-    let best = Infinity;
-    for (let index = 0; index < this.xs.length; index += 1) {
-      const dx = this.xs[index]! - x;
-      const dz = this.zs[index]! - z;
-      const d2 = dx * dx + dz * dz;
-      if (d2 < best) {
-        best = d2;
+      if (d2 >= best) continue;
+      best = d2;
+      if (out !== undefined) {
         out.x = this.xs[index]!;
         out.z = this.zs[index]!;
       }
     }
-    return out;
+    return best;
   }
 
   private index(distance: number): number {
@@ -104,8 +124,8 @@ export class Lane {
   }
 }
 
-function catmull(p0: number, p1: number, p2: number, p3: number, t: number): number {
+function hermite(p1: number, m1: number, p2: number, m2: number, t: number): number {
   const t2 = t * t;
   const t3 = t2 * t;
-  return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
+  return (2 * t3 - 3 * t2 + 1) * p1 + (t3 - 2 * t2 + t) * m1 + (3 * t2 - 2 * t3) * p2 + (t3 - t2) * m2;
 }

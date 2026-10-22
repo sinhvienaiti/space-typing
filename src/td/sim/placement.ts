@@ -25,21 +25,20 @@ export function socketCell(w: World, x: number, z: number, radius: number): numb
 }
 
 export function canPlace(w: World, def: number, qx: number, qz: number): Placement {
-  const spec = w.c.buildings[def];
+  const spec = Number.isInteger(def) ? w.c.buildings[def] : undefined;
   if (w.phase === "defeat") return no("phase");
-  if (spec === undefined || spec.placement === "fixed") return no("capType");
   const B = w.buildings;
-  let total = 0;
-  let sameKind = 0;
-  for (let slot = 1; slot < B.top; slot += 1) {
-    if (B.used[slot] === 0) continue;
-    total += 1;
+  const others = B.live(1);
+  if (others.length >= BUILD.caps.total) return no("capTotal");
+  if (spec === undefined || spec.placement === "fixed") return no("capType");
+  const sameKind = others.filter((slot) => {
     const other = w.c.buildings[B.def[slot]!]!;
-    if (spec.family === "attack" ? other.family === "attack" : other.index === def) sameKind += 1;
-  }
-  if (total >= BUILD.caps.total) return no("capTotal");
+    return spec.family === "attack" ? other.family === "attack" : other.index === def;
+  }).length;
   if ((spec.family === "attack" && sameKind >= BUILD.caps.attack) || (spec.barracks !== null && sameKind >= BUILD.caps.barracks)) return no("capType");
 
+  // Positions are whole quarter metres; anything else (NaN included) is off the map.
+  if (!Number.isInteger(qx) || !Number.isInteger(qz)) return no("bounds");
   let x = qx * BUILD.snapM;
   let z = qz * BUILD.snapM;
   const r = spec.radius;
@@ -49,8 +48,7 @@ export function canPlace(w: World, def: number, qx: number, qz: number): Placeme
   let node = -1;
   if (spec.placement === "node") {
     node = w.map.nodes.findIndex((n) => (n.x - x) * (n.x - x) + (n.z - z) * (n.z - z) <= BUILD.nodeSnapM * BUILD.nodeSnapM);
-    if (node < 0) return no("node");
-    for (let slot = 1; slot < B.top; slot += 1) if (B.used[slot] === 1 && B.node[slot] === node) return no("node");
+    if (node < 0 || others.some((slot) => B.node[slot] === node)) return no("node");
     x = w.map.nodes[node]!.x;
     z = w.map.nodes[node]!.z;
   }
@@ -68,8 +66,7 @@ export function canPlace(w: World, def: number, qx: number, qz: number): Placeme
   const kz = w.map.keep[1] - z;
   if (kx * kx + kz * kz < (BUILD.keepClearM + r) * (BUILD.keepClearM + r)) return no("keep");
 
-  for (let slot = 1; slot < B.top; slot += 1) {
-    if (B.used[slot] === 0) continue;
+  for (const slot of others) {
     const gap = r + w.c.buildings[B.def[slot]!]!.radius + BUILD.gapM;
     const dx = B.x[slot]! - x;
     const dz = B.z[slot]! - z;
@@ -78,21 +75,14 @@ export function canPlace(w: World, def: number, qx: number, qz: number): Placeme
 
   if (spec.barracks !== null && !w.lanes.slice(0, -1).some((lane) => lane.gap2(x, z) <= RALLY.radiusM * RALLY.radiusM)) return no("rally");
 
-  if (!socketsReachable(w, x, z, r)) return no("path");
+  // With the building down, a walker must still get from the Bastion to every socket.
+  const sockets = others.map((slot) => socketCell(w, B.x[slot]!, B.z[slot]!, w.c.buildings[B.def[slot]!]!.radius));
+  sockets.push(socketCell(w, x, z, r));
+  w.grid.stamp(x, z, r, CELL.probe, true);
+  const reachable = reachesAll(w.grid, w.keepCell, sockets);
+  w.grid.stamp(x, z, r, CELL.probe, false);
+  if (!reachable) return no("path");
 
   if (w.gold < spec.costs[0] * 1000) return no("gold");
   return { ok: true, x, z, node };
-}
-
-/** With a building at (x, z), can a walker still get from the Bastion to every socket? */
-function socketsReachable(w: World, x: number, z: number, r: number): boolean {
-  const B = w.buildings;
-  const sockets = [socketCell(w, x, z, r)];
-  for (let slot = 1; slot < B.top; slot += 1) {
-    if (B.used[slot] === 1) sockets.push(socketCell(w, B.x[slot]!, B.z[slot]!, w.c.buildings[B.def[slot]!]!.radius));
-  }
-  w.grid.stamp(x, z, r, CELL.probe, true);
-  const ok = reachesAll(w.grid, w.keepCell, sockets);
-  w.grid.stamp(x, z, r, CELL.probe, false);
-  return ok;
 }

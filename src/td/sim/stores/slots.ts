@@ -44,9 +44,16 @@ export class Slots {
     return (this.gen[slot]! << 10) | slot;
   }
 
-  /** The slot an id names while that entity lives; −1 after. */
+  /** The slot an id names while that entity lives; −1 after, and for anything not a whole number. */
   slotOf(id: number): number {
     const slot = id & 1023;
-    return slot < this.cap && this.used[slot] === 1 && this.gen[slot] === id >>> 10 ? slot : -1;
+    return Number.isInteger(id) && slot < this.cap && this.used[slot] === 1 && this.gen[slot] === id >>> 10 ? slot : -1;
+  }
+
+  /** Used slots from `from` up, in slot order: for commands and checks; systems loop inline. */
+  live(from = 0): number[] {
+    const out: number[] = [];
+    for (let slot = from; slot < this.top; slot += 1) if (this.used[slot] === 1) out.push(slot);
+    return out;
   }
 }

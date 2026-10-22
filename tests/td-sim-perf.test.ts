@@ -11,7 +11,7 @@ import { build, enemyAt, ready, world } from "./td/fixtures";
 describe("simulation step cost", () => {
   it("steps 300 enemies, 9 soldiers, 200 shots and 10 buildings in ≤ 2 ms", () => {
     const w = world({ gold: 5000 });
-    for (const [x, z] of [[-18, -20], [-18, -8], [-8, -16], [-8, -8], [8, -26], [10, -8]] as const) build(w, "archer", x, z);
+    for (const [x, z] of [[-18, -20], [-18, -8], [-8, -16], [-8, -8], [7, -25], [10, -8]] as const) build(w, "archer", x, z);
     for (const [x, z] of [[2, 18], [8, 12], [-10, 16]] as const) build(w, "barracks", x, z);
     build(w, "gold-mine", 26, -30);
     ready(w);

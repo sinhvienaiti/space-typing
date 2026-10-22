@@ -263,6 +263,15 @@ describe("Typing Defense boundary (TK 25.3)", () => {
     );
     expect(crossing).toEqual([]);
   });
+
+  it("the 1A code (td.html, src/platform/rng.ts, src/td) stays under BUILD_NOW §2's hard ceiling", () => {
+    const ceiling = /Trần cứng (\d+)\.(\d{3})/.exec(readFileSync(join(ROOT, "docs/td/BUILD_NOW.md"), "utf8"));
+    expect(ceiling, "BUILD_NOW §2 names the hard ceiling").not.toBeNull();
+    const lines = (text: string) => (text.match(/\n/g) ?? []).length;
+    const files = [readFileSync(join(ROOT, "td.html"), "utf8"), readFileSync(join(ROOT, "src/platform/rng.ts"), "utf8"), ...td.map((source) => source.text)];
+    // docs/td/BUILD_NOTES.md §1 keeps the count per group and what each milestone may still spend.
+    expect(files.reduce((sum, text) => sum + lines(text), 0)).toBeLessThanOrEqual(Number(ceiling![1]! + ceiling![2]!));
+  });
 });
 
 describe("the boundary checks themselves", () => {

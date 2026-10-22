@@ -2,9 +2,17 @@
 // hold two sandbox waves with no typing. Builds through __td.send (the same
 // commands a player sends), runs the sandbox at 2×, takes a picture while
 // soldiers block, then waits for wave 2 to end. Checks kills, blocks, both
-// wave ends, a world hash, and no console error or page exception.
+// wave ends, and no console error or page exception. The run's log, seed and
+// hash go to td-1a-combat-replay-<size>.json, and scripts/td/replay.ts replays
+// it in Node, which must reach the browser's hash (§7 gate 4).
 //   URL=http://127.0.0.1:3110/ OUT_DIR=… node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-combat.mjs --width=1280 --height=720
+import { execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { DEV_URL, gesture, out } from "./common.mjs";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 const td = (code) => "(() => { const t = window.__td; if (!t) return null; " + code + " })()";
 const LAYOUT = [
@@ -48,8 +56,16 @@ export default async function (page) {
     await page.sleep(250);
   }
   shots.push(await page.shot(out("td-1a-combat-end-" + size + ".png")));
-  // One evaluation between two frames: the tick, hash and log belong together (a Node replay of the log must reach the same hash).
-  const final = await page.eval(td("return { state: t.state(), stats: t.stats(), hash: t.hash(), rejected: t.events().filter((e) => e.t === 'rejected'), log: t.log() };"));
+  // One evaluation between two frames: the tick, hash and log belong together.
+  const final = await page.eval(td("return { flags: t.flags(), state: t.state(), stats: t.stats(), hash: t.hash(), rejected: t.events().filter((e) => e.t === 'rejected'), log: t.log() };"));
+  const replayFile = out("td-1a-combat-replay-" + size + ".json");
+  writeFileSync(replayFile, JSON.stringify({ ...final?.flags, tick: final?.state?.tick, hash: final?.hash, log: final?.log ?? [] }));
+  let replay = null;
+  try {
+    replay = JSON.parse(execFileSync(process.execPath, ["--import", "tsx", resolve(root, "scripts/td/replay.ts"), replayFile], { cwd: root, encoding: "utf8" }));
+  } catch (error) {
+    replay = { match: false, error: String(error.stdout || error.message).trim() };
+  }
   const checks = {
     ready,
     layoutPlaceable: Array.isArray(placeable) && placeable.every(Boolean),
@@ -57,17 +73,18 @@ export default async function (page) {
     soldiersBlocked: blocking !== null && (final?.stats?.blocks ?? 0) > 0,
     kills: (final?.stats?.kills ?? 0) > 0,
     twoWavesEnded: ended.includes(1) && ended.includes(2),
-    hash: /^[0-9a-f]{8}$/.test(final?.hash ?? ""),
+    nodeReplaysToBrowserHash: replay?.match === true && /^[0-9a-f]{8}$/.test(final?.hash ?? ""),
     noConsoleErrors: page.logs.filter((line) => line.startsWith("error")).length === 0,
     noExceptions: page.exceptions.length === 0,
   };
   const pass = Object.values(checks).every(Boolean);
   if (!pass) process.exitCode = 1;
-  const { state, ...rest } = final ?? {};
+  const { state, log, ...rest } = final ?? {};
   return {
     pass,
     checks,
-    final: { ...rest, tick: state?.tick, wave: state?.wave, lives: state?.lives, gold: state?.gold, enemies: state?.enemies, buildings: state?.buildings?.length },
+    final: { ...rest, commands: log?.length, tick: state?.tick, wave: state?.wave, lives: state?.lives, gold: state?.gold, enemies: state?.enemies, buildings: state?.buildings?.length },
+    replay: { file: replayFile, ...replay },
     blockingAt: blocking && { tick: blocking.tick, wave: blocking.wave, enemies: blocking.enemies },
     shots,
   };

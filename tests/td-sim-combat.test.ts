@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createRng } from "../src/platform/rng";
+import { compileAttack } from "../src/td/content/compile";
+import { SLICE_1A } from "../src/td/content/slice-1a";
 import { hashHex } from "../src/td/sim/hash";
 import { SOURCE, STAT } from "../src/td/sim/stats";
 import { PROJECTILE } from "../src/td/sim/stores/projectiles";
@@ -7,7 +9,8 @@ import { damageEnemy, fireAt, selectTargets, towersAttack } from "../src/td/sim/
 import { deathsStep } from "../src/td/sim/systems/deaths";
 import { projectilesStep } from "../src/td/sim/systems/projectile";
 import { createWorld, runLog, step, type World } from "../src/td/sim/world";
-import type { Command } from "../src/td/sim/commands";
+import { Session } from "../src/td/app/session";
+import type { Command, CommandBody } from "../src/td/sim/commands";
 import { build, def, enemyAt, enemyPoint, q, ready, run, send, world } from "./td/fixtures";
 
 /** Damage, armour, crits, blasts and targeting (docs/td/TYPING_DEFENSE_DESIGN.md 10, 11.3). */
@@ -72,6 +75,25 @@ describe("damage (TK 10.1–10.2)", () => {
     expect(1000 - w.enemies.hp[rim]!).toBe(20);
     expect(1000 - w.enemies.hp[outside]!).toBe(0);
     expect(90 - w.enemies.hp[wisp]!).toBe(60);
+  });
+
+  it("a blast always hurts its target at any height it may aim at; around it, only ground and low (Draconis on a high flyer)", () => {
+    const wisp = SLICE_1A.enemies.find((enemy) => enemy.id === "ma-troi")!;
+    const w = world({ content: { ...SLICE_1A, enemies: [...SLICE_1A.enemies, { ...wisp, id: "test-high", altitude: "high" }] } });
+    const fireball = compileAttack(w.c.content.hero.attack);
+    const target = enemyPoint(w, "test-high", 0, -30);
+    const highNear = enemyPoint(w, "test-high", 0.5, -30);
+    const lowNear = enemyPoint(w, "ma-troi", -0.5, -30);
+    expect(w.enemies.altitude[target]).toBe(2);
+    expect(selectTargets(w, 0, -38, fireball, fireball.levels[0]!, 1)).toBe(1);
+    fireAt(w, PROJECTILE.fireball, 0, -38, fireball, fireball.levels[0]!, target, SOURCE.hero, 1, 0, 1);
+    expect(w.projectiles.splash[w.projectiles.top - 1]).toBe(1.8);
+    for (let tick = 0; tick < 60 && w.projectiles.count > 0; tick += 1) projectilesStep(w);
+    expect(w.projectiles.count).toBe(0);
+    expect(w.enemies.hp[target]).toBeLessThan(90);
+    expect(w.enemies.hp[highNear]).toBe(90);
+    expect(w.enemies.hp[lowNear]).toBeLessThan(90);
+    expect(w.stats[STAT.damageHero]).toBeGreaterThan(0);
   });
 
   it("a shell whose target died flies on and bursts at the last point; an arrow just lands", () => {
@@ -175,5 +197,31 @@ describe("leaks and determinism", () => {
     expect(hashes(5)).toEqual(first);
     expect(first.kills).toBeGreaterThan(0);
     expect(hashes(6).out).not.toEqual(first.out);
+  });
+
+  it("a session stepping by uneven frames, with commands sent between them, ends where a replay of its log ends", () => {
+    const session = new Session({ seed: 7 });
+    const w = session.world;
+    const barracks = () => w.buildings.id(w.buildings.live(1).find((slot) => w.c.buildings[w.buildings.def[slot]!]!.barracks !== null)!);
+    const sends: Record<number, () => CommandBody[]> = {
+      0: () => [{ t: "build", def: def(w, "archer"), qx: q(-18), qz: q(-10) }, { t: "build", def: def(w, "barracks"), qx: q(6), qz: q(18) }],
+      5: () => [{ t: "callWave" }],
+      90: () => [{ t: "sandbox", op: { op: "speed", value: 2 } }, { t: "sandbox", op: { op: "gold", value: 500 } }, { t: "build", def: def(w, "cannon"), qx: q(-8), qz: q(10) }],
+      300: () => [{ t: "rally", building: barracks(), qx: q(0), qz: q(12) }],
+    };
+    let now = 1000;
+    for (let frame = 0; frame < 900; frame += 1) {
+      for (const body of sends[frame]?.() ?? []) session.send(body);
+      session.paused = frame >= 400 && frame < 420;
+      now += 16 + (frame % 7) * 2;
+      session.frame(now);
+    }
+    expect(session.log.map((command) => command.t)).toEqual(["build", "build", "callWave", "sandbox", "sandbox", "build", "rally"]);
+    expect(w.events.rare.filter((event) => event.t === "rejected")).toEqual([]);
+    expect(w.stats[STAT.shots]).toBeGreaterThan(0);
+    const replay = createWorld({ seed: 7 });
+    runLog(replay, session.log, w.tick);
+    expect(replay.tick).toBe(w.tick);
+    expect(hashHex(replay)).toBe(hashHex(w));
   });
 });
