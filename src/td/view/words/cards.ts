@@ -200,7 +200,8 @@ export class WordCards {
       const gap = Math.max(COLUMN.gap, Math.ceil(1.2 * Math.max(...cards.map((card) => card.height))) + 4);
       const heights = columnHeights(cards.map(() => 0), cards.map(() => 1), [], gap);
       const roof = c >= 0 ? this.project(C.x[c]!, C.z[c]! - ROOF_M) : { x: cards[0]!.ax, y: cards[0]!.ay };
-      const tallest = heights[heights.length - 1]! + Math.max(...cards.map((card) => card.height));
+      // A locked card grows up to ×1.2 from its bottom edge: the column's box reaches its scaled top (review R3).
+      const tallest = Math.max(...cards.map((card, k) => heights[k]! + card.height * (card.slot >= 0 && card.slot === lock ? 1.2 : 1)));
       const roofY = Math.min(height - SAFE.bottom, Math.max(roof.y, SAFE.top + tallest));
       boxes.push({ x: roof.x, top: roofY - tallest, bottom: roofY, half: Math.max(...cards.map((card) => (card.slot >= 0 && card.slot === lock ? card.half * 1.2 + 18 : card.half))) + 9 });
       columns.push({ b: c, cards, heights, roofY });
