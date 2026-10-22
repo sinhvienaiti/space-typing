@@ -59,6 +59,8 @@ describe("a call's life (§5.2)", () => {
     run(w, T(8)); // far away now
     expect(Math.hypot(w.agents.x[0]! - N1[0], w.agents.z[0]! - N1[1])).toBeGreaterThan(10);
     expect([w.calls.bright[c], textOf(w, w.typing.router.lock)]).toEqual([1, word]);
+    w.typing.typed.fill(0); // the 8 s held locked leave the 20 s window: room for the next word (the budget has its own test)
+    w.typing.typedSum = 0;
     const gold = w.gold;
     const pile = w.buildings.pile[mine]!;
     type(w, word.slice(1));
@@ -160,22 +162,41 @@ describe("the AttentionDirector (§5.3)", () => {
     }
   });
 
-  it("counts a tick with a lock as typing; past the mode's 8 s in 20 s only power and build open", () => {
+  it("counts a tick with a lock as typing; a word starts only if every 20 s window stays within the mode's seconds (review R3)", () => {
     const w = world({ deck });
     const c = makeCall(w, CALL_KIND.mine, 1, -1, 0, -1, -1);
     step(w);
     type(w, wordOfCall(w, c)[0]!);
     run(w, T(2));
     expect(w.typing.typedSum).toBe(T(2) + 1);
+    send(w, { t: "unlock" });
+    // A full window: nothing lights or opens, power and build included; a bright word not begun dims, at no loss.
     w.typing.typed.fill(1);
     w.typing.typedSum = w.typing.typed.length;
-    const [mine, build] = calls(w, [CALL_KIND.mine, CALL_KIND.build]);
+    const chain = w.typing.chain;
+    const [mine, build, power] = calls(w, [CALL_KIND.mine, CALL_KIND.build, CALL_KIND.power]);
     step(w);
-    expect(open(w, [mine!, build!])).toEqual([0, 1]);
+    expect(open(w, [c, mine!, build!, power!])).toEqual([1, 0, 0, 0]);
+    expect([w.calls.bright[c], w.calls.word[c], w.words.count, w.typing.chain]).toEqual([0, -1, 0, chain]);
+    // An empty one: they light by priority, power and build first, then the older mine call, to the cap of 3.
     w.typing.typed.fill(0);
     w.typing.typedSum = 0;
     step(w);
-    expect(open(w, [mine!])).toEqual([1]);
+    expect(open(w, [c, mine!, build!, power!])).toEqual([1, 0, 1, 1]);
+    expect([power!, build!, c].map((k) => w.calls.bright[k])).toEqual([1, 1, 1]);
+  });
+
+  it("looks ahead: 8 s typed long ago leave the window as a word is typed, 8 s typed just now do not (review R3)", () => {
+    for (const [past, lights] of [[true, 1], [false, 0]] as const) {
+      const w = world({ deck });
+      const len = w.typing.typed.length;
+      const at = w.tick % len; // the slot the next step writes; the oldest tick is the one after it
+      for (let j = 1; j <= T(MODES.balanced.typeS); j += 1) w.typing.typed[(at + (past ? j : len - j)) % len] = 1;
+      w.typing.typedSum = T(MODES.balanced.typeS);
+      const c = makeCall(w, CALL_KIND.mine, 1, -1, 0, -1, -1);
+      step(w);
+      expect(w.calls.bright[c], past ? "typed long ago" : "typed just now").toBe(lights);
+    }
   });
 
   it("at night opens one economy call at a time, and a quiz ends with its day (§7)", () => {
@@ -265,14 +286,14 @@ describe("work by hand and by typing (§5.1)", () => {
     return { w, c, tree: w.calls.tree[c]! };
   }
 
-  it("self-work and typed words add up: one Perfect word of four takes a quarter off a 20 s chop; a call the worker ends costs nothing and pays no bonus (review R1)", () => {
+  it("self-work and typed words add up: one Perfect word of four takes a quarter off the chop; a call the worker ends costs nothing and pays no bonus (review R1)", () => {
     const { w, c, tree } = chopping();
     const started = w.calls.born[c]!;
     const [chain, wood] = [w.typing.chain, w.wood];
     type(w, wordOfCall(w, c), 60, true);
     expect(w.typing.chain).toBe(chain + 1);
     let felled = -1;
-    for (let k = 0; k < T(25) && felled < 0; k += 1) {
+    for (let k = 0; k < T(TREE.chopS) && felled < 0; k += 1) {
       step(w);
       if (w.trees.standing[tree] === 0) felled = w.tick - 1;
     }
@@ -287,7 +308,7 @@ describe("work by hand and by typing (§5.1)", () => {
   it("answered to the end, every word Perfect: the word that fells the tree earns the bonus, though self-work spared the last one", () => {
     const { w, c, tree } = chopping();
     const wood = w.wood;
-    run(w, T(5.5)); // over a quarter of the chop done alone: three Perfect words of four finish it
+    run(w, T(TREE.chopS * 0.28)); // over a quarter of the chop done alone: three Perfect words of four finish it
     for (let k = 0; k < 3; k += 1) type(w, wordOfCall(w, c), 60, true);
     expect([w.trees.standing[tree], w.calls.used[c], w.calls.done[c]]).toEqual([0, 0, 3]);
     expect(w.wood).toBe(wood + TREE.wood + TREE.perfectWood);

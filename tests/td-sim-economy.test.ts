@@ -170,7 +170,7 @@ describe("farms (§4.1)", () => {
 });
 
 describe("villagers and trees (§4.2)", () => {
-  it("two villagers start; unmarked they chop the trees nearest the Bastion within 30 m, one a tree; a tree falls after 20 s for 8 wood, its stump blocks nothing", () => {
+  it("two villagers start; unmarked they chop the trees nearest the Bastion within 30 m, one a tree; a tree falls after its chop time for its wood, its stump blocks nothing", () => {
     const w = world();
     expect(countNpcs(w, NPC_KIND.villager)).toBe(VILLAGERS.start);
     run(w, 2);
@@ -181,11 +181,11 @@ describe("villagers and trees (§4.2)", () => {
     expect(taken).toEqual(near.slice(0, 2).sort((a, b) => a - b));
     const wood = w.wood;
     const tree = taken[0]!;
-    until(w, () => w.trees.standing[tree] === 0, T(60));
+    until(w, () => w.trees.standing[tree] === 0, T(TREE.chopS + 20));
     expect(w.wood - wood).toBeGreaterThanOrEqual(TREE.wood);
     expect(w.trees.worker[tree]).toBe(-1);
     // Seven trees lie within 30 m: once they are down, the villagers wait for marks.
-    run(w, T(120));
+    run(w, T(4 * TREE.chopS + 60));
     expect(near.every((t) => w.trees.standing[t] === 0)).toBe(true);
     expect(near.length).toBe(7);
     expect(w.npcs.live().filter((n) => w.npcs.kind[n] === NPC_KIND.villager).every((n) => w.npcs.task[n] === TASK.idle)).toBe(true);
