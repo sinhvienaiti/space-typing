@@ -104,6 +104,7 @@ export const SLICE_1A: Content = {
     id: "draconis", flySpeed: 6, takeoffS: 0.6, landS: 0.6,
     attack: { damageType: "magic", critPct: 5, hits: ["ground", "low", "high"], projectileSpeed: 20, levels: [{ damage: [22, 34], periodS: 1.6, rangeM: 9, splashM: 1.8 }] },
     affinity: ["cannon"],
+    burn: { dps: 3, durationS: 2 },
     view: { name: "Draconis", short: "D", color: "#F2994A" },
   },
   helpers: [

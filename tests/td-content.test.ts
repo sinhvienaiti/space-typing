@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { compile, contentHash, waveSchedule } from "../src/td/content/compile";
-import { AURA_ATTACK, CAP, TEMPO, TIERS } from "../src/td/content/rules";
+import { AURA_ATTACK, CAP, EXPECTED, LENGTH_BY_E, TEMPO, TIERS } from "../src/td/content/rules";
 import { validateContent } from "../src/td/content/schema";
 import { SLICE_1A } from "../src/td/content/slice-1a";
-import type { Content } from "../src/td/content/types";
+import type { Content, Difficulty } from "../src/td/content/types";
+import { availableLetters, bandWords, streamCap } from "../src/td/typing/decks";
+import { lifeSeconds, typeSeconds } from "../src/td/typing/scorer";
+import { lengthBand } from "../src/td/typing/tempo";
+import { realDeck } from "./td/typing";
 
 /** Typing Defense content (docs/td/TYPING_DEFENSE_DESIGN.md 25.4, BUILD_NOW §3, §6.1). */
 const copy = (): Content => JSON.parse(JSON.stringify(SLICE_1A)) as Content;
@@ -107,5 +111,41 @@ describe("1A content", () => {
     expect([count(6, "thuong-luong"), count(6, "cuong-thi"), count(6, "ma-troi")]).toEqual([4, 20, 4]);
     expect([count(7, "thuong-luong"), count(7, "cuong-thi"), count(7, "ma-troi")]).toEqual([5, 23, 5]);
     expect([count(10, "thuong-luong"), count(10, "cuong-thi"), count(10, "ma-troi")]).toEqual([6, 32, 6]);
+  });
+
+  it("A and the stream cap on the real vocabulary, levels 1, 1–3, 1–5, match TK 6.5's table", () => {
+    const deck = realDeck();
+    const measured = [1, 3, 5].map((level) => LENGTH_BY_E.map(({ len }) => {
+      const words = bandWords(deck, level, len[0], len[1]);
+      const a = availableLetters(deck, words);
+      return [words.length, a, streamCap(a)];
+    }));
+    // TK 6.5's 4–8 column was measured on 5–8 letters (58 / 237 / 453 words); the real 4–8 band is wider.
+    expect(measured).toEqual([
+      [[122, 16, 10], [140, 16, 10], [123, 15, 9], [124, 15, 9]],
+      [[291, 19, 12], [362, 20, 12], [355, 21, 12], [375, 21, 12]],
+      [[499, 22, 12], [626, 22, 12], [635, 23, 12], [676, 23, 12]],
+    ]);
+    expect([1, 3, 5].map((level) => bandWords(deck, level, 5, 8).length)).toEqual([58, 237, 453]);
+  });
+
+  it("every word can be typed in its life (TK 25.4): L_w ≥ 1.2 + 12·(len + 1)/(E·d) at every E and tempo, easy and normal", () => {
+    const clamped: string[] = [];
+    for (const difficulty of ["easy", "normal", "hard"] as Difficulty[]) {
+      for (let E = EXPECTED.floor[difficulty]; E <= EXPECTED.max; E += 1) {
+        for (let tempo = 1; tempo < TEMPO.length; tempo += 1) {
+          const [lo, hi] = lengthBand(E, tempo);
+          for (let len = lo; len <= hi; len += 1) {
+            const life = lifeSeconds(len, E, 1, difficulty);
+            if (life >= 1.2 + typeSeconds(len, E, 1)) continue;
+            clamped.push(difficulty + " E" + E + " " + len + " letters: " + life.toFixed(2) + " s");
+            // Hard trims life by 10 %: the typing alone still fits.
+            expect(difficulty, clamped[clamped.length - 1]).toBe("hard");
+            expect(life).toBeGreaterThanOrEqual(typeSeconds(len, E, 1));
+          }
+        }
+      }
+    }
+    console.log("td life: " + clamped.length + " (difficulty, E, length) cells below 1.2 s + typing time, all on hard; first: " + clamped.slice(0, 3).join(", "));
   });
 });

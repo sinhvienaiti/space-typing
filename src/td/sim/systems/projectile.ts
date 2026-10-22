@@ -6,12 +6,13 @@
  * (COMBAT.splashHits, TK 10.4: ground and low), from full damage at the
  * centre down to the rim's share (cannon: 50 %), times the enemy's blast
  * multiplier (Ma Trơi ×1.5); a single shot hurts its target if it still lives.
+ * A burning shot (Draconis' Word Shot from a cannon) sets every enemy it hurts on fire.
  */
 import { ALTITUDES } from "../../content/compile";
 import { COMBAT } from "../../content/rules";
 import { FX } from "../events";
 import type { World } from "../world";
-import { damageEnemy } from "./combat";
+import { burnTicks, damageEnemy } from "./combat";
 
 const BLAST_REACHES = ALTITUDES.map((altitude) => (COMBAT.splashHits as readonly string[]).includes(altitude));
 
@@ -38,6 +39,7 @@ export function projectilesStep(w: World): void {
     const x = (P.x[p] = P.tx[p]!);
     const z = (P.z[p] = P.tz[p]!);
     const splash = P.splash[p]!;
+    const burnUntil = P.burn[p] === 1 ? w.tick + burnTicks(w) : 0;
     if (splash > 0) {
       const fade = 1 - P.edge[p]!;
       for (let e = 0; e < E.top; e += 1) {
@@ -48,10 +50,12 @@ export function projectilesStep(w: World): void {
         if (d2 > splash * splash) continue;
         const share = 1 - (fade * Math.sqrt(d2)) / splash;
         damageEnemy(w, e, P.power[p]! * share * w.c.enemies[E.def[e]!]!.splashMul, P.damageType[p]!, P.source[p]!);
+        if (burnUntil > 0) E.burnUntil[e] = burnUntil;
       }
       w.events.ring.push(FX.burst, x, z, Math.round(splash * 100), w.tick);
     } else if (alive) {
       damageEnemy(w, t, P.power[p]!, P.damageType[p]!, P.source[p]!);
+      if (burnUntil > 0) E.burnUntil[t] = burnUntil;
       w.events.ring.push(FX.hit, x, z, P.crit[p]!, w.tick);
     }
     P.release(p);

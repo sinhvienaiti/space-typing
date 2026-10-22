@@ -3,14 +3,18 @@
  * docs/td/TYPING_DEFENSE_DESIGN.md 25.6. Pure TypeScript: no clock, no DOM,
  * randomness only from the named seeded streams. The same seed, content and
  * command log give the same world on Node and in every browser.
- * 1A.1 runs the combat half; agents (step 3) and the word stream and heat
- * (steps 11–12) join in the next milestones.
+ * Agents (step 3) join in 1A.3; until then an assigned agent is at its
+ * building at once.
  */
 import { createRng, type Rng } from "../../platform/rng";
 import { compile, type Compiled } from "../content/compile";
-import { ECONOMY, EXPECTED, STORE } from "../content/rules";
+import { ECONOMY, EVENNESS, EXPECTED, STORE } from "../content/rules";
 import { SLICE_1A } from "../content/slice-1a";
 import type { Content, Difficulty, MapDef } from "../content/types";
+import { compileDeck, type Deck } from "../typing/decks";
+import { Letters } from "../typing/letters";
+import type { Bag } from "../typing/picker";
+import type { Router } from "../typing/router";
 import { applyCommand, placeBuilding, type Command } from "./commands";
 import { Events } from "./events";
 import { groundLanes, Lane } from "./lanes";
@@ -20,18 +24,43 @@ import { BuildingStore } from "./stores/buildings";
 import { EnemyStore } from "./stores/enemies";
 import { ProjectileStore } from "./stores/projectiles";
 import { UnitStore } from "./stores/units";
-import { meleeStep, towersAttack } from "./systems/combat";
+import { WordStore } from "./stores/words";
+import { auraStep } from "./systems/aura";
+import { meleeStep, statusStep, towersAttack } from "./systems/combat";
 import { deathsStep } from "./systems/deaths";
 import { moveEnemies } from "./systems/move";
 import { soldiersStep } from "./systems/block";
 import { productionStep } from "./systems/production";
+import { heatStep } from "./systems/heat";
 import { projectilesStep } from "./systems/projectile";
+import { fireWordShots } from "./systems/rewards";
 import { spawnEnemies } from "./systems/spawn";
+import { configureDeck, setTempo, startTempo, streamStep } from "./systems/stream";
 import { wavesStep } from "./systems/waves";
 
 export type Phase = "prep" | "battle" | "defeat";
 
 export type QueuedSpawn = { tick: number; enemy: number; route: number; wave: number };
+
+/** A Word Shot (or a Bastion bolt) a word finished in step 1 asks for; fired in step 7 of the same tick. */
+export type PendingShot = { b: number; power: number; crit: boolean; word: number; burn: boolean; bolt: boolean };
+
+/**
+ * The typing state of a run (TK 25.8). Bags go by the band's top length (a
+ * dense tempo cuts it); a, cap and meanLen follow E and the vocabulary;
+ * lastSpawn is the last deal anywhere (the 0.2 s spacing); keyMs rings the
+ * last key times for the evenness C; tempoByDef is the tempo last chosen per
+ * building kind (0: none yet).
+ */
+function createTyping(deck: Deck, defs: number) {
+  return {
+    deck, letters: new Letters(), router: { lock: -1, group: -1 } as Router, bags: [] as (Bag | undefined)[],
+    a: 0, cap: 0, meanLen: 0, streamLive: 0, lastSpawn: -1e6, chain: 0, graceUntil: 0, graceReadyAt: 0, allStopped: false,
+    keyMs: new Float64Array(EVENNESS.gaps + 1), keys: 0, tempoByDef: new Uint8Array(defs), shots: [] as PendingShot[],
+  };
+}
+
+export type Typing = ReturnType<typeof createTyping>;
 
 export type World = {
   readonly c: Compiled;
@@ -67,11 +96,14 @@ export type World = {
   readonly units: UnitStore;
   readonly buildings: BuildingStore;
   readonly projectiles: ProjectileStore;
+  readonly words: WordStore;
+  readonly typing: Typing;
   readonly stats: Float64Array;
   readonly events: Events;
 };
 
-export type WorldOptions = { seed: number; sandbox?: boolean; content?: Content; gold?: number; difficulty?: Difficulty; expected?: number; vocab?: number };
+/** `deck`: the compiled vocabulary (levels 1–5); none deals no word. */
+export type WorldOptions = { seed: number; sandbox?: boolean; content?: Content; deck?: Deck; gold?: number; difficulty?: Difficulty; expected?: number; vocab?: number };
 
 export const KEEP_SLOT = 0;
 
@@ -106,10 +138,14 @@ export function createWorld(options: WorldOptions): World {
     units: new UnitStore(STORE.soldiers),
     buildings: new BuildingStore(STORE.buildings),
     projectiles: new ProjectileStore(STORE.projectiles),
+    words: new WordStore(STORE.words),
+    typing: createTyping(options.deck ?? compileDeck([]), c.buildings.length),
     stats: createStats(),
     events: new Events(),
   };
+  configureDeck(w);
   placeBuilding(w, 0, map.keep[0], map.keep[1], -1, 0);
+  setTempo(w, 0, startTempo(w, 0), false);
   return w;
 }
 
@@ -119,14 +155,19 @@ export function step(w: World, commands: readonly Command[] = []): void {
     w.tick += 1;
     return;
   }
-  for (const command of commands) applyCommand(w, command); // 1
+  for (const command of commands) applyCommand(w, command); // 1: keys route; finished words pay
   spawnEnemies(w); // 2
   moveEnemies(w); // 4
   soldiersStep(w); // 5
   towersAttack(w); // 6–7: targets (aura from the last tick), shots
+  fireWordShots(w); // 7: Word Shots waiting
   meleeStep(w); // 7: melee
   projectilesStep(w); // 8
+  statusStep(w); // 9
   productionStep(w); // 10
+  streamStep(w); // 11
+  heatStep(w); // 12
+  auraStep(w); // 12
   deathsStep(w); // 15
   wavesStep(w); // 17
   w.tick += 1;

@@ -7,6 +7,8 @@ export const STATS = [
   "spawned", "kills", "leaks", "livesLost", "shots", "hits", "blocks", "soldierDeaths", "wavesCleared",
   "goldKill", "goldProduce", "goldWave", "goldEarly", "goldWord",
   "damageTower", "damageCrossbow", "damageSoldier", "damageWordShot", "damageHero",
+  "streamSpawned", "streamDone", "streamPerfect", "streamSloppy", "streamMissed", "streamCancelled", "jams", "fullDrops",
+  "keys", "keyErrors", "strays", "wordShots", "fizzles", "rawWpmSum",
 ] as const;
 
 export type StatName = (typeof STATS)[number];

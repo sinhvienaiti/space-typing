@@ -32,12 +32,14 @@ function mixColumn(hash: number, column: Column, count: number): number {
   return h;
 }
 
-/** A column store: every typed array up to `top`, plus its counters. */
-function mixStore(hash: number, store: object & { top: number }): number {
+/** Every typed array of `store` (up to `top` slots when it has slots, whole otherwise) and its numbers. */
+function mixStore(hash: number, store: object & { top?: number; cap?: number }): number {
   let h = hash;
   for (const [key, value] of Object.entries(store)) {
-    if (ArrayBuffer.isView(value)) h = mixColumn(h, value as unknown as Column, store.top);
-    else if (typeof value === "number") h = mixNumber(mix(h, key.length), value);
+    if (ArrayBuffer.isView(value)) {
+      const column = value as unknown as Column;
+      h = mixColumn(h, column, store.top === undefined ? column.length : store.top * (column.length / store.cap!));
+    } else if (typeof value === "number" || typeof value === "boolean") h = mixNumber(mix(h, key.length), Number(value));
   }
   return h;
 }
@@ -50,7 +52,10 @@ export function hashWorld(w: World): number {
   for (const value of rngState(w.rng)) h = mix(h, value);
   for (const list of [w.waveLeft, w.waveAlive, w.waveEnded]) for (let index = 1; index <= w.wave; index += 1) h = mixNumber(h, list[index] ?? -1);
   for (const spawn of w.spawnQueue) h = mix(mix(mix(mix(h, spawn.tick), spawn.enemy), spawn.route), spawn.wave);
-  for (const store of [w.enemies, w.units, w.buildings, w.projectiles]) h = mixStore(h, store);
+  for (const store of [w.enemies, w.units, w.buildings, w.projectiles, w.words]) h = mixStore(h, store);
+  const T = w.typing;
+  h = mixStore(mixStore(mixStore(h, T), T.letters), T.router);
+  T.bags.forEach((bag, hi) => (h = mixColumn(mixNumber(mixNumber(h, hi), bag!.next), bag!.order, bag!.order.length)));
   h = mixColumn(h, w.grid.cells, w.grid.cells.length);
   h = mixColumn(h, w.stats, w.stats.length);
   return h >>> 0;

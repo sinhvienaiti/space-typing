@@ -3,12 +3,15 @@
  * Canvas 2D, no media. Grass, lanes, the Silver Stream and its bridges, ore
  * nodes, buildings as discs of their true radius, enemies as ink-purple dots
  * sized by tier, soldiers, shots and short-lived hit marks read from the
- * combat ring. It reads the world and never changes it.
+ * combat ring; each building's heat lanterns, tempo badge and assistant,
+ * and Word Shots with a jade head trailing their word. It reads the world
+ * and never changes it.
  */
-import { BUILD } from "../content/rules";
+import { BUILD, TEMPO } from "../content/rules";
 import { FX } from "../sim/events";
 import { PROJECTILE } from "../sim/stores/projectiles";
 import type { World } from "../sim/world";
+import { wordText } from "../typing/decks";
 
 const COLOR = {
   grass: "#7dba5a",
@@ -23,6 +26,9 @@ const COLOR = {
   soldier: "#3b7ddd",
   enemyHp: "#ff4a4a",
   buildingHp: "#ffb020",
+  jade: "#0b8a78",
+  lamp: "#ffb84d",
+  gold: "#c98a2e",
 } as const;
 
 const FONT = '"Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif';
@@ -197,8 +203,20 @@ export class DebugView {
         this.ctx.fillStyle = COLOR.ink;
         this.ctx.fillRect(x - 0.6 * level + mark * 1.2 + 0.25, z + r * 0.45, 0.7, this.px(3));
       }
-      // Five lanterns over the roof: heat (unlit until the word stream runs, 1A.2).
-      for (let lamp = 0; lamp < 5; lamp += 1) this.disc(x - 1.2 + lamp * 0.6, z - r - 0.7, 0.22, COLOR.paper, COLOR.ink, 1);
+      // Five lanterns over the roof: heat, a lantern per point, half lit at half a point.
+      for (let lamp = 0; lamp < 5; lamp += 1) {
+        const lit = B.heat[b]! - lamp * 1000;
+        this.disc(x - 1.9 + lamp * 0.95, z - r - 0.9, 0.42, lit >= 1000 ? COLOR.lamp : lit >= 500 ? "#ffe0a8" : COLOR.paper, COLOR.ink, 1);
+      }
+      const tempo = TEMPO[B.tempo[b]!]!.periodS;
+      this.text(tempo === 0 ? "Dừng" : tempo + "s", x + r + 0.9, z + r * 0.6, 10, COLOR.ink, 700);
+      const agent = B.assist[b]!;
+      if (agent >= 0) {
+        const view = agent === 0 ? w.c.content.hero.view : w.c.content.helpers[agent - 1]!.view;
+        this.disc(x + r * 0.75, z - r * 0.75, 0.75, view.color, COLOR.ink, 1.5);
+        this.text(view.short, x + r * 0.75, z - r * 0.75, 9, COLOR.ink);
+        if (B.waiting[b] === 1) this.text("…", x, z - r - 1.7, 14, COLOR.ink);
+      }
       if (spec.hp[0] > 0 && B.hp[b]! < spec.hp[level - 1]!) this.bar(x, z + r + 0.5, r * 2, B.hp[b]! / spec.hp[level - 1]!, COLOR.buildingHp);
       if (spec.barracks !== null) this.flag(B.rallyX[b]!, B.rallyZ[b]!);
       if (spec.mine !== null && B.pile[b]! > 0) this.text("+" + Math.floor(B.pile[b]! / 1000), x + r + 1.2, z, 11, "#7a4f12");
@@ -256,6 +274,10 @@ export class DebugView {
       const x = P.x[p]!;
       const z = P.z[p]!;
       const kind = P.kind[p]!;
+      if (kind === PROJECTILE.wordShot) {
+        this.wordShot(w, x, z, P.tx[p]! - x, P.tz[p]! - z, P.word[p]!);
+        continue;
+      }
       if (kind === PROJECTILE.shell) {
         this.disc(x + 0.35, z + 0.6, 0.3, "rgba(43, 33, 24, 0.3)", null);
         this.disc(x, z, 0.38, COLOR.ink, null);
@@ -274,13 +296,21 @@ export class DebugView {
     }
   }
 
+  /** A jade head with the word's letters trailing behind it. */
+  private wordShot(w: World, x: number, z: number, dx: number, dz: number, word: number): void {
+    const d = Math.sqrt(dx * dx + dz * dz) || 1;
+    const text = word >= 0 ? wordText(w.typing.deck, word) : "";
+    for (let k = 0; k < text.length; k += 1) this.text(text[text.length - 1 - k]!, x - (dx / d) * 0.9 * (k + 1), z - (dz / d) * 0.9 * (k + 1), 11, "rgba(11, 138, 120, " + (0.9 - k * 0.1).toFixed(2) + ")");
+    this.disc(x, z, 0.45, "#7ff5e0", COLOR.jade, 2);
+  }
+
   private readMarks(w: World): void {
     const ring = w.events.ring;
     if (ring.written - this.readCursor > ring.size) this.readCursor = ring.written - ring.size;
     for (; this.readCursor < ring.written; this.readCursor += 1) {
       const slot = this.readCursor % ring.size;
       const kind = ring.kind[slot]!;
-      if (kind === FX.death || kind === FX.burst || kind === FX.leak || kind === FX.coin || kind === FX.soldierDown) {
+      if (kind === FX.death || kind === FX.burst || kind === FX.leak || kind === FX.coin || kind === FX.soldierDown || kind === FX.fizzle || kind === FX.wordGold) {
         this.marks.push({ kind, x: ring.x[slot]!, z: ring.z[slot]!, value: ring.value[slot]!, tick: ring.tick[slot]! });
       }
     }
@@ -295,6 +325,8 @@ export class DebugView {
       else if (mark.kind === FX.death) this.disc(mark.x, mark.z, 0.6 + age * 1.4, "rgba(91, 58, 140, " + (0.5 * (1 - age)).toFixed(2) + ")", null);
       else if (mark.kind === FX.soldierDown) this.disc(mark.x, mark.z, 0.5 + age, null, "rgba(59, 125, 221, " + alpha + ")", 2);
       else if (mark.kind === FX.leak) this.disc(mark.x, mark.z, 1 + age * 4, null, "rgba(255, 74, 74, " + alpha + ")", 3);
+      else if (mark.kind === FX.fizzle) this.disc(mark.x, mark.z - 2 - age * 3, 0.4 + age * 1.6, null, "rgba(127, 245, 224, " + alpha + ")", 2);
+      else if (mark.kind === FX.wordGold) this.text("+" + Number((mark.value / 1000).toFixed(1)), mark.x, mark.z - 3 - age * 3, 13, "rgba(201, 138, 46, " + alpha + ")");
       else this.text("+" + mark.value, mark.x, mark.z - 1 - age * 2.5, 12, "rgba(201, 138, 46, " + alpha + ")");
     }
   }

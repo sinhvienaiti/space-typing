@@ -36,6 +36,12 @@ export const LETTERS = { cooldownS: 1.0, reserve: 3, avoid: "qxzj", avoidUntilLe
 export const SCORE = { errNum: 1.5, errMin: 0.15, errMax: 0.4, phraseLen: 12, fastBase: 0.35, fastK: 0.8, effBase: 0.4, effK: 0.6, qA: 0.6, qS: 0.4, flashS: 0.7 } as const;
 export const WORD_D = { known: 1.0, learning: 0.85 } as const;
 export const EXPECTED = { default: 35, min: 12, max: 140, floor: { easy: 12, normal: 20, hard: 35 } } as const;
+/** TK 6.5: who gets first letters first; the stream and review words leave the reserve to the others. */
+export const KIND_PRIORITY = ["seal", "direct", "ultWord", "finisher", "pickup", "spellWord", "rare", "stream", "review"] as const;
+export const RESERVE_KINDS = ["stream", "review"] as const;
+/** TK 6.14: evenness C = clamp((0.7 − CV) / 0.4) over the last 30 key gaps; TK 6.13 load, tempo hint. */
+export const EVENNESS = { gaps: 30, cvTop: 0.7, cvSpan: 0.4 } as const;
+export const LOAD = { share: 0.75, hintWords: 10, hintUp: 0.95, hintDown: 0.7, calm: 1.0, busy: 1.25 } as const;
 
 export const HEAT = { max: 5, flash: 1.5, good: 1, ok: 0.5, sloppy: -1, expired: -1, prepCap: 2.5, holdBase: 4, holdC: 2, decayPerS: 0.25, recentWords: 5 } as const;
 export const CHAIN = {
@@ -50,7 +56,9 @@ export const AURA_ATTACK = { rate: 0.5, dmg: 0.4, crit: 0.15, area: 0.5, targets
 export const AURA_ECONOMY = { cycle: 0.4, perProduce: 0.25 } as const;
 export const AURA_MILITARY = { respawn: 0.4, buff: 0.3, tempSoldierAt: 0.6, shout: 0.1 } as const;
 export const REWARD = { lenDiv: 6, lenMin: 0.8, lenMax: 1.2, qA: [0.4, 0.6], qS: [0.8, 0.4], qQ: [0.5, 0.5], shotQ: [0.8, 1.2], perfectCrit: 1.75 } as const;
-export const FIVE_GOOD = { mineGold: 5, tempSoldierS: 15, tempSoldierMax: 2 } as const;
+export const FIVE_GOOD = { words: 5, mineGold: 5, tempSoldierS: 15, tempSoldierMax: 2 } as const;
+/** TK 11.3: Accuracy narrows a blast's fall-off (rim 50 % → 70 %); the cannon's Flow widens it by at most 40 %, with no extra target. */
+export const CANNON_AURA = { edge: 0.2, areaCap: 1.4 } as const;
 export const RICHNESS = [0.8, 1.0, 1.25] as const;
 
 export const ASSIST = { enterM: 3.0, exitM: 4.5, settleS: 0.4, socketGapM: 1.0 } as const;

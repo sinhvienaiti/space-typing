@@ -3,15 +3,18 @@
  * the world. Play, bots and replays all go through applyCommand, each command
  * stamped with the tick it acts on. A refused command changes nothing and
  * leaves a `rejected` event with the reason. Positions are quarter metres.
- * 1A.1 handles building, undo, rally, calling a wave and the sandbox; the
- * typing and agent commands join with their milestones.
+ * Agents walk from 1A.3; until then `assignUnit` puts one at its building.
  */
 import { ticks } from "../content/compile";
 import { BUILD, ECONOMY, EXPECTED, RALLY } from "../content/rules";
 import type { Difficulty } from "../content/types";
+import { routeBackspace } from "../typing/router";
+import { tempoOpen } from "../typing/tempo";
 import { CELL } from "./nav/grid";
 import { canPlace } from "./placement";
+import { assignAgent, configureDeck, densestFor, orderGrace, setAssist, setTempo, slotsOpen, startTempo, stopAll } from "./systems/stream";
 import { callWave, startWave } from "./systems/waves";
+import { cancelWords, typeKey } from "./systems/words";
 import type { World } from "./world";
 
 export type SandboxOp =
@@ -29,6 +32,14 @@ export type CommandBody =
   | { t: "sell"; building: number }
   | { t: "rally"; building: number; qx: number; qz: number }
   | { t: "callWave" }
+  | { t: "assignUnit"; agent: number; building: number }
+  | { t: "recall"; agent: number }
+  | { t: "setTempo"; building: number; idx: number }
+  | { t: "setAllTempo"; stop: boolean }
+  | { t: "uiFocus"; on: boolean }
+  | { t: "key"; letter: number; atMs: number }
+  | { t: "backspace"; atMs: number }
+  | { t: "unlock" }
   | { t: "sandbox"; op: SandboxOp };
 
 export type Command = CommandBody & { tick: number };
@@ -79,6 +90,39 @@ function run(w: World, command: Command): string | null {
     }
     case "callWave":
       return callWave(w) ? null : "notCounting";
+    case "assignUnit": {
+      const slot = w.buildings.slotOf(command.building);
+      if (slot < 0) return "noBuilding";
+      if (!(Number.isInteger(command.agent) && command.agent >= 0 && command.agent < slotsOpen(w))) return "noSlot";
+      assignAgent(w, command.agent, slot);
+      return null;
+    }
+    case "recall":
+      if (!(Number.isInteger(command.agent) && command.agent >= 0 && command.agent < slotsOpen(w))) return "noSlot";
+      setAssist(w, command.agent, -1);
+      return null;
+    case "setTempo": {
+      const slot = w.buildings.slotOf(command.building);
+      if (slot < 0) return "noBuilding";
+      if (!tempoOpen(command.idx, densestFor(w, slot), w.difficulty)) return "tempoClosed";
+      setTempo(w, slot, command.idx);
+      return null;
+    }
+    case "setAllTempo":
+      stopAll(w, command.stop === true);
+      return null;
+    case "uiFocus":
+      orderGrace(w, command.on === true);
+      return null;
+    case "key":
+      return typeKey(w, command.letter, command.atMs);
+    case "backspace":
+      routeBackspace(w.typing.router, w.words);
+      return null;
+    case "unlock":
+      w.typing.router.lock = -1;
+      w.typing.router.group = -1;
+      return null;
     case "sandbox":
       return w.sandbox ? sandbox(w, command.op) : "noSandbox";
   }
@@ -103,10 +147,12 @@ function sandbox(w: World, op: SandboxOp): string | null {
     case "expected":
       if (!(op.value >= EXPECTED.min && op.value <= EXPECTED.max)) return "badValue";
       w.expected = Math.round(op.value);
+      configureDeck(w);
       return null;
     case "vocab":
       if (!VOCAB_LEVELS.includes(op.value)) return "badValue";
       w.vocab = op.value;
+      configureDeck(w);
       return null;
     case "speed":
       if (!SPEEDS.includes(op.value)) return "badValue";
@@ -156,11 +202,13 @@ export function placeBuilding(w: World, def: number, x: number, z: number, node:
     }
   }
   w.events.rare.push({ t: "built", tick: w.tick, building: w.buildings.id(slot), def });
+  if (spec.placement !== "fixed") setTempo(w, slot, startTempo(w, def), false);
   return slot;
 }
 
 function removeBuilding(w: World, slot: number): void {
   const spec = w.c.buildings[w.buildings.def[slot]!]!;
+  cancelWords(w, slot);
   for (const s of w.units.live()) if (w.units.barracks[s] === slot) w.units.release(s);
   w.grid.stamp(w.buildings.x[slot]!, w.buildings.z[slot]!, spec.radius, CELL.building, false);
   w.buildings.release(slot);

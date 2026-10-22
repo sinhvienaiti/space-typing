@@ -93,8 +93,9 @@ export type HeroDef = {
   takeoffS: number;
   landS: number;
   attack: AttackSpec;
-  /** Building ids where the hero's passive applies. */
+  /** Building ids where the hero's passive applies: its Word Shots set enemies burning. */
   affinity: readonly string[];
+  burn: { dps: number; durationS: number };
   view: ViewBlock;
 };
 

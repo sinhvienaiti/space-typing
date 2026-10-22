@@ -1,20 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { STAT } from "../src/td/sim/stats";
 import { step } from "../src/td/sim/world";
-import { build, enemyAt, ready, world } from "./td/fixtures";
+import { tempoIndex } from "../src/td/typing/tempo";
+import { build, enemyAt, ready, send, world } from "./td/fixtures";
+import { realDeck } from "./td/typing";
 
 /**
  * One simulation step under load (BUILD_NOW §6.1, §7 gate 5: ≤ 0.5 ms on the
  * owner's machine, ≤ 2 ms on CI): 300 enemies, 9 soldiers, 200 shots in
- * flight, 10 buildings. The 4 typing slots join this load in 1A.2–1A.3.
+ * flight, 10 buildings, 4 assisted at 1 s on the real vocabulary.
  */
 describe("simulation step cost", () => {
-  it("steps 300 enemies, 9 soldiers, 200 shots and 10 buildings in ≤ 2 ms", () => {
-    const w = world({ gold: 5000 });
+  it("steps 300 enemies, 9 soldiers, 200 shots, 10 buildings and 4 slots at 1 s in ≤ 2 ms", () => {
+    const w = world({ gold: 5000, deck: realDeck() });
+    send(w, { t: "sandbox", op: { op: "keepLevel", value: 4 } });
     for (const [x, z] of [[-18, -20], [-18, -8], [-8, -16], [-8, -8], [7, -25], [10, -8]] as const) build(w, "archer", x, z);
     for (const [x, z] of [[2, 18], [8, 12], [-10, 16]] as const) build(w, "barracks", x, z);
-    build(w, "gold-mine", 26, -30);
+    const mine = build(w, "gold-mine", 26, -30);
     ready(w);
+    // The Bastion, two archers and the mine deal a word every second.
+    [0, w.buildings.live(1)[0]!, w.buildings.live(1)[1]!, mine].forEach((b, agent) => {
+      send(w, { t: "assignUnit", agent, building: w.buildings.id(b) });
+      send(w, { t: "setTempo", building: w.buildings.id(b), idx: tempoIndex(1) });
+    });
     w.phase = "battle";
     w.lives = 1e6;
     const ids = ["cuong-thi", "ma-troi", "thuong-luong"];
@@ -38,6 +46,7 @@ describe("simulation step cost", () => {
     }
     expect(w.projectiles.count).toBeGreaterThanOrEqual(200);
     expect(w.stats[STAT.blocks]).toBeGreaterThan(0);
+    expect(w.stats[STAT.streamSpawned]).toBeGreaterThan(10);
     const sorted = times.slice(100).sort((a, b) => a - b);
     const median = sorted[sorted.length >> 1]!;
     const p95 = sorted[Math.floor(sorted.length * 0.95)]!;

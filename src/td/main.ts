@@ -1,18 +1,24 @@
 /**
  * Typing Defense (td.html), step 1A "Cổng vui" (docs/td/BUILD_NOW.md): a
- * top-down 2D test field. The world steps at 60 Hz in a session, the debug
- * view draws it every frame, and window.__td lets the browser scenarios
- * drive it through commands.
+ * top-down 2D test field. The vocabulary loads first; then the world steps
+ * at 60 Hz in a session, the debug view draws it, word cards float over it,
+ * typing sounds follow its events, and window.__td lets the browser
+ * scenarios drive it through commands.
  */
 import "./ui/td.css";
 import { runFrameLoop } from "../platform/frame-loop";
 import { installDevHandle } from "./app/dev-handle";
+import { installTypingInput } from "./app/input";
 import { Session } from "./app/session";
+import { loadDeck } from "./app/vocab";
 import type { RareEvent } from "./sim/events";
 import { hashHex } from "./sim/hash";
 import { canPlace } from "./sim/placement";
 import { statsObject } from "./sim/stats";
+import { wordText } from "./typing/decks";
+import { TypingAudio } from "./view/audio-min";
 import { DebugView } from "./view/debug-2d";
+import { WordCards } from "./view/words/cards";
 
 function byId<T extends HTMLElement = HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -24,8 +30,6 @@ const params = new URLSearchParams(window.location.search);
 // 1A is the sandbox build: on unless ?sandbox=0.
 const sandbox = params.get("sandbox") !== "0";
 const seed = Number(params.get("seed") ?? "1") >>> 0 || 1;
-const session = new Session({ seed, sandbox });
-const world = session.world;
 const view = new DebugView(byId<HTMLCanvasElement>("tdCanvas"));
 let painted = false;
 
@@ -35,18 +39,50 @@ title.textContent = "Typing Defense";
 if (sandbox) title.insertAdjacentHTML("beforeend", "<small>Hộp cát · bản thử 1A</small>");
 const status = document.createElement("div");
 status.className = "td-status";
-title.append(status);
+status.textContent = "Đang tải từ vựng…";
+const mute = document.createElement("button");
+mute.className = "td-mute";
+mute.type = "button";
+mute.textContent = "Tắt tiếng";
+title.append(status, mute);
 byId("tdHud").append(title);
+
+const { deck, source } = await loadDeck();
+const session = new Session({ seed, sandbox, deck });
+const world = session.world;
+const cards = new WordCards(byId("tdWords"), (x, z) => view.project(x, z));
+const audio = new TypingAudio();
+let imeWarning = false;
+
+mute.addEventListener("click", () => {
+  audio.resume();
+  audio.muted = !audio.muted;
+  mute.textContent = audio.muted ? "Bật tiếng" : "Tắt tiếng";
+});
+window.addEventListener("pointerdown", () => audio.resume());
+window.addEventListener("keydown", () => audio.resume());
+installTypingInput(window, {
+  send: (command) => session.send(command),
+  locked: () => world.typing.router.lock >= 0 || world.typing.router.group >= 0,
+  onVietnamese: () => (imeWarning = true),
+  allowUntrusted: params.get("untrusted") === "1",
+});
 
 const waveCount = world.c.content.waves.list.length;
 let shown = "";
 function showStatus(): void {
   const wave = world.wave === 0 ? "Chuẩn bị" : "Đợt " + world.wave + "/" + waveCount;
-  const text = "Mạng " + world.lives + " · Vàng " + Math.floor(world.gold / 1000) + " · " + wave + (world.phase === "defeat" ? " · Thua" : "");
+  const parts = ["Mạng " + world.lives, "Vàng " + Math.floor(world.gold / 1000), wave, "Chuỗi " + world.typing.chain];
+  if (world.phase === "defeat") parts.push("Thua");
+  if (imeWarning) parts.push("Tắt bộ gõ tiếng Việt để gõ");
+  if (source === "fallback") parts.push("Từ dự phòng");
+  const text = parts.join(" · ");
   if (text !== shown) status.textContent = shown = text;
 }
 
 const resize = (): void => {
+  const ui = Math.max(0.8, Math.min(1.2, Math.min(window.innerWidth / 1600, window.innerHeight / 900)));
+  document.documentElement.style.setProperty("--ui", ui.toFixed(3));
   view.resize(window.innerWidth, window.innerHeight, Math.min(2, window.devicePixelRatio || 1), world.map.halfM);
   view.draw(world);
   painted = true;
@@ -59,12 +95,16 @@ const recent: RareEvent[] = [];
 runFrameLoop({
   update(now) {
     session.frame(now);
-    recent.push(...world.events.rare.splice(0));
-    if (recent.length > 200) recent.splice(0, recent.length - 200);
+    const fresh = world.events.rare.splice(0);
+    cards.read(fresh, world, now);
+    audio.read(fresh, world, now);
+    recent.push(...fresh);
+    if (recent.length > 400) recent.splice(0, recent.length - 400);
     showStatus();
   },
-  draw() {
+  draw(now) {
     view.draw(world);
+    cards.draw(world, now, window.innerWidth, window.innerHeight);
     painted = true;
   },
   onError() {
@@ -74,7 +114,7 @@ runFrameLoop({
 
 installDevHandle({
   ready: () => painted,
-  flags: () => ({ sandbox, seed: world.seed, content: world.c.hash }),
+  flags: () => ({ sandbox, seed: world.seed, content: world.c.hash, deck: deck.hash, vocabulary: source }),
   send: (command) => session.send(command),
   stats: () => statsObject(world.stats),
   hash: () => hashHex(world),
@@ -82,12 +122,25 @@ installDevHandle({
   canPlace: (id, x, z) => canPlace(world, world.c.buildingIndex(id), Math.round(x * 4), Math.round(z * 4)),
   events: () => recent.slice(),
   log: () => session.log.slice(),
+  liveWords: () => {
+    const W = world.words;
+    return W.live().map((s) => ({
+      id: W.id(s), text: wordText(deck, W.word[s]!), typed: W.typed[s]!, errors: W.errors[s]!, tier: W.tier[s]!, building: world.buildings.id(W.building[s]!),
+      age: world.tick - W.born[s]!, left: W.expire[s]! - world.tick, locked: world.typing.router.lock === s,
+    }));
+  },
+  typing: () => ({ chain: world.typing.chain, cap: world.typing.cap, a: world.typing.a, lock: world.typing.router.lock, allStopped: world.typing.allStopped }),
   state: () => {
     const B = world.buildings;
     const U = world.units;
     const buildings = [];
     for (let b = 0; b < B.top; b += 1) {
-      if (B.used[b] === 1) buildings.push({ id: B.id(b), def: world.c.buildings[B.def[b]!]!.id, level: B.level[b]!, x: B.x[b]!, z: B.z[b]!, ready: world.tick >= B.readyTick[b]! });
+      if (B.used[b] === 1) {
+        buildings.push({
+          id: B.id(b), def: world.c.buildings[B.def[b]!]!.id, level: B.level[b]!, x: B.x[b]!, z: B.z[b]!, ready: world.tick >= B.readyTick[b]!,
+          tempo: B.tempo[b]!, assist: B.assist[b]!, heat: B.heat[b]! / 1000, words: B.liveWords[b]!,
+        });
+      }
     }
     const soldiers = [];
     for (let s = 0; s < U.top; s += 1) if (U.used[s] === 1) soldiers.push({ alive: U.hp[s]! > 0, contact: U.contact[s] === 1, x: U.x[s]!, z: U.z[s]! });

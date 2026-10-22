@@ -1,9 +1,10 @@
 /**
  * Slot bookkeeping shared by the column stores (docs/td/TYPING_DEFENSE_DESIGN.md
  * 25.5): a store is typed arrays indexed by slot, allocated once. A new
- * entity takes the lowest free slot; loops run up to `top`, in slot order.
- * Its stable id is (generation << 10) | slot, so a command or a projectile
- * that names a dead entity never hits the one that reused its slot.
+ * entity takes the lowest free slot, every column zeroed there (so add()
+ * sets only what is not 0); loops run up to `top`, in slot order. Its
+ * stable id is (generation << 10) | slot, so a command or a projectile that
+ * names a dead entity never hits the one that reused its slot.
  */
 export class Slots {
   readonly cap: number;
@@ -12,6 +13,7 @@ export class Slots {
   /** One past the highest used slot. */
   top = 0;
   count = 0;
+  private columns: Uint8Array[] | undefined;
 
   constructor(cap: number) {
     if (cap > 1024) throw new Error("td store: ids hold 10 slot bits, " + cap + " slots asked");
@@ -20,7 +22,7 @@ export class Slots {
     this.gen = new Uint16Array(cap);
   }
 
-  /** The lowest free slot, now used; −1 when full. */
+  /** The lowest free slot, now used and zeroed in every column (a column may hold several numbers a slot); −1 when full. */
   protected take(): number {
     for (let slot = 0; slot < this.cap; slot += 1) {
       if (this.used[slot] !== 0) continue;
@@ -28,6 +30,8 @@ export class Slots {
       this.gen[slot] = (this.gen[slot]! + 1) & 0xffff;
       this.count += 1;
       if (slot >= this.top) this.top = slot + 1;
+      this.columns ??= Object.values(this).filter((value): value is Uint8Array => ArrayBuffer.isView(value) && value !== this.used && value !== this.gen);
+      for (const column of this.columns) column.fill(0, slot * (column.length / this.cap), (slot + 1) * (column.length / this.cap));
       return slot;
     }
     return -1;

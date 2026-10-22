@@ -27,6 +27,10 @@ export function soldiersStep(w: World): void {
   }
   for (let s = 0; s < U.top; s += 1) {
     if (U.used[s] === 0) continue;
+    if (U.temp[s] === 2 && w.tick >= U.expireAt[s]!) {
+      U.release(s);
+      continue;
+    }
     const b = U.barracks[s]!;
     const level = w.c.buildings[B.def[b]!]!.barracks!.levels[B.level[b]! - 1]!;
     if (U.hp[s]! <= 0) {
@@ -80,6 +84,23 @@ export function soldiersStep(w: World): void {
       U.regen[s] = regen - whole;
     }
   }
+}
+
+/** A soldier beyond the squad at barracks b (TK 6.10, 6.11): kind 1 while Flow holds, kind 2 until `until`. */
+export function addTempSoldier(w: World, b: number, kind: number, until: number): void {
+  const B = w.buildings;
+  const s = w.units.add(b, POSTS.length + kind, w.c.buildings[B.def[b]!]!.barracks!.levels[B.level[b]! - 1]!.hp, B.x[b]!, B.z[b]!);
+  if (s < 0) return;
+  w.units.temp[s] = kind;
+  w.units.expireAt[s] = until;
+}
+
+/** The slot of barracks b's extra soldier of `kind` after skipping `skip` of them; −1 when there are not that many. */
+export function findTempSoldier(w: World, b: number, kind: number, skip = 0): number {
+  const U = w.units;
+  let left = skip;
+  for (let s = 0; s < U.top; s += 1) if (U.used[s] === 1 && U.barracks[s] === b && U.temp[s] === kind && left-- === 0) return s;
+  return -1;
 }
 
 const far = (dx: number, dz: number, limit: number) => dx * dx + dz * dz > limit * limit;

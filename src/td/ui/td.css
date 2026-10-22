@@ -74,3 +74,26 @@ body {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+.td-mute { margin-top: 4px; padding: 1px 8px; border: 1.5px solid var(--td-ink); border-radius: 6px; background: #fff; color: var(--td-ink); font: 700 11px/1.4 var(--td-font); cursor: pointer; }
+
+/*
+ * Word cards (TK 23.4): paper lanterns in ink, one rule a line. Only
+ * transform and opacity move per frame; a card stays under 40 px tall (the
+ * column gap) at every --ui.
+ */
+.td-card, .td-stamp { position: absolute; top: 0; left: 0; will-change: transform, opacity; white-space: nowrap; }
+.td-card { padding: 3px 9px 4px; border: 2px solid var(--td-ink); border-radius: 7px; background: var(--td-paper); box-shadow: 2px 2px 0 var(--td-ink); font: 700 clamp(18px, calc(22px * var(--ui, 1)), 24px) / 1.2 var(--td-font); transform-origin: 50% 100%; }
+.td-card .l { font-weight: 800; text-decoration: underline 2px var(--fam); text-underline-offset: 3px; }
+.td-card .t { color: var(--td-jade); }
+.td-card .p { background: #ffd3d3; }
+.td-card-dot { position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; border: 1.5px solid var(--td-ink); border-radius: 50%; background: var(--agent); }
+.td-card-bar { position: absolute; left: 6px; right: 6px; bottom: 1px; height: 3px; border-radius: 2px; background: rgba(43, 33, 24, 0.35); transform-origin: 0 50%; }
+.td-card.is-locked { border-color: var(--td-jade); box-shadow: 2px 2px 0 var(--td-jade); }
+.td-card.is-late { border-color: #ffb020; }
+.td-card.is-late .td-card-bar { background: #ffb020; }
+.td-card.is-ash { background: #d8d2c4; color: #8a8172; }
+.td-stamp { padding: 1px 7px; border: 2px solid currentColor; border-radius: 999px; background: rgba(255, 244, 214, 0.92); color: var(--td-ink); font: 800 13px/1.3 var(--td-font); }
+.td-stamp.is-flash, .td-stamp.is-perfect { color: var(--td-jade); }
+.td-stamp.is-sloppy { color: #b86f00; }
+.td-stamp.is-expired, .td-stamp.is-cancelled { color: #7a7062; }

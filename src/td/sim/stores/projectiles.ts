@@ -24,6 +24,9 @@ export class ProjectileStore extends Slots {
   readonly splash = new Float64Array(this.cap);
   readonly edge = new Float64Array(this.cap);
   readonly source = new Uint8Array(this.cap);
+  /** A Word Shot's deck word (the letters trail behind it), −1 for other shots; it sets enemies burning. */
+  readonly word = new Int32Array(this.cap);
+  readonly burn = new Uint8Array(this.cap);
 
   add(kind: number, x: number, z: number, target: number, tx: number, tz: number, speed: number, source: number): number {
     const slot = this.take();
@@ -36,11 +39,8 @@ export class ProjectileStore extends Slots {
     this.tz[slot] = tz;
     this.speed[slot] = speed;
     this.source[slot] = source;
-    this.power[slot] = 0;
-    this.damageType[slot] = 0;
-    this.crit[slot] = 0;
-    this.splash[slot] = 0;
     this.edge[slot] = 1;
+    this.word[slot] = -1;
     return slot;
   }
 }

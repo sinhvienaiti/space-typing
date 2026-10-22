@@ -17,19 +17,24 @@ export type TdState = {
   gold: number;
   enemies: number;
   projectiles: number;
-  buildings: { id: number; def: string; level: number; x: number; z: number; ready: boolean }[];
+  buildings: { id: number; def: string; level: number; x: number; z: number; ready: boolean; tempo: number; assist: number; heat: number; words: number }[];
   soldiers: { alive: boolean; contact: boolean; x: number; z: number }[];
 };
+
+/** A live word as a player sees it; `age` and `left` in ticks. */
+export type TdWord = { id: number; text: string; typed: number; errors: number; tier: number; building: number; age: number; left: number; locked: boolean };
 
 export type TdDevHandle = {
   /** The page has booted and drawn its first frame. */
   ready(): boolean;
-  /** What a Node replay of log() needs besides the log: the seed and the content hash. */
-  flags(): { sandbox: boolean; seed: number; content: string };
+  /** What a Node replay of log() needs besides the log: seed, content hash, deck hash and where the words came from. */
+  flags(): { sandbox: boolean; seed: number; content: string; deck: string; vocabulary: string };
   /** Queues a command for the next tick, as the player's input does. */
   send(command: CommandBody): void;
   stats(): Record<StatName, number>;
   state(): TdState;
+  liveWords(): TdWord[];
+  typing(): { chain: number; cap: number; a: number; lock: number; allStopped: boolean };
   /** The world hash, 8 hex digits. */
   hash(): string;
   /** Building ids by definition index (the `def` of a build command). */
