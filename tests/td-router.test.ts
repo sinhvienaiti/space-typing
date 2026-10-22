@@ -79,13 +79,30 @@ describe("key router", () => {
     expect(w.buildings.count).toBe(buildings);
   });
 
-  it("unlock (Escape) lets go of the word; a key that starts nothing is a stray, counted against accuracy", () => {
-    const { w } = withWords("duck");
-    type(w, "du");
+  it("a lock with no letter in (a call's next word, BUILD_1A6 §5.2): another word's first letter switches, Backspace lets go, never wrapping (review R1)", () => {
+    const { w, slot } = withWords("cat", "dog");
+    w.typing.router.lock = slot("cat"); // what a call does with its next word
+    expect(results(type(w, "d"))).toEqual([KEY.switch]);
+    expect([w.typing.router.lock, w.words.typed[slot("dog")], w.words.errors[slot("cat")]]).toEqual([slot("dog"), 1, 0]);
+    const back = withWords("cat");
+    back.w.typing.router.lock = back.slot("cat");
+    send(back.w, { t: "backspace", atMs: 0 });
+    expect([back.w.typing.router.lock, back.w.words.typed[back.slot("cat")]]).toEqual([-1, 0]);
+    // A wrong key that starts nothing is still an error on the locked word; after it, no switch.
+    const typo = withWords("cat", "dog");
+    typo.w.typing.router.lock = typo.slot("cat");
+    expect(results(type(typo.w, "xd"))).toEqual([KEY.wrong, KEY.wrong]);
+  });
+
+  it("unlock (Escape) lets go of the word and drops what was typed, errors uncounted; a key that starts nothing is a stray, counted against accuracy", () => {
+    const { w, slot } = withWords("duck");
+    type(w, "dux");
     send(w, { t: "unlock" });
-    expect(w.typing.router.lock).toBe(-1);
-    expect(results(type(w, "z"))).toEqual([KEY.stray]);
-    expect(w.stats[STAT.strays]).toBe(1);
+    expect([w.typing.router.lock, w.words.typed[slot("duck")], w.words.errors[slot("duck")]]).toEqual([-1, 0, 0]);
+    expect(type(w, "duck", 50, true).find((event) => event.t === "wordHit")).toMatchObject({ errors: 0 });
+    const again = withWords("duck");
+    expect(results(type(again.w, "z"))).toEqual([KEY.stray]);
+    expect(again.w.stats[STAT.strays]).toBe(1);
   });
 
   it("several keys in one tick route in order", () => {

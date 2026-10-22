@@ -100,14 +100,15 @@ class Typist {
   }
 }
 
-/** §12 gate 6 and TK 6.5: open ≤ cap; only bright calls hold a word, each its own; distinct first letters, no twins, nothing one edit apart; the lock on a bright call's word. */
+/** §12 gate 6 and TK 6.5: bright ≤ cap; only bright calls hold a word, each its own; distinct first letters, no twins, nothing one edit apart; the lock on a bright call's word. */
 export function callProblems(w: World): string[] {
   const W = w.words;
   const C = w.calls;
   const { deck } = w.typing;
   const out: string[] = [];
-  const open = C.live().filter((c) => C.state[c] === CALL_STATE.open).length;
-  if (open > MODES[w.mode].open) out.push(open + " open calls");
+  const bright = C.live().filter((c) => C.bright[c] === 1).length;
+  if (bright > MODES[w.mode].open) out.push(bright + " bright calls");
+  for (const c of C.live()) if (C.bright[c] === 1 && C.state[c] !== CALL_STATE.open) out.push("call " + c + " is bright and queued");
   for (const c of C.live()) if (C.word[c]! >= 0 && (C.bright[c] !== 1 || W.call[C.word[c]!] !== c)) out.push("call " + c + " holds a word it should not");
   const live = W.live();
   const texts = live.map((s) => wordText(deck, W.word[s]!));

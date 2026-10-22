@@ -391,8 +391,8 @@ Worktree `games/.wt-td-1a6`, nhánh `feat/td-1a6`. R1 làm phần sim, dữ li�
 ### 3.2 Lệch (có lý do)
 
 1. **Thợ mỏ chở một gùi, không cả đống.** §4.4 nói thợ mỏ đổ đống mỗi 10 s và đống ≥ 50 % thì gọi. Đổ cả đống thì đống không bao giờ quá ~5 Vàng (Mỏ cấp 1 ★★★ ra 3,75 Vàng / 8 s, sức chứa 60), lời gọi Đào không bao giờ có. Thợ mỏ chở `MINE.haulK` = 0,8 × sản lượng một lần của cấp mỗi 10 s: ★ đủ chở hết (không gọi), ★★ đầy nửa sau ~220 s, ★★★ sau ~130 s. Không gõ thì mỏ giàu chỉ ra phần gùi. Số này để R3 chỉnh theo bot.
-2. **Thưởng Hoàn hảo khi việc xong trước từ cuối.** Tự làm cộng với gõ nên việc thường xong trước khi gõ hết (gặt 12 s: 1/3 tự làm mất 4 s, ba từ ở 35 WPM mất ~6–7 s). Đọc chữ nghĩa "mọi từ" thì thưởng gần như không bao giờ có. R1 trả thưởng khi việc xong lúc lời gọi còn sống, đã gõ ≥ 1 từ và mọi từ đã gõ đều Chớp hoặc Hoàn hảo (`finished` của lời gọi). Mỏ và Bắn mạnh không có việc riêng: từ cuối là việc xong.
-3. **Trần đếm lời gọi MỞ (sáng và mờ), không chỉ sáng.** Đếm chỉ lời gọi sáng thì đi giữa nhiều lời gọi mờ làm sáng quá trần cùng lúc. Lời gọi sáng là tập con của lời gọi mở, nên "sáng ≤ trần" (§12 cổng 6) vẫn đúng; chip "Đang gọi n/N" đếm lời gọi mở.
+2. **Thưởng Hoàn hảo khi việc xong trước từ cuối.** Tự làm cộng với gõ nên việc thường xong trước khi gõ hết (gặt 12 s: 1/3 tự làm mất 4 s, ba từ ở 35 WPM mất ~6–7 s). Đọc chữ nghĩa "mọi từ" thì thưởng gần như không bao giờ có. R1 trả thưởng khi việc xong lúc lời gọi còn sống, đã gõ ≥ 1 từ và mọi từ đã gõ đều Chớp hoặc Hoàn hảo (`finished` của lời gọi). Mỏ và Bắn mạnh không có việc riêng: từ cuối là việc xong. *Review R1 siết lại (mục 3.6, số 4): một từ gõ phải là nhát làm xong việc.*
+3. **Trần đếm lời gọi MỞ (sáng và mờ), không chỉ sáng.** Đếm chỉ lời gọi sáng thì đi giữa nhiều lời gọi mờ làm sáng quá trần cùng lúc. Lời gọi sáng là tập con của lời gọi mở, nên "sáng ≤ trần" (§12 cổng 6) vẫn đúng; chip "Đang gọi n/N" đếm lời gọi mở. *Review R1 bỏ lệch này (mục 3.6, số 1): trần đếm lời gọi sáng như §5.3.*
 4. **Bắn mạnh đang khóa sống quá 6 s** tới khi gõ xong hoặc Esc (§5.2: lời gọi khóa giữ từ tới khi xong hoặc Esc).
 5. **Lời gọi không dùng tầng 2.** Chữ đầu tầng 2 bị tính như kẹt chữ và chờ tick sau, để mọi từ sống có chữ đầu khác nhau (§12 cổng 6). Với ≤ 4 từ sống thì chữ không bao giờ thiếu.
 6. **Thêm lệnh `upgrade`.** §4.3 cho thời gian và số từ của nâng cấp nhưng 1A chỉ có cấp hộp cát. Nâng cấp trả giá chênh (Vàng + Gỗ), đi qua thợ xây; hoàn tác 5 s hủy nâng cấp. Op hộp cát `level` vẫn tức thì, miễn phí (như 1A), nhưng không áp cho công trường chưa xong (`notReady`).
@@ -445,3 +445,26 @@ Viết theo dòng chữ, nhịp, trợ lực ở ổ; R3 thay bằng `td-1a6-*` 
 | `td-1a-ime` | Hỏng, không lỗi console | `minusEqualSetTempo` (phím `-` `=` đã bỏ); phần bộ gõ tiếng Việt vẫn đạt |
 | `td-1a-perf` | Hỏng, không lỗi console | `presetAssisted`, `fourBuildingsDealtAt1s`, `noRejectedCommand` (`setTempo`) |
 | `td-1a-slots`, `td-1a-keyboard-only`, `td-1a-tour` | Hết 150 s | chờ trợ lực, nhịp, đợt mà luật mới không có |
+
+### 3.6 Review R1 (phản biện độc lập, 23/10)
+
+Đọc diff `8ab227eb..e77ceeae` theo `BUILD_1A6.md` §1–§6 và ý của kế hoạch; dựng lại từng lỗi bằng test thăm dò; thử 24 đột biến luật (tắt ×1,5 ban đêm, bỏ kiểm vàng khi tự mua hạt, hai dân một cây…): bộ test TD bắt cả 24, nhưng 2 cái chỉ file vàng bắt (nay có test riêng).
+
+| # | Mức | Lỗi (cách dựng lại) | Sửa |
+|---|---|---|---|
+| 1 | Cao | Lệch 3 (trần đếm lời gọi MỞ) làm bỏ qua có phạt: lời gọi Đào không tự đóng, mờ ở xa vẫn giữ chỗ mãi. Hai mỏ bị bỏ qua ở Thư giãn (ba ở Cân bằng) làm một lời gọi Xây ngay cạnh Tướng nằm CHỜ 30 s; Bắn mạnh cũng không mở được | Trần đếm lời gọi SÁNG (§5.3). Lời gọi mờ không giữ chỗ; lời gọi mở trong vòng chỉ sáng khi còn chỗ, theo ưu tiên, nên đi vào giữa nhiều lời gọi vẫn không sáng quá trần. Luật đêm đếm lời gọi kinh tế đang sáng. Chip "Đang gọi n/N" đếm lời gọi sáng |
+| 2 | Cao | Từ kế của lời gọi đến KHÓA với 0 chữ: Backspace trừ `typed` (Uint8) thành 255, từ kẹt, mọi phím sau đó là lỗi (5 lỗi trên một từ gõ đúng); gõ chữ đầu của lời gọi khác là lỗi, không đổi khóa (trái kế hoạch 4.6: không cướp bàn phím) | `router.ts`: đổi khóa mềm khi đã gõ ≤ 1 chữ, chưa lỗi (0 chữ với từ kế); Backspace không trừ dưới 0, ở 0 thì nhả khóa. `firstMs` của từ kế lấy từ phím đầu của chính nó (tốc thô) |
+| 3 | TB | Hoàn tác trong 5 s sau một nâng cấp đã xong (gõ 3 từ, 23 tick) xóa cả nhà, chỉ hoàn giá nâng cấp; hoàn tác lần hai sau khi hủy nâng cấp hoàn tiền lần nữa (+63 Vàng, +27 Gỗ) và xóa nhà | Chỉ hoàn tác việc đang xây (công trường, nâng cấp dở); việc xong trả `finished` ("Xây xong rồi, không hoàn tác") |
+| 4 | TB | Lệch 2 quá rộng: gõ 1 từ Hoàn hảo rồi bỏ đi, thợ tự làm xong, vẫn được thưởng "cả lời gọi Hoàn hảo" (Chặt: +2 Gỗ cho 1 từ trong 4) | Thưởng cần một từ gõ là nhát làm xong việc (đã trả lời tới cùng), mọi từ đã gõ Chớp hoặc Hoàn hảo; tự làm tha cho các từ cuối thì vẫn được. Mỏ, Bắn mạnh: từ cuối là việc xong, như cũ |
+| 5 | Thấp | Hủy một nâng cấp đóng mọi lời gọi của nhà (Đào của mỏ, Gặt của ruộng) | `stopSite` chỉ đóng lời gọi Xây; xóa nhà vẫn đóng hết |
+| 6 | Thấp | Op hộp cát `level` trong lúc nâng cấp: nâng cấp xong ghi đè cấp | Từ chối `notReady` khi đang nâng cấp |
+| 7 | Thấp | Nhà "nền chắc" mất +10 % máu khi nâng cấp không Hoàn hảo | `finishSite` giữ ×1,1 |
+| 8 | Thấp | Esc giữ chữ và lỗi của từ dở; gõ lại thì lỗi cũ vẫn tính (kế hoạch §8 câu 6: Esc bỏ từ dở, không tính lỗi) | `unlock` xóa chữ đã gõ và lỗi của từ đang khóa |
+
+Test thêm: `td-calls` (mỏ bị bỏ qua không chặn lời gọi trong vòng; quá trần thì chờ, sáng theo ưu tiên khi có chỗ; từ kế: đổi khóa, Backspace, tốc thô; thưởng chỉ khi gõ tới cùng; thuộc tính đếm sáng ≤ trần), `td-router` (khóa 0 chữ, Esc), `td-sim-economy` (hoàn tác việc xong và lần hai, op `level` khi nâng cấp, hủy nâng cấp giữ lời gọi Đào, nền chắc, tự mua hạt khi thiếu vàng, thợ lấy công trường cũ trước). Mỗi test mới đỏ trên mã R1.
+
+**Lệch của R1:** giữ 1, 4–15. Số 2 siết lại, số 3 bỏ (bảng trên). Ghi chú số 1: "★ không gọi" gần đúng (đống ★ lên 40 % sau 15 phút).
+
+**Để R2/R3 (thấp, chưa sửa):** Bắn mạnh tạo cuối đêm còn sống tối đa 3 s sang ngày (vô hại: lượt mạnh giữ lại); NPC đang làm bị `reroute` để ở chế độ đi (chỉ hình); dân không có đường thì chặt tại chỗ (hiếm); op `mode` không đổi độ dài ngày đang chạy. Báo cáo bot (3 seed, 4 đêm) sau sửa: cả hai bot qua 4 đêm, nhưng bot gõ còn 107 Vàng, 7 Gỗ, 124 Lúa, bot không gõ 186 Vàng, 28 Gỗ, 67 Lúa: cổng 7 cần chỉnh ở R3.
+
+**Số sau review:** 5.540 dòng (+13). File vàng làm lại vì luật đổi (lệch từ tick 780): 16.406 tick, 273 mã băm, 330 lệnh, 44 lời gọi, 52 từ, 22 lời gọi Hoàn hảo. `tsc` hai cấu hình sạch; `npx vitest run` 405 file, 2.655 đạt, 1 bỏ qua (TD 18 file, 189 test); `vite build` đạt; trình duyệt (1280 × 720, 1920 × 1080): `td-1a-boot` đạt và một kịch bản tạm ngoài repo (đặt sẵn, gõ phím thật cho lời gọi sáng, Backspace sau từ, gọi đêm) không lỗi console.

@@ -134,6 +134,11 @@ describe("farms (§4.1)", () => {
     until(off.w, () => off.plot(0) === PLOT.growing);
     off.w.gold = 0;
     expect(send(off.w, { t: "buySeeds" }).find((event) => event.t === "rejected")).toMatchObject({ reason: "gold" });
+    // Short of 8 gold, the farmer waits: no seed, no debt.
+    const poor = farmWorld(0);
+    poor.w.gold = FARM.seedGold * 1000 - 1;
+    run(poor.w, T(10));
+    expect([poor.plot(0), poor.w.gold, poor.w.seeds, poor.w.stats[STAT.seedsBought]]).toEqual([PLOT.empty, FARM.seedGold * 1000 - 1, 0, 0]);
   });
 
   it("a click on a ripe plot has the farmer harvest it next; an unripe one is refused", () => {
@@ -242,6 +247,16 @@ describe("sites and builders (§4.3)", () => {
     expect(Math.abs(timed(false, true) - T(BUILD.buildTimeS.M) / 1.5)).toBeLessThanOrEqual(1);
   });
 
+  it("sites wait their turn: the one builder takes the older of two waiting sites first", () => {
+    const w = world({ gold: 1000 });
+    const first = build(w, "archer", -8, 12);
+    const older = build(w, "archer", -18, -10);
+    const newer = build(w, "archer", 10, -6);
+    until(w, () => w.buildings.ready[first] === 1, T(60));
+    run(w, 1);
+    expect([w.buildings.builder[older]! >= 0, w.buildings.builder[newer]]).toEqual([true, -1]);
+  });
+
   it("an upgrade costs the price between levels in gold and wood, takes 0.75 of the time with a 3-word call; the building runs at its level meanwhile", () => {
     const w = world({ gold: 1000 });
     const archer = built(w, "archer", -8, 12);
@@ -273,6 +288,49 @@ describe("sites and builders (§4.3)", () => {
     send(w, { t: "upgrade", building: w.buildings.id(late) });
     send(w, { t: "sell", building: w.buildings.id(late) });
     expect([w.gold, w.wood, w.buildings.level[late], w.buildings.upTo[late], w.buildings.used[late]]).toEqual([g, wd, 1, 0, 1]);
+    // A second undo in the same 5 s finds nothing under way: no second refund, the building stays (review R1).
+    expect(send(w, { t: "sell", building: w.buildings.id(late) }).find((event) => event.t === "rejected")).toMatchObject({ reason: "finished" });
+    expect([w.gold, w.wood, w.buildings.used[late]]).toEqual([g, wd, 1]);
+  });
+
+  it("finished work is never undone, even within 5 s: an upgrade typed through in 1 s keeps its building (review R1)", () => {
+    const w = world({ gold: 1000 });
+    const archer = build(w, "archer", -18, -10);
+    ready(w);
+    const n = w.npcs.live().find((k) => w.npcs.kind[k] === NPC_KIND.builder)!;
+    [w.npcs.x[n], w.npcs.z[n]] = [-18, -7.5]; // the builder stands by it already
+    send(w, { t: "upgrade", building: w.buildings.id(archer) });
+    // Typed words push the site like the builder's own work: here the whole of it, in a second.
+    until(w, () => w.npcs.task[n] === TASK.working, T(1));
+    w.buildings.progress[archer] = 1;
+    until(w, () => w.buildings.level[archer] === 2, 2);
+    const [gold, wood] = [w.gold, w.wood];
+    expect(send(w, { t: "sell", building: w.buildings.id(archer) }).find((event) => event.t === "rejected")).toMatchObject({ reason: "finished" });
+    expect([w.gold, w.wood, w.buildings.used[archer], w.buildings.level[archer]]).toEqual([gold, wood, 1, 2]);
+    // The sandbox's free level waits for an upgrade under way, which would set its own level when done.
+    send(w, { t: "upgrade", building: w.buildings.id(archer) });
+    expect(send(w, { t: "sandbox", op: { op: "level", building: w.buildings.id(archer), value: 1 } }).find((event) => event.t === "rejected")).toMatchObject({ reason: "notReady" });
+  });
+
+  it("undoing an upgrade ends only its build call: the mine's own call goes on (review R1)", () => {
+    const w = world({ gold: 1000 });
+    const mine = built(w, "gold-mine", N1[0], N1[1]);
+    [w.buildings.haulAt[mine], w.buildings.pile[mine]] = [1e9, 40000];
+    run(w, 1);
+    const id = w.calls.id(w.buildings.call[mine]!);
+    send(w, { t: "upgrade", building: w.buildings.id(mine) });
+    const ended = send(w, { t: "sell", building: w.buildings.id(mine) }).filter((event) => event.t === "callEnd");
+    expect([ended, w.calls.id(w.buildings.call[mine]!), w.buildings.upTo[mine]]).toEqual([[], id, 0]);
+  });
+
+  it("a sturdy building (a whole Perfect build call) keeps its +10 % through an upgrade built without one", () => {
+    const w = world({ gold: 1000 });
+    const archer = build(w, "archer", -18, -10);
+    ready(w);
+    w.buildings.sturdy[archer] = 1;
+    send(w, { t: "upgrade", building: w.buildings.id(archer) });
+    ready(w);
+    expect(w.buildings.hp[archer]).toBe(Math.round(w.c.buildings[def(w, "archer")]!.hp[1]! * BUILD.sturdy));
   });
 
   it("no sequence of builds, upgrades, undos and free sandbox levels makes gold or wood (property)", () => {

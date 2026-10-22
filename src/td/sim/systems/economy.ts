@@ -191,7 +191,7 @@ function villager(w: World, n: number): void {
 /** Ticks of work site b needs: its footprint's time, an upgrade 0.75 of it (§4.3). */
 const siteTicks = (w: World, b: number): number => w.c.buildings[w.buildings.def[b]!]!.buildTicks * (w.buildings.ready[b] === 1 ? BUILD.upgradeK : 1);
 
-/** Site b is done: the level it was built to runs, at its full hit points; a new barracks' squad and a new farm's farmer come out. */
+/** Site b is done: the level it was built to runs, at its full hit points (+10 % on a sturdy one); a new barracks' squad and a new farm's farmer come out. */
 export function finishSite(w: World, b: number): void {
   const B = w.buildings;
   const def = w.c.buildings[B.def[b]!]!;
@@ -201,7 +201,7 @@ export function finishSite(w: World, b: number): void {
   B.upTo[b] = 0;
   B.progress[b] = 0;
   B.builder[b] = -1;
-  B.hp[b] = def.hp[B.level[b]! - 1]!;
+  B.hp[b] = Math.round(def.hp[B.level[b]! - 1]! * (B.sturdy[b] === 1 ? BUILD.sturdy : 1));
   if (first && def.barracks !== null) for (let post = 0; post < def.barracks.soldiers; post += 1) w.units.add(b, post, def.barracks.levels[0]!.hp, B.x[b]!, B.z[b]!);
   if (first && def.farm) B.farmer[b] = w.npcs.add(NPC_KIND.farmer, B.x[b]!, B.z[b]!, b);
   w.events.rare.push({ t: "finished", tick: w.tick, building: B.id(b), level: B.level[b]! });

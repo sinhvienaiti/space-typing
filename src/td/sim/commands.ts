@@ -14,7 +14,7 @@ import { canPlace } from "./placement";
 import { PLOT } from "./stores/buildings";
 import { NPC_KIND, TASK } from "./stores/npcs";
 import { moveAgent, orderAgent, recallAgent, releaseBuilding, reroute, slotsOpen } from "./systems/agents";
-import { closeCallsOf, configureDeck, typeKey } from "./systems/calls";
+import { closeCall, closeCallsOf, configureDeck, typeKey } from "./systems/calls";
 import { addVillager, countNpcs, finishSite, releaseNpc, staffBuilders, villagerCap } from "./systems/economy";
 import { flood } from "./systems/spawn";
 import { callNight, startNight } from "./systems/waves";
@@ -109,9 +109,10 @@ function run(w: World, command: Command): string | null {
       return null;
     }
     case "sell": {
-      // An undo (§4.3): a site or an upgrade within 5 s of its start goes, refunded in full.
+      // An undo (§4.3): a site or an upgrade still being built, within 5 s of its start, goes, refunded in full; finished work stays.
       const slot = B.slotOf(command.building);
       if (slot <= 0) return "noBuilding";
+      if (B.ready[slot] === 1 && B.upTo[slot] === 0) return "finished";
       if (w.tick - B.builtTick[slot]! > ticks(ECONOMY.undoWindowS)) return "undoWindow";
       w.gold += B.paidGold[slot]! * 1000;
       w.wood += B.paidWood[slot]!;
@@ -193,6 +194,8 @@ function run(w: World, command: Command): string | null {
       routeBackspace(w.typing.router, w.words);
       return null;
     case "unlock":
+      // Esc drops the half-typed word, its errors uncounted (plan §8 Q6): typed again, it starts clean.
+      if (w.typing.router.lock >= 0) w.words.typed[w.typing.router.lock] = w.words.errors[w.typing.router.lock] = 0;
       w.typing.router.lock = -1;
       w.typing.router.group = -1;
       return null;
@@ -266,7 +269,7 @@ function preset(w: World): void {
 function setLevel(w: World, slot: number, level: number, max: number): string | null {
   if (!(Number.isInteger(level) && level >= 1 && level <= max)) return "badValue";
   const B = w.buildings;
-  if (B.ready[slot] === 0) return "notReady";
+  if (B.ready[slot] === 0 || B.upTo[slot]! > 0) return "notReady"; // an upgrade under way would set its own level when done
   const def = w.c.buildings[B.def[slot]!]!;
   B.level[slot] = level;
   if (def.hp[0] > 0) B.hp[slot] = def.hp[level - 1]!;
@@ -307,12 +310,12 @@ export function placeBuilding(w: World, def: number, x: number, z: number, node:
   return slot;
 }
 
-/** A site's work stops: its builder goes idle and its call ends; an upgrade leaves the building as it was. */
+/** A site's work stops: its builder goes idle and its build call ends (a mine's or a farm's own calls go on); an upgrade leaves the building as it was. */
 function stopSite(w: World, slot: number): void {
   const B = w.buildings;
   const n = B.builder[slot]!;
-  closeCallsOf(w, slot);
   if (n >= 0) {
+    if (w.npcs.call[n]! >= 0) closeCall(w, w.npcs.call[n]!);
     w.npcs.task[n] = TASK.idle;
     w.npcs.job[n] = -1;
   }
@@ -324,6 +327,7 @@ function stopSite(w: World, slot: number): void {
 function removeBuilding(w: World, slot: number): void {
   const spec = w.c.buildings[w.buildings.def[slot]!]!;
   stopSite(w, slot);
+  closeCallsOf(w, slot);
   for (const s of w.units.live()) if (w.units.barracks[s] === slot) w.units.release(s);
   for (const n of w.npcs.live()) if (w.npcs.kind[n] === NPC_KIND.farmer && w.npcs.home[n] === slot) releaseNpc(w, n);
   w.grid.stamp(w.buildings.x[slot]!, w.buildings.z[slot]!, spec.radius, CELL.building, false);

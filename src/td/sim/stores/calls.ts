@@ -10,7 +10,7 @@ export const CALL_STATE = { queued: 0, open: 1 } as const;
  * Calls for help (§5): an NPC (`npc`) or a building (`b`) asks for `words` words; `done` are typed. A call is
  * queued, then open: bright in someone's help ring (it holds `word`, a live word slot) or dim (−1). Its target is
  * the farm `b` and `plot`, the tree, or the building `b`. `perfect` stays 1 while every typed word is Flash or
- * Perfect; `finished` is set when its work is done while it lives (the Perfect bonus needs it). `expire`: −1 never.
+ * Perfect; `finished` is set when a typed word finishes its work (the Perfect bonus needs it). `expire`: −1 never.
  */
 export class CallStore extends Slots {
   readonly kind = new Uint8Array(this.cap);

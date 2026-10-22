@@ -135,8 +135,9 @@ function perfectBonus(w: World, c: number): void {
 }
 
 /**
- * Call c ends (§5.2): its work is done, its words are typed, its maker is gone or it ran out. A call whose work
- * was done while it lived, with at least one word typed and every typed word Flash or Perfect, pays its bonus.
+ * Call c ends (§5.2): its work is done, its words are typed, its maker is gone or it ran out. A call whose work a
+ * typed word finished, every typed word Flash or Perfect, pays its bonus: answered to the end, though self-work
+ * may have spared it its last words (BUILD_NOTES §3.2 item 2, review R1).
  */
 export function closeCall(w: World, c: number): void {
   const C = w.calls;
@@ -153,10 +154,10 @@ export function closeCall(w: World, c: number): void {
   C.release(c);
 }
 
-/** The work of call c is done while it lives (a worker's job, or its last word for a call with no job): it ends, its bonus earned. */
-export function endWork(w: World, c: number): void {
+/** A worker's job is done, or (`byWord`) the last word of a call with no job of its own is typed: call c (−1 none) ends. */
+export function endWork(w: World, c: number, byWord = false): void {
   if (c < 0) return;
-  w.calls.finished[c] = 1;
+  if (byWord) w.calls.finished[c] = 1;
   closeCall(w, c);
 }
 
@@ -222,7 +223,10 @@ function finishWord(w: World, s: number): void {
   w.events.rare.push({ t: "wordHit", tick: w.tick, word: W.id(s), call: C.id(c), grade: score.grade, errors: W.errors[s]!, quality: score.quality });
   dropWord(w, s);
   // A job this word finished ends at its worker's step this tick (economy.ts), with its yield and the bonus.
-  if (work(w, c, score.grade === "sloppy" ? CALL.sloppy : 1, word, len, score.quality, top)) return;
+  if (work(w, c, score.grade === "sloppy" ? CALL.sloppy : 1, word, len, score.quality, top)) {
+    C.finished[c] = 1;
+    return;
+  }
   if (C.done[c]! < C.words[c]!) {
     giveWord(w, c);
     const next = C.word[c]!;
@@ -230,7 +234,7 @@ function finishWord(w: World, s: number): void {
       w.typing.router.lock = next;
       W.touched[next] = 1;
     }
-  } else if (C.kind[c] === CALL_KIND.mine || C.kind[c] === CALL_KIND.power || C.kind[c] === CALL_KIND.quiz) endWork(w, c);
+  } else if (C.kind[c] === CALL_KIND.mine || C.kind[c] === CALL_KIND.power || C.kind[c] === CALL_KIND.quiz) endWork(w, c, true);
   else closeCall(w, c); // every word typed, a sloppy one among them: the worker finishes alone
 }
 
@@ -244,7 +248,7 @@ export function typeKey(w: World, letter: number, atMs: number): string | null {
   const result = routeKey(T.router, T.deck, T.letters, W, letter);
   const s = result === KEY.done ? before : T.router.lock;
   if (result === KEY.stray || result === KEY.wrong || result === KEY.switch) bump(w.stats, result === KEY.stray ? STAT.strays : STAT.keyErrors);
-  if (s >= 0 && s !== before) W.firstMs[s] = atMs; // the lock came to this word with this key
+  if (s >= 0 && (s !== before || (result === KEY.advance && W.typed[s] === 1))) W.firstMs[s] = atMs; // its first letter: the lock came with this key, or it came locked
   if (result === KEY.lock || result === KEY.switch || result === KEY.advance || result === KEY.done) W.lastMs[s] = atMs;
   w.events.rare.push({ t: "wordKey", tick: w.tick, word: s >= 0 ? W.id(s) : -1, result });
   if (result === KEY.done) finishWord(w, s);

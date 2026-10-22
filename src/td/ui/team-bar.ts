@@ -1,12 +1,11 @@
 /**
  * The team bar (BUILD_NOW §5.3, BUILD_1A6 §9, TK 23.5, 23.7): Draconis and
  * the Thư Đồng with their number keys and a badge for the building each was
- * sent to, a closed slot's Bastion level, and the "Đang gọi n/N" chip: open
- * calls against the mode's cap.
+ * sent to, a closed slot's Bastion level, and the "Đang gọi n/N" chip: bright
+ * calls against the mode's cap (BUILD_1A6 §5.3).
  */
 import { MODES } from "../content/rules";
 import type { ViewBlock } from "../content/types";
-import { CALL_STATE } from "../sim/stores/calls";
 import { slotsOpen } from "../sim/systems/agents";
 import type { World } from "../sim/world";
 
@@ -15,7 +14,7 @@ const buildingView = (w: World, b: number): ViewBlock => w.c.buildings[w.buildin
 
 export function teamHtml(w: World, selected: number): string {
   const { agents: A, calls: C } = w;
-  const open = C.live().filter((c) => C.state[c] === CALL_STATE.open).length;
+  const bright = C.live().filter((c) => C.bright[c] === 1).length;
   const portraits = A.live().map((a) => {
     const view = agentView(w, a);
     const opensAt = w.c.content.buildings[0]!.keep!.levels.findIndex((level) => level.slots > a) + 1;
@@ -25,7 +24,7 @@ export function teamHtml(w: World, selected: number): string {
     return `<button class="td-agent${a === selected ? " is-on" : ""}" data-act="agent:${a}" style="--c:${view.color}" title="${view.name}"><i>${a + 1}</i>${view.short}${badge}</button>`;
   });
   return (
-    `<div class="td-row"><span><b>${selected + 1} · ${agentView(w, selected).name}</b></span><span class="td-load" title="Lời gọi đang mở / tối đa">Đang gọi ${open}/${MODES[w.mode].open}</span></div>` +
+    `<div class="td-row"><span><b>${selected + 1} · ${agentView(w, selected).name}</b></span><span class="td-load" title="Lời gọi đang sáng / tối đa">Đang gọi ${bright}/${MODES[w.mode].open}</span></div>` +
     `<div class="td-agents">${portraits.join("")}</div>`
   );
 }

@@ -9,6 +9,7 @@ import { CALL_KIND, CALL_STATE } from "../src/td/sim/stores/calls";
 import { closeCall, makeCall } from "../src/td/sim/systems/calls";
 import { createWorld, runLog, step, type World } from "../src/td/sim/world";
 import { wordText } from "../src/td/typing/decks";
+import { KEY } from "../src/td/typing/router";
 import { built, goTo, q, run, send, world } from "./td/fixtures";
 import { live, realDeck, smallDeck, type } from "./td/typing";
 
@@ -187,6 +188,71 @@ describe("the AttentionDirector (§5.3)", () => {
     step(w);
     expect(open(w, list)).toEqual([1, 1, 1, 1]);
   });
+
+  it("the cap counts bright calls only: dim calls nobody answers never keep a call in a ring waiting (review R1)", () => {
+    for (const mode of ["relax", "balanced"] as const) {
+      const w = world({ deck, gold: 3000, mode });
+      // A mine call never ends by itself: three ignored far away, dim.
+      const mines = [[26, -30], [-12, 32], [-34, 8]].map(([x, z]) => built(w, "gold-mine", x!, z!));
+      for (const m of mines) [w.buildings.haulAt[m], w.buildings.pile[m]] = [1e9, 50000];
+      goTo(w, 0, 0, 34); // by the Bastion, 12 m and more from every mine
+      const far = mines.map((m) => w.buildings.call[m]!);
+      expect(far.map((c) => w.calls.bright[c])).toEqual([0, 0, 0]);
+      const near = makeCall(w, CALL_KIND.build, 2, -1, 0, -1, -1); // the Bastion's, in the hero's ring
+      step(w);
+      expect([w.calls.state[near], w.calls.bright[near], w.calls.word[near]! >= 0], mode).toEqual([CALL_STATE.open, 1, true]);
+    }
+  });
+
+  it("calls in a ring past the cap wait dim or queued, and light by priority as places free", () => {
+    const w = world({ deck, mode: "relax" });
+    const list = calls(w, [CALL_KIND.chop, CALL_KIND.mine, CALL_KIND.harvest]);
+    step(w);
+    const bright = () => list.map((c) => (w.calls.used[c] === 1 ? w.calls.bright[c] : -1));
+    expect(bright()).toEqual([1, 1, 0]);
+    expect(w.calls.state[list[2]!]).toBe(CALL_STATE.queued);
+    closeCall(w, list[0]!);
+    step(w);
+    expect(bright()).toEqual([-1, 1, 1]);
+  });
+});
+
+describe("a call's next word comes locked, and never holds the keyboard (§5.2, plan 4.6; review R1)", () => {
+  /** A bright 2-word mine call with its first word typed (the next one locked, no letter in), and a bright build call by it. */
+  function chained() {
+    const { w, mine, c } = mineCall({ mode: "challenge" });
+    goTo(w, 0, N1[0], N1[1] + 6);
+    const other = makeCall(w, CALL_KIND.build, 2, -1, mine, -1, -1);
+    step(w);
+    type(w, wordOfCall(w, c), 60, true);
+    const next = w.calls.word[c]!;
+    expect([w.typing.router.lock, w.words.typed[next]]).toEqual([next, 0]);
+    return { w, c, next, other };
+  }
+
+  it("another call's first letter moves the lock there, at no error to the next word", () => {
+    const { w, next, other } = chained();
+    const word = wordOfCall(w, other);
+    const hit = type(w, word[0]!, 60, true).find((event) => event.t === "wordKey");
+    expect(hit).toMatchObject({ result: KEY.switch });
+    expect([w.typing.router.lock, w.words.typed[w.calls.word[other]!], w.words.errors[next]]).toEqual([w.calls.word[other], 1, 0]);
+    expect(type(w, word.slice(1), 60, true).find((event) => event.t === "wordHit")).toMatchObject({ grade: "flash" });
+  });
+
+  it("its raw speed counts from its own first key", () => {
+    const { w, next } = chained();
+    send(w, { t: "key", letter: textOf(w, next).charCodeAt(0) - 97, atMs: 5000 });
+    expect(w.words.firstMs[next]).toBe(5000);
+  });
+
+  it("Backspace lets the lock go (no letter to take back) and the word stays whole", () => {
+    const { w, c, next } = chained();
+    send(w, { t: "backspace", atMs: 0 });
+    expect([w.typing.router.lock, w.words.typed[next]]).toEqual([-1, 0]);
+    const chain = w.typing.chain;
+    expect(type(w, wordOfCall(w, c), 60, true).find((event) => event.t === "wordHit")).toMatchObject({ errors: 0, grade: "flash" });
+    expect(w.typing.chain).toBe(chain + 1);
+  });
 });
 
 describe("work by hand and by typing (§5.1)", () => {
@@ -199,7 +265,7 @@ describe("work by hand and by typing (§5.1)", () => {
     return { w, c, tree: w.calls.tree[c]! };
   }
 
-  it("self-work and typed words add up: one Perfect word of four takes a quarter off a 20 s chop; a call the work ends costs nothing, its Perfect words still earn the bonus", () => {
+  it("self-work and typed words add up: one Perfect word of four takes a quarter off a 20 s chop; a call the worker ends costs nothing and pays no bonus (review R1)", () => {
     const { w, c, tree } = chopping();
     const started = w.calls.born[c]!;
     const [chain, wood] = [w.typing.chain, w.wood];
@@ -213,8 +279,19 @@ describe("work by hand and by typing (§5.1)", () => {
     expect(felled - started).toBeGreaterThanOrEqual(T(TREE.chopS) * 0.75 - 2);
     expect(felled - started).toBeLessThanOrEqual(T(TREE.chopS) * 0.75 + 2);
     expect(w.calls.used[c]).toBe(0); // closed with the tree, three words untyped
-    expect(w.wood).toBe(wood + TREE.wood + TREE.perfectWood);
+    expect(w.wood).toBe(wood + TREE.wood); // one Perfect word is not a whole Perfect call
+    expect(w.events.rare.find((event) => event.t === "callEnd")).toMatchObject({ perfect: false, finished: false });
     expect(w.typing.chain).toBe(chain + 1);
+  });
+
+  it("answered to the end, every word Perfect: the word that fells the tree earns the bonus, though self-work spared the last one", () => {
+    const { w, c, tree } = chopping();
+    const wood = w.wood;
+    run(w, T(5.5)); // over a quarter of the chop done alone: three Perfect words of four finish it
+    for (let k = 0; k < 3; k += 1) type(w, wordOfCall(w, c), 60, true);
+    expect([w.trees.standing[tree], w.calls.used[c], w.calls.done[c]]).toEqual([0, 0, 3]);
+    expect(w.wood).toBe(wood + TREE.wood + TREE.perfectWood);
+    expect(w.events.rare.find((event) => event.t === "callEnd")).toMatchObject({ perfect: true, finished: true });
   });
 
   it("a sloppy word pushes the work ×0.6", () => {
@@ -249,7 +326,7 @@ function randomPlay(seed: number, ticks: number, typing: boolean) {
   const problems: string[] = [];
   const fail = (what: string) => problems.length < 10 && problems.push("tick " + w.tick + ": " + what);
   const sendNow: CommandBody[] = [{ t: "sandbox", op: { op: "preset" } }];
-  const seen = { words: 0, bright: 0, maxOpen: 0, typedTicks: 0 };
+  const seen = { words: 0, bright: 0, maxBright: 0, dimOpen: 0, typedTicks: 0 };
   const deckOf = w.typing.deck;
   for (let tick = 0; tick < ticks; tick += 1) {
     const C = w.calls;
@@ -279,17 +356,18 @@ function randomPlay(seed: number, ticks: number, typing: boolean) {
     log.push(...commands);
     step(w, commands);
     w.events.rare.length = 0;
-    // Gate 6: open ≤ cap; only bright calls hold a word, each its own; one lock, on a bright call; distinct first letters.
-    let opened = 0;
+    // Gate 6: bright ≤ cap; only bright calls hold a word, each its own; one lock, on a bright call; distinct first letters.
+    let bright = 0;
     for (const c of C.live()) {
-      if (C.state[c] === CALL_STATE.open) opened += 1;
+      if (C.bright[c] === 1) bright += 1;
+      else if (C.state[c] === CALL_STATE.open) seen.dimOpen += 1;
       if (C.bright[c] === 1 && C.state[c] !== CALL_STATE.open) fail("a queued call is bright");
       const s = C.word[c]!;
       if (s >= 0 && (C.bright[c] !== 1 || w.words.used[s] !== 1 || w.words.call[s] !== c)) fail("call " + c + " holds a word it should not");
-      if (C.bright[c] === 1) seen.bright += 1;
     }
-    if (opened > MODES[w.mode].open) fail(opened + " open calls");
-    seen.maxOpen = Math.max(seen.maxOpen, opened);
+    if (bright > MODES[w.mode].open) fail(bright + " bright calls");
+    seen.bright += bright;
+    seen.maxBright = Math.max(seen.maxBright, bright);
     const firsts = new Set<number>();
     for (const s of w.words.live()) {
       const c = w.words.call[s]!;
@@ -310,11 +388,12 @@ function randomPlay(seed: number, ticks: number, typing: boolean) {
 }
 
 describe("invariants (§12 gate 6) and replay", () => {
-  it("random play on the real vocabulary: open ≤ cap, one lock on a bright call, one word a bright call, distinct first letters; the log replays to the same hash", () => {
+  it("random play on the real vocabulary: bright ≤ cap, one lock on a bright call, one word a bright call, distinct first letters; the log replays to the same hash", () => {
     for (const seed of [1, 2, 3]) {
       const { w, log, problems, seen } = randomPlay(seed, T(240), true);
       expect(problems).toEqual([]);
-      expect(seen.maxOpen).toBe(MODES.balanced.open);
+      expect(seen.maxBright).toBeGreaterThanOrEqual(2);
+      expect(seen.dimOpen).toBeGreaterThan(0);
       expect(seen.words).toBeGreaterThanOrEqual(2);
       expect(seen.typedTicks).toBeGreaterThan(T(10));
       expect(w.stats[STAT.callWords]).toBeGreaterThan(20);
