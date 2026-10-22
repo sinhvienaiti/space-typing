@@ -9,7 +9,7 @@ import type { CommandBody } from "../../src/td/sim/commands";
 import type { RareEvent } from "../../src/td/sim/events";
 import { step, type World, type WorldOptions } from "../../src/td/sim/world";
 import { compileDeck, wordText, type Deck } from "../../src/td/typing/decks";
-import { build, ready, send, world } from "./fixtures";
+import { arrive, build, ready, send, world } from "./fixtures";
 
 const levels = new Map<number, { id: string; en: string }[]>();
 const level = (n: number) => {
@@ -42,13 +42,19 @@ export function type(w: World, text: string, ms = 150, sameTick = false): RareEv
   return w.events.rare.slice(from);
 }
 
-/** A sandbox world with the given deck and buildings, assisted by agents 0, 1, … in order, every construction done. */
-export function assisted(options: Partial<WorldOptions>, spots: readonly (readonly [string, number, number])[], keepLevel = 4): { w: World; slots: number[] } {
+/**
+ * A sandbox world with the given deck and buildings, assisted by agents 0, 1,
+ * … in order: every construction done, every agent arrived (returns on the
+ * tick after the last arrival). `init` runs on the new world first.
+ */
+export function assisted(options: Partial<WorldOptions>, spots: readonly (readonly [string, number, number])[], keepLevel = 4, init?: (w: World) => void): { w: World; slots: number[] } {
   const w = world({ gold: 5000, ...options });
+  init?.(w);
   send(w, { t: "sandbox", op: { op: "keepLevel", value: keepLevel } });
   const slots = spots.map(([id, x, z]) => (id === "keep" ? 0 : build(w, id, x, z)));
   ready(w);
   slots.forEach((b, agent) => send(w, { t: "assignUnit", agent, building: w.buildings.id(b) }));
+  arrive(w);
   return { w, slots };
 }
 

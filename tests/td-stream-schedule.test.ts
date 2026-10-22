@@ -22,14 +22,15 @@ function deals(w: World, ticks: number): Map<number, number[]> {
 }
 
 describe("stream schedule", () => {
-  it("settles 0.4 s, deals the first word 0.6 s later, then one every N with no drift", () => {
+  it("settles 0.4 s after the agent arrives, deals the first word 0.6 s later, then one every N with no drift", () => {
     const { w, slots } = assisted({ deck }, [SPOTS.archer]);
-    const assignedAt = w.tick - 1;
+    const arrivedAt = w.tick - 1;
+    expect(w.events.rare.some((event) => event.t === "agentArrived" && event.tick === arrivedAt)).toBe(true);
     w.events.rare.length = 0;
     const archer = slots[0]!;
     expect(w.buildings.tempo[archer]).toBe(tempoIndex(4)); // E = 35: 4 s
     const ticks = deals(w, T(30)).get(archer)!;
-    const first = assignedAt + T(EMIT.settleS + EMIT.firstDelayS);
+    const first = arrivedAt + T(EMIT.settleS + EMIT.firstDelayS);
     expect(ticks).toEqual(Array.from({ length: ticks.length }, (_, k) => first + k * T(4)));
     expect(ticks.length).toBe(8);
   });

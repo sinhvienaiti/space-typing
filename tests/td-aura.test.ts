@@ -3,7 +3,7 @@ import { AURA_ATTACK, PRESENCE, TEMPO } from "../src/td/content/rules";
 import { auraStep } from "../src/td/sim/systems/aura";
 import type { World } from "../src/td/sim/world";
 import { tempoIndex } from "../src/td/typing/tempo";
-import { build, ready, run, send, world } from "./td/fixtures";
+import { arrive, build, ready, run, send, world } from "./td/fixtures";
 
 /** Auras (docs/td/TYPING_DEFENSE_DESIGN.md 6.10, 11.3–11.5; BUILD_NOW §6.1 td-aura). */
 function tower(id = "archer"): { w: World; b: number } {
@@ -50,7 +50,8 @@ describe("aura caps (TK 6.10)", () => {
   it("presence (+15 %) multiplies the rate outside the cap", () => {
     const { w, b } = tower();
     send(w, { t: "assignUnit", agent: 0, building: w.buildings.id(b) });
-    run(w, 30);
+    arrive(w);
+    run(w, 30); // settled
     set(w, b, 5, 1, 1, 1, 80);
     expect(w.buildings.rateMul[b]).toBeCloseTo(1.5 * (1 + PRESENCE), 12);
   });

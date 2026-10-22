@@ -36,6 +36,14 @@ export function ready(w: World): void {
   run(w, 151);
 }
 
+/** Steps until every agent sent to a building assists it (walking and flying take time since 1A.3); returns on the tick after the last arrival. */
+export function arrive(w: World, limit = 60 * 60): void {
+  const A = w.agents;
+  const pending = () => A.live().some((a) => A.goal[a]! >= 0 && A.at[a] !== A.goal[a]);
+  for (let tick = 0; tick < limit && pending(); tick += 1) step(w);
+  if (pending()) throw new Error("agents still on their way after " + limit + " ticks");
+}
+
 /**
  * Puts an enemy `dist` metres along route `route` (0, 1 ground; last: flying)
  * at lateral 0, as the spawn system would; returns its slot.

@@ -15,13 +15,17 @@ export type Placement = { ok: true; x: number; z: number; node: number } | { ok:
 
 const no = (reason: PlaceReason): Placement => ({ ok: false, reason });
 
-/** The assist socket of a building: on its rim plus a step, facing the Bastion (TK 8.4). */
-export function socketCell(w: World, x: number, z: number, radius: number): number {
+export type Point = { x: number; z: number };
+const socket: Point = { x: 0, z: 0 };
+
+/** The cell `reach` m from (x, z) toward the Bastion (from the Bastion itself, south, off the road), the point into `out`: a socket is a step off the rim (TK 8.4). */
+export function socketCell(w: World, x: number, z: number, reach: number, out = socket): number {
   const dx = w.map.keep[0] - x;
   const dz = w.map.keep[1] - z;
-  const norm = Math.sqrt(dx * dx + dz * dz) || 1;
-  const reach = radius + ASSIST.socketGapM;
-  return w.grid.cell(x + (dx / norm) * reach, z + (dz / norm) * reach);
+  const norm = Math.sqrt(dx * dx + dz * dz);
+  out.x = norm > 0 ? x + (dx / norm) * reach : x;
+  out.z = norm > 0 ? z + (dz / norm) * reach : z + reach;
+  return w.grid.cell(out.x, out.z);
 }
 
 export function canPlace(w: World, def: number, qx: number, qz: number): Placement {
@@ -76,8 +80,8 @@ export function canPlace(w: World, def: number, qx: number, qz: number): Placeme
   if (spec.barracks !== null && !w.lanes.slice(0, -1).some((lane) => lane.gap2(x, z) <= RALLY.radiusM * RALLY.radiusM)) return no("rally");
 
   // With the building down, a walker must still get from the Bastion to every socket.
-  const sockets = others.map((slot) => socketCell(w, B.x[slot]!, B.z[slot]!, w.c.buildings[B.def[slot]!]!.radius));
-  sockets.push(socketCell(w, x, z, r));
+  const sockets = others.map((slot) => socketCell(w, B.x[slot]!, B.z[slot]!, w.c.buildings[B.def[slot]!]!.radius + ASSIST.socketGapM));
+  sockets.push(socketCell(w, x, z, r + ASSIST.socketGapM));
   w.grid.stamp(x, z, r, CELL.probe, true);
   const reachable = reachesAll(w.grid, w.keepCell, sockets);
   w.grid.stamp(x, z, r, CELL.probe, false);

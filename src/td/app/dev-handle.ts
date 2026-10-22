@@ -19,6 +19,8 @@ export type TdState = {
   projectiles: number;
   buildings: { id: number; def: string; level: number; x: number; z: number; ready: boolean; tempo: number; assist: number; heat: number; words: number }[];
   soldiers: { alive: boolean; contact: boolean; x: number; z: number }[];
+  /** Hero first; mode: stand, walk, takeoff, fly, land; goal and at: building ids (−1 none); path: the walker's points ahead, x, z, x, z… */
+  agents: { x: number; z: number; mode: number; goal: number; at: number; path: number[] }[];
 };
 
 /** A live word as a player sees it; `age` and `left` in ticks. */

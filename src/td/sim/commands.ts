@@ -3,7 +3,6 @@
  * the world. Play, bots and replays all go through applyCommand, each command
  * stamped with the tick it acts on. A refused command changes nothing and
  * leaves a `rejected` event with the reason. Positions are quarter metres.
- * Agents walk from 1A.3; until then `assignUnit` puts one at its building.
  */
 import { ticks } from "../content/compile";
 import { BUILD, ECONOMY, EXPECTED, RALLY } from "../content/rules";
@@ -12,7 +11,8 @@ import { routeBackspace } from "../typing/router";
 import { tempoOpen } from "../typing/tempo";
 import { CELL } from "./nav/grid";
 import { canPlace } from "./placement";
-import { assignAgent, configureDeck, densestFor, orderGrace, recheckTempos, setAssist, setTempo, slotsOpen, startTempo, stopAll } from "./systems/stream";
+import { orderAgent, recallAgent, releaseBuilding, rerouteAgents, slotsOpen } from "./systems/agents";
+import { configureDeck, densestFor, orderGrace, recheckTempos, setTempo, startTempo, stopAll } from "./systems/stream";
 import { callWave, startWave } from "./systems/waves";
 import { cancelWords, typeKey } from "./systems/words";
 import type { World } from "./world";
@@ -94,12 +94,12 @@ function run(w: World, command: Command): string | null {
       const slot = w.buildings.slotOf(command.building);
       if (slot < 0) return "noBuilding";
       if (!(Number.isInteger(command.agent) && command.agent >= 0 && command.agent < slotsOpen(w))) return "noSlot";
-      assignAgent(w, command.agent, slot);
+      orderAgent(w, command.agent, slot);
       return null;
     }
     case "recall":
       if (!(Number.isInteger(command.agent) && command.agent >= 0 && command.agent < slotsOpen(w))) return "noSlot";
-      setAssist(w, command.agent, -1);
+      recallAgent(w, command.agent);
       return null;
     case "setTempo": {
       const slot = w.buildings.slotOf(command.building);
@@ -179,6 +179,7 @@ function setLevel(w: World, slot: number, level: number, max: number): string | 
   }
   w.events.rare.push({ t: "levelSet", tick: w.tick, building: B.id(slot), level });
   recheckTempos(w);
+  if (slot === 0) for (let agent = slotsOpen(w); agent < w.agents.top; agent += 1) if (w.agents.goal[agent]! >= 0) recallAgent(w, agent); // a closed slot's agent goes home
   return null;
 }
 
@@ -188,6 +189,7 @@ export function placeBuilding(w: World, def: number, x: number, z: number, node:
   const slot = w.buildings.add(def, x, z, spec.hp[0], w.tick, w.tick + spec.buildTicks, paid, node);
   if (slot < 0) return -1;
   if (spec.placement !== "fixed") w.grid.stamp(x, z, spec.radius, CELL.building, true);
+  rerouteAgents(w, x, z, spec.radius);
   if (spec.barracks !== null) {
     const point = { x, z };
     let best = Infinity;
@@ -214,5 +216,6 @@ function removeBuilding(w: World, slot: number): void {
   cancelWords(w, slot);
   for (const s of w.units.live()) if (w.units.barracks[s] === slot) w.units.release(s);
   w.grid.stamp(w.buildings.x[slot]!, w.buildings.z[slot]!, spec.radius, CELL.building, false);
+  releaseBuilding(w, slot); // after the grid is open again: a recalled walker's path may cross the freed ground
   w.buildings.release(slot);
 }

@@ -3,8 +3,6 @@
  * docs/td/TYPING_DEFENSE_DESIGN.md 25.6. Pure TypeScript: no clock, no DOM,
  * randomness only from the named seeded streams. The same seed, content and
  * command log give the same world on Node and in every browser.
- * Agents (step 3) join in 1A.3; until then an assigned agent is at its
- * building at once.
  */
 import { createRng, type Rng } from "../../platform/rng";
 import { compile, type Compiled } from "../content/compile";
@@ -20,11 +18,13 @@ import { Events } from "./events";
 import { groundLanes, Lane } from "./lanes";
 import { WalkGrid } from "./nav/grid";
 import { createStats } from "./stats";
+import { AgentStore } from "./stores/agents";
 import { BuildingStore } from "./stores/buildings";
 import { EnemyStore } from "./stores/enemies";
 import { ProjectileStore } from "./stores/projectiles";
 import { UnitStore } from "./stores/units";
 import { WordStore } from "./stores/words";
+import { agentsStep, heroAttack, home } from "./systems/agents";
 import { auraStep } from "./systems/aura";
 import { meleeStep, statusStep, towersAttack } from "./systems/combat";
 import { deathsStep } from "./systems/deaths";
@@ -97,6 +97,7 @@ export type World = {
   readonly buildings: BuildingStore;
   readonly projectiles: ProjectileStore;
   readonly words: WordStore;
+  readonly agents: AgentStore;
   readonly typing: Typing;
   readonly stats: Float64Array;
   readonly events: Events;
@@ -104,8 +105,6 @@ export type World = {
 
 /** `deck`: the compiled vocabulary (levels 1–5); none deals no word. */
 export type WorldOptions = { seed: number; sandbox?: boolean; content?: Content; deck?: Deck; gold?: number; difficulty?: Difficulty; expected?: number; vocab?: number };
-
-export const KEEP_SLOT = 0;
 
 export function createWorld(options: WorldOptions): World {
   const c = compile(options.content ?? SLICE_1A);
@@ -139,12 +138,14 @@ export function createWorld(options: WorldOptions): World {
     buildings: new BuildingStore(STORE.buildings),
     projectiles: new ProjectileStore(STORE.projectiles),
     words: new WordStore(STORE.words),
+    agents: new AgentStore(STORE.agents),
     typing: createTyping(options.deck ?? compileDeck([]), c.buildings.length),
     stats: createStats(),
     events: new Events(),
   };
   configureDeck(w);
   placeBuilding(w, 0, map.keep[0], map.keep[1], -1, 0);
+  for (let agent = 0; agent <= c.content.helpers.length; agent += 1) w.agents.add(home(w, agent));
   return w;
 }
 
@@ -156,10 +157,12 @@ export function step(w: World, commands: readonly Command[] = []): void {
   }
   for (const command of commands) applyCommand(w, command); // 1: keys route; finished words pay
   spawnEnemies(w); // 2
+  agentsStep(w); // 3
   moveEnemies(w); // 4
   soldiersStep(w); // 5
   towersAttack(w); // 6–7: targets (aura from the last tick), shots
   fireWordShots(w); // 7: Word Shots waiting
+  heroAttack(w); // 7: the hero's fireballs
   meleeStep(w); // 7: melee
   projectilesStep(w); // 8
   statusStep(w); // 9

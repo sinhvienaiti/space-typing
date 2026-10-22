@@ -7,7 +7,7 @@ import { spawnWord } from "../src/td/sim/systems/words";
 import type { World } from "../src/td/sim/world";
 import { compileDeck, wordText } from "../src/td/typing/decks";
 import { tempoIndex } from "../src/td/typing/tempo";
-import { build, ready, run, send, world } from "./td/fixtures";
+import { arrive, build, ready, run, send, world } from "./td/fixtures";
 import { smallDeck, type } from "./td/typing";
 
 /** Heat, afterglow, chain, per-building Flow (docs/td/TYPING_DEFENSE_DESIGN.md 6.7–6.9, 6.14; BUILD_NOW §6.1 td-heat-chain). */
@@ -55,6 +55,7 @@ describe("heat (TK 6.7)", () => {
     const archer = build(w, "archer", -16, -4);
     ready(w);
     send(w, { t: "assignUnit", agent: 0, building: w.buildings.id(archer) });
+    arrive(w);
     w.buildings.heat[archer] = 3500;
     run(w, 3000);
     expect(w.buildings.heat[archer]).toBe(3500);
@@ -66,12 +67,15 @@ describe("heat (TK 6.7)", () => {
       const archer = build(w, "archer", -16, -4);
       ready(w);
       send(w, { t: "assignUnit", agent: 0, building: w.buildings.id(archer) });
+      arrive(w);
       // Even keys (every 200 ms) make C = 1; none leave C = 0.
       if (even) for (let k = 0; k < 31; k += 1) send(w, { t: "key", letter: 25, atMs: 1000 + k * 200 });
       expect(evenness(w.typing)).toBe(even ? 1 : 0);
       w.phase = "battle"; // the preparation phase caps heat at 2.5
       w.buildings.heat[archer] = 3000;
       send(w, { t: "recall", agent: 0 });
+      // The assist ends once Draconis is 4.5 m off (0.6 s takeoff, then 6 m/s); the hold starts on that tick.
+      while (w.buildings.assist[archer] === 0) run(w, 1);
       const hold = (HEAT.holdBase + (even ? HEAT.holdC : 0)) * 60;
       run(w, hold);
       expect(w.buildings.heat[archer]).toBe(3000);

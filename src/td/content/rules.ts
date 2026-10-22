@@ -61,7 +61,7 @@ export const FIVE_GOOD = { words: 5, mineGold: 5, tempSoldierS: 15, tempSoldierM
 export const CANNON_AURA = { edge: 0.2, areaCap: 1.4 } as const;
 export const RICHNESS = [0.8, 1.0, 1.25] as const;
 
-export const ASSIST = { enterM: 3.0, exitM: 4.5, settleS: 0.4, socketGapM: 1.0 } as const;
+export const ASSIST = { enterM: 3.0, exitM: 4.5, settleS: 0.4, socketGapM: 1.0, homeSideM: 5.5, homeGapM: 2.4 } as const; // idle helpers: a row west of the Bastion (TK 23.7)
 
 /** TK 10. Crits multiply by 1.75; armour and resist tiers are 0 / 30 / 60 / 80 %. */
 export const COMBAT = { critMul: 1.75, armorTiers: [0, 30, 60, 80], minDamage: 1, splashHits: ["ground", "low"] } as const;

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { STAT } from "../src/td/sim/stats";
 import { step } from "../src/td/sim/world";
 import { tempoIndex } from "../src/td/typing/tempo";
-import { build, enemyAt, ready, send, world } from "./td/fixtures";
+import { arrive, build, enemyAt, ready, send, world } from "./td/fixtures";
 import { realDeck } from "./td/typing";
 
 /**
@@ -23,6 +23,7 @@ describe("simulation step cost", () => {
       send(w, { t: "assignUnit", agent, building: w.buildings.id(b) });
       send(w, { t: "setTempo", building: w.buildings.id(b), idx: tempoIndex(1) });
     });
+    arrive(w);
     w.phase = "battle";
     w.lives = 1e6;
     const ids = ["cuong-thi", "ma-troi", "thuong-luong"];

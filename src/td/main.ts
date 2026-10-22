@@ -15,6 +15,7 @@ import type { RareEvent } from "./sim/events";
 import { hashHex } from "./sim/hash";
 import { canPlace } from "./sim/placement";
 import { statsObject } from "./sim/stats";
+import { PATH_MAX } from "./sim/stores/agents";
 import { wordText } from "./typing/decks";
 import { TypingAudio } from "./view/audio-min";
 import { DebugView } from "./view/debug-2d";
@@ -131,22 +132,19 @@ installDevHandle({
   },
   typing: () => ({ chain: world.typing.chain, cap: world.typing.cap, a: world.typing.a, lock: world.typing.router.lock, allStopped: world.typing.allStopped }),
   state: () => {
-    const B = world.buildings;
-    const U = world.units;
-    const buildings = [];
-    for (let b = 0; b < B.top; b += 1) {
-      if (B.used[b] === 1) {
-        buildings.push({
-          id: B.id(b), def: world.c.buildings[B.def[b]!]!.id, level: B.level[b]!, x: B.x[b]!, z: B.z[b]!, ready: world.tick >= B.readyTick[b]!,
-          tempo: B.tempo[b]!, assist: B.assist[b]!, heat: B.heat[b]! / 1000, words: B.liveWords[b]!,
-        });
-      }
-    }
-    const soldiers = [];
-    for (let s = 0; s < U.top; s += 1) if (U.used[s] === 1) soldiers.push({ alive: U.hp[s]! > 0, contact: U.contact[s] === 1, x: U.x[s]!, z: U.z[s]! });
+    const { buildings: B, units: U, agents: A } = world;
     return {
       tick: world.tick, phase: world.phase, wave: world.wave, nextWaveAt: world.nextWaveAt, lives: world.lives, gold: world.gold / 1000,
-      enemies: world.enemies.count, projectiles: world.projectiles.count, buildings, soldiers,
+      enemies: world.enemies.count, projectiles: world.projectiles.count,
+      buildings: B.live().map((b) => ({
+        id: B.id(b), def: world.c.buildings[B.def[b]!]!.id, level: B.level[b]!, x: B.x[b]!, z: B.z[b]!, ready: world.tick >= B.readyTick[b]!,
+        tempo: B.tempo[b]!, assist: B.assist[b]!, heat: B.heat[b]! / 1000, words: B.liveWords[b]!,
+      })),
+      soldiers: U.live().map((s) => ({ alive: U.hp[s]! > 0, contact: U.contact[s] === 1, x: U.x[s]!, z: U.z[s]! })),
+      agents: A.live().map((a) => ({
+        x: A.x[a]!, z: A.z[a]!, mode: A.mode[a]!, goal: A.goal[a]! < 0 ? -1 : B.id(A.goal[a]!), at: A.at[a]! < 0 ? -1 : B.id(A.at[a]!),
+        path: Array.from(A.path.subarray((a * PATH_MAX + A.next[a]!) * 2, (a * PATH_MAX + A.pathN[a]!) * 2)),
+      })),
     };
   },
 });

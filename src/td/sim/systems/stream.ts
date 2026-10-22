@@ -5,11 +5,11 @@
  * anchor + k × N, which never drifts. Deals anywhere on the map keep 0.2 s
  * apart by putting the later one back 0.2 s, at most 0.6 s; a building at a
  * cap waits and gives the deal up at its next mark; a letter jam skips one
- * deal and is never a miss. Tempo, "stop all", assists and the order grace
- * restart or pause the schedule here.
+ * deal and is never a miss. Tempo, "stop all" and the order grace restart or
+ * pause the schedule here; an agent settling in restarts it (agents.ts).
  */
 import { ticks } from "../../content/compile";
-import { ASSIST, CAP, EMIT, LIFE, ORDER_GRACE, TEMPO } from "../../content/rules";
+import { CAP, EMIT, LIFE, ORDER_GRACE, TEMPO } from "../../content/rules";
 import { availableLetters, bandWords, streamCap } from "../../typing/decks";
 import { KIND } from "../../typing/letters";
 import { createBag, pickWord, type Bag } from "../../typing/picker";
@@ -38,8 +38,8 @@ function bagFor(w: World, hi: number): Bag {
   return (w.typing.bags[hi] ??= createBag(bandWords(w.typing.deck, w.vocab, lengthBand(expectedE(w), STOP)[0], hi)));
 }
 
-/** The first deal `delay` ticks from now, then one every period. */
-function restart(w: World, b: number, delay: number): void {
+/** The first deal `delay` ticks from now, then one every period (a tempo change; an agent settling in). */
+export function restartStream(w: World, b: number, delay: number): void {
   const B = w.buildings;
   B.anchor[b] = B.nextEmit[b] = w.tick + delay;
   B.anchorK[b] = B.shift[b] = B.waiting[b] = 0;
@@ -62,7 +62,7 @@ export function setTempo(w: World, b: number, tempo: number, remember = true): v
   B.tempo[b] = tempo;
   B.waiting[b] = B.resolved[b] = B.hits[b] = 0;
   if (remember) B.tempoPrev[b] = 0;
-  if (tempo !== STOP) restart(w, b, period(tempo));
+  if (tempo !== STOP) restartStream(w, b, period(tempo));
   if (remember && tempo !== STOP) {
     w.typing.tempoByDef[B.def[b]!] = tempo;
     w.typing.allStopped = false;
@@ -107,35 +107,6 @@ export function stopAll(w: World, stop: boolean): void {
     }
   }
   w.typing.allStopped = stop;
-}
-
-/** Assist slots: the Bastion's level, and no more than the hero and the helpers brought (the sandbox brings all three). */
-export const slotsOpen = (w: World): number => Math.min(w.c.content.buildings[0]!.keep!.levels[w.buildings.level[0]! - 1]!.slots, 1 + w.c.content.helpers.length);
-
-/**
- * Agent `agent` (0: the hero) assists building b, or leaves (b = −1). It
- * settles in 0.4 s and the first word comes 0.6 s later (TK 6.4). 1A.2 has
- * no walking yet: the agent is there at once.
- */
-export function setAssist(w: World, agent: number, b: number): void {
-  const B = w.buildings;
-  for (const other of B.live()) if (B.assist[other] === agent) B.assist[other] = -1;
-  w.events.rare.push({ t: "assist", tick: w.tick, agent, building: b < 0 ? -1 : B.id(b) });
-  if (b < 0) return;
-  B.assist[b] = agent;
-  const settle = ticks(agent === 0 ? ASSIST.settleS : w.c.content.helpers[agent - 1]!.settleS);
-  B.assistAt[b] = w.tick + settle;
-  restart(w, b, settle + ticks(EMIT.firstDelayS));
-}
-
-/** Sending an agent to a building someone else assists swaps the two (TK 25.9). */
-export function assignAgent(w: World, agent: number, b: number): void {
-  const B = w.buildings;
-  const from = B.live().find((other) => B.assist[other] === agent) ?? -1;
-  if (from === b) return;
-  const other = B.assist[b]!;
-  setAssist(w, agent, b);
-  if (other >= 0) setAssist(w, other, from);
 }
 
 /** The order grace (TK 6.14): a menu open spares expiring words for 2 s; another opening within 3 s gets none. */

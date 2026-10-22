@@ -3,13 +3,15 @@
  * Canvas 2D, no media. Grass, lanes, the Silver Stream and its bridges, ore
  * nodes, buildings as discs of their true radius, enemies as ink-purple dots
  * sized by tier, soldiers, shots and short-lived hit marks read from the
- * combat ring; each building's heat lanterns, tempo badge and assistant,
- * and Word Shots with a jade head trailing their word. It reads the world
- * and never changes it.
+ * combat ring; each building's heat lanterns and tempo badge; the hero and
+ * the helpers with their paths and assist lines; and Word Shots with a jade
+ * head trailing their word. It reads the world and never changes it.
  */
-import { BUILD, TEMPO } from "../content/rules";
+import { BUILD, TEMPO, TICK_HZ } from "../content/rules";
 import { FX } from "../sim/events";
+import { MODE, PATH_MAX } from "../sim/stores/agents";
 import { PROJECTILE } from "../sim/stores/projectiles";
+import { slotsOpen } from "../sim/systems/agents";
 import type { World } from "../sim/world";
 import { wordText } from "../typing/decks";
 
@@ -21,6 +23,8 @@ const COLOR = {
 const FONT = '"Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif';
 /** How long a hit mark stays, in ticks. */
 const MARK_TICKS = 24;
+/** Draconis from above, nose up: a body and two swept wings, in metres. */
+const DRAGON = new Path2D("M0 -1.15L0.35 -0.15L1.3 0.7L0.27 0.4L0 0.85L-0.27 0.4L-1.3 0.7L-0.35 -0.15Z");
 
 type Mark = { kind: number; x: number; z: number; value: number; tick: number };
 
@@ -64,6 +68,7 @@ export class DebugView {
     this.buildings(w);
     this.soldiers(w);
     this.enemies(w);
+    this.agents(w);
     this.shots(w);
     this.readMarks(w);
     this.drawMarks(w);
@@ -197,13 +202,7 @@ export class DebugView {
       }
       const tempo = TEMPO[B.tempo[b]!]!.periodS;
       this.text(tempo === 0 ? "Dừng" : tempo + "s", x + r + 0.9, z + r * 0.6, 10, COLOR.ink, 700);
-      const agent = B.assist[b]!;
-      if (agent >= 0) {
-        const view = agent === 0 ? w.c.content.hero.view : w.c.content.helpers[agent - 1]!.view;
-        this.disc(x + r * 0.75, z - r * 0.75, 0.75, view.color, COLOR.ink, 1.5);
-        this.text(view.short, x + r * 0.75, z - r * 0.75, 9, COLOR.ink);
-        if (B.waiting[b] === 1) this.text("…", x, z - r - 1.7, 14, COLOR.ink);
-      }
+      if (B.assist[b]! >= 0 && B.waiting[b] === 1) this.text("…", x, z - r - 1.7, 14, COLOR.ink);
       if (spec.hp[0] > 0 && B.hp[b]! < spec.hp[level - 1]!) this.bar(x, z + r + 0.5, r * 2, B.hp[b]! / spec.hp[level - 1]!, COLOR.buildingHp);
       if (spec.barracks !== null) this.flag(B.rallyX[b]!, B.rallyZ[b]!);
       if (spec.mine !== null && B.pile[b]! > 0) this.text("+" + Math.floor(B.pile[b]! / 1000), x + r + 1.2, z, 11, "#7a4f12");
@@ -245,6 +244,43 @@ export class DebugView {
       }
       this.disc(x, z, def.radius, def.def.view.color, COLOR.ink, def.armor > 0 ? 3 : 1.2);
       if (E.hp[e]! < def.hp) this.bar(x, z - def.radius - 0.7, Math.max(1.4, def.radius * 2), E.hp[e]! / def.hp, COLOR.enemyHp);
+    }
+  }
+
+  private polyline(points: ArrayLike<number>, color: string, dash: number): void {
+    const { ctx } = this;
+    Object.assign(ctx, { strokeStyle: color, lineWidth: this.px(3) });
+    ctx.setLineDash(dash > 0 ? [this.px(dash), this.px(dash * 0.7)] : []);
+    ctx.beginPath();
+    for (let k = 0; k < points.length; k += 2) ctx.lineTo(points[k]!, points[k + 1]!);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  /** The assist line to the building's centre; a walker's path ahead, dashed; Thư Đồng as lettered discs, Draconis a winged triangle over its shadow. */
+  private agents(w: World): void {
+    const { ctx } = this;
+    const A = w.agents;
+    for (let a = 0; a < A.top; a += 1) {
+      if (a >= slotsOpen(w) && A.goal[a]! < 0 && A.mode[a] === MODE.stand) continue; // a closed slot's helper waits inside the Bastion
+      const view = a === 0 ? w.c.content.hero.view : w.c.content.helpers[a - 1]!.view;
+      const x = A.x[a]!;
+      const z = A.z[a]!;
+      if (A.at[a]! >= 0) this.polyline([x, z, w.buildings.x[A.at[a]!]!, w.buildings.z[A.at[a]!]!], view.color, 0);
+      if (A.mode[a] === MODE.walk) this.polyline([x, z, ...A.path.subarray((a * PATH_MAX + A.next[a]!) * 2, (a * PATH_MAX + A.pathN[a]!) * 2)], view.color, 7);
+      if (a > 0) {
+        this.disc(x, z, 0.85, view.color, COLOR.ink, 1.5);
+        this.text(view.short, x, z, 10, COLOR.ink);
+        continue;
+      }
+      const left = (A.until[a]! - w.tick) / ((A.mode[a] === MODE.land ? w.c.content.hero.landS : w.c.content.hero.takeoffS) * TICK_HZ);
+      const up = A.mode[a] === MODE.fly ? 1 : A.mode[a] === MODE.takeoff ? 1 - left : A.mode[a] === MODE.land ? left : 0; // height 0–1: the body lifts off its shadow
+      if (up > 0) this.disc(x + 0.9 * up, z + 1.4 * up, 0.9, "rgba(43, 33, 24, 0.25)", null);
+      ctx.translate(x, z - 0.8 * up);
+      Object.assign(ctx, { fillStyle: view.color, strokeStyle: COLOR.ink, lineWidth: this.px(1.5) });
+      ctx.fill(DRAGON);
+      ctx.stroke(DRAGON);
+      ctx.translate(-x, 0.8 * up - z);
     }
   }
 

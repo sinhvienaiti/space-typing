@@ -24,6 +24,7 @@ export type Compiled = {
   hash: string;
   buildings: readonly CompiledBuilding[];
   enemies: readonly CompiledEnemy[];
+  hero: CompiledAttack;
   buildingIndex(id: string): number;
   enemyIndex(id: string): number;
 };
@@ -85,7 +86,7 @@ export function compile(content: Content): Compiled {
     if (index < 0) throw new Error("td content: no " + kind + " " + id);
     return index;
   };
-  return { content, hash: contentHash(content), buildings, enemies, buildingIndex: find(buildings, "building"), enemyIndex: find(enemies, "enemy") };
+  return { content, hash: contentHash(content), buildings, enemies, hero: compileAttack(content.hero.attack), buildingIndex: find(buildings, "building"), enemyIndex: find(enemies, "enemy") };
 }
 
 /** Wave n (from 1). Past the list, the last wave grows by `endlessGrowth` per wave. */

@@ -76,9 +76,10 @@ class StreamAsHigherKind extends Letters {
 
 /** BUILD_NOW §6.1: 4 slots at 1 s for 10,000 ticks on the real vocabulary, every invariant checked every tick. */
 function propertyRun(vocab: number, ticks = 10000, letters?: Letters): Run {
-  const { w, slots } = assisted({ deck: realDeck(), vocab, expected: 35 }, [SPOTS.keep, SPOTS.archer, SPOTS.cannon, SPOTS.mine]);
-  expect(w.words.count).toBe(0); // no letter is held yet, so another Letters can take over
-  if (letters !== undefined) w.typing.letters = letters;
+  // Another Letters takes over before any word holds a letter; the Bastion deals while the helpers still walk.
+  const { w, slots } = assisted({ deck: realDeck(), vocab, expected: 35 }, [SPOTS.keep, SPOTS.archer, SPOTS.cannon, SPOTS.mine], 4, (fresh) => {
+    if (letters !== undefined) fresh.typing.letters = letters;
+  });
   for (const b of slots) send(w, { t: "setTempo", building: w.buildings.id(b), idx: tempoIndex(1) });
   const host = build(w, SPOTS.barracks[0], SPOTS.barracks[1], SPOTS.barracks[2]);
   const directWords = bandWords(w.typing.deck, 5, 3, 8);
@@ -87,9 +88,9 @@ function propertyRun(vocab: number, ticks = 10000, letters?: Letters): Run {
   const W = w.words;
   const problems: string[] = [];
   const fail = (what: string) => problems.length < 20 && problems.push("tick " + w.tick + ": " + what);
-  const texts = new Map<number, string>();
+  const texts = new Map<number, string>(W.live().map((s) => [W.id(s), wordText(w.typing.deck, W.word[s]!)]));
   const released = new Int32Array(26).fill(-1e6);
-  const lastAt = new Map<number, number>();
+  const lastAt = new Map<number, number>(slots.map((b) => [w.buildings.id(b), w.buildings.lastLetter[b]!]));
   const out: Run = { spawned: 0, jams: 0, tier2: 0, tier2MaxFree: 0, done: 0, maxLive: 0, minFree: 26, atReserve: 0, reserveTaken: 0, tier2AtFloor: 0, problems };
   for (let tick = 0; tick < ticks; tick += 1) {
     const from = w.events.rare.length;

@@ -42,7 +42,9 @@ export type RareEvent = { tick: number } & (
   | { t: "pileCollected"; building: number; gold: number }
   | { t: "leak"; enemy: number; lives: number }
   | { t: "defeat" }
-  | { t: "assist"; agent: number; building: number }
+  | { t: "agentOrdered"; agent: number; building: number } // building −1: home, or a point for the hero
+  | { t: "agentArrived"; agent: number; building: number }
+  | { t: "agentLeft"; agent: number; building: number }
   | { t: "tempoChanged"; building: number; tempo: number }
   | { t: "wordSpawn"; word: number; building: number }
   | { t: "wordKey"; word: number; result: number }
