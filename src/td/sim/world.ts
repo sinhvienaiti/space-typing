@@ -205,3 +205,12 @@ export function runLog(w: World, log: readonly Command[], tick: number): void {
     step(w, log.slice(from, next));
   }
 }
+
+/**
+ * A replay to a run seen at `tick`: runLog, then the orders logged at `tick` itself, which the tactical pause carried
+ * out before that tick's step (app/session.ts). Once, to compare with that run; stepping on would apply them again.
+ */
+export function replayTo(w: World, log: readonly Command[], tick: number): void {
+  runLog(w, log, tick);
+  for (const command of log) if (command.tick === tick) applyCommand(w, command);
+}

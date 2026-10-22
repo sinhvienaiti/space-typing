@@ -19,7 +19,7 @@ import { CALL_KIND } from "../../sim/stores/calls";
 import type { World } from "../../sim/world";
 import { gloss, wordText } from "../../typing/decks";
 import { KEY } from "../../typing/router";
-import { COLUMN, columnHeights, spreadLanes, type LaneBox } from "./lanes";
+import { besidePanels, COLUMN, columnHeights, lanesTouch, spreadLanes, type LaneBox, type Rect } from "./lanes";
 
 export const GRADE_NAME: Readonly<Record<Grade, string>> = { flash: "Chớp", perfect: "Hoàn hảo", good: "Tốt", ok: "Vừa", sloppy: "Ẩu" };
 /** By call kind (CALL_KIND): power, build, harvest, chop, mine, quiz. */
@@ -45,7 +45,8 @@ type Card = {
   typed: number; pink: boolean; late: boolean; lockedAt: number; half: number; height: number; x: number; y: number; seen: number;
   leave: Leave; leaveAt: number; tx: number; ty: number; shakeUntil: number; pinkUntil: number;
 };
-type Stamp = { el: HTMLElement; at: number; x: number; y: number; half: number };
+/** A grade's stamp; over a meaning card it rides above it as the card takes its place (`card`, else null). */
+type Stamp = { el: HTMLElement; at: number; x: number; y: number; half: number; card: Card | null };
 
 function element(root: HTMLElement, className: string, html = ""): HTMLElement {
   const el = root.appendChild(Object.assign(document.createElement("div"), { className, innerHTML: html }));
@@ -72,7 +73,7 @@ export class WordCards {
       const [text, bar, dots, sub] = [1, 2, 3, 4].map((k) => el.children[k] as HTMLElement);
       return { el, text, bar, pips: dots, sub, id: -1, leave: "" } as Card;
     });
-    this.stamps = Array.from({ length: STAMPS }, () => ({ el: element(root, "td-stamp"), at: -1e9, x: 0, y: 0, half: 0 }));
+    this.stamps = Array.from({ length: STAMPS }, () => ({ el: element(root, "td-stamp"), at: -1e9, x: 0, y: 0, half: 0, card: null }));
   }
 
   /** This frame's events: a wrong key shakes its card; a typed word sends the card off and stamps its grade. */
@@ -98,7 +99,7 @@ export class WordCards {
         const stamp = this.stamps.reduce((oldest, next) => (next.at < oldest.at ? next : oldest));
         stamp.el.textContent = GRADE_NAME[event.grade];
         stamp.el.className = "td-stamp is-" + event.grade;
-        Object.assign(stamp, { at: now, x: card.x, y: card.y - 30, half: stamp.el.offsetWidth / 2 });
+        Object.assign(stamp, { at: now, x: card.x, y: card.y - 30, half: stamp.el.offsetWidth / 2, card: card.leave === "mean" ? card : null });
       }
     }
   }
@@ -138,7 +139,8 @@ export class WordCards {
     return card === undefined ? -1 : card.call;
   }
 
-  draw(w: World, now: number, width: number, height: number): void {
+  /** `panels`: the HUD's panels on screen, which columns keep off when there is room. */
+  draw(w: World, now: number, width: number, height: number, panels: readonly Rect[] = []): void {
     const W = w.words;
     const lock = w.typing.router.lock;
     const dt = Math.min(100, now - this.last);
@@ -174,7 +176,7 @@ export class WordCards {
       if (c < 0) [c, card.ax, card.ay] = [-1 - this.cards.indexOf(card), Number.isNaN(card.ax) ? card.x : card.ax, Number.isNaN(card.ax) ? card.y + card.height : card.ay];
       (lanes.get(c) ?? lanes.set(c, []).get(c)!).push(card);
     }
-    this.layout(w, lanes, lock, now, dt, width, height);
+    this.layout(w, lanes, lock, now, dt, width, height, panels);
     for (const card of this.cards) {
       // A word gone with no result read (the run was reset) folds away.
       if (card.id >= 0 && card.leave === "" && card.seen !== this.frame) {
@@ -186,11 +188,13 @@ export class WordCards {
     }
     for (const stamp of this.stamps) {
       const p = Math.min(1, (now - stamp.at) / MS.stamp);
+      // A meaning card moves up its column over the call's next word: the stamp stays over it, never on its words (review R2).
+      if (stamp.card !== null && stamp.card.leave === "mean" && stamp.card.leaveAt === stamp.at) [stamp.x, stamp.y] = [stamp.card.x, stamp.card.y - 30];
       if (p < 1 || stamp.el.style.opacity !== "0.00") place(stamp.el, stamp.x - stamp.half, stamp.y - 28 * p, "1", 1 - p * p);
     }
   }
 
-  private layout(w: World, lanes: Map<number, Card[]>, lock: number, now: number, dt: number, width: number, height: number): void {
+  private layout(w: World, lanes: Map<number, Card[]>, lock: number, now: number, dt: number, width: number, height: number, panels: readonly Rect[]): void {
     const W = w.words;
     const C = w.calls;
     const boxes: LaneBox[] = [];
@@ -206,7 +210,11 @@ export class WordCards {
       boxes.push({ x: roof.x, top: roofY - tallest, bottom: roofY, half: Math.max(...cards.map((card) => (card.slot >= 0 && card.slot === lock ? card.half * 1.2 + 18 : card.half))) + 9 });
       columns.push({ b: c, cards, heights, roofY });
     }
-    const target = spreadLanes(boxes, SAFE.side, width - SAFE.side, []);
+    // Off the side panels when the columns still part there (review R2: a fourth bubble pushed over the dock); else
+    // over them, as 1A: a word is never hidden under another.
+    const beside = boxes.map((box) => besidePanels(box, panels, width / 2));
+    const kept = spreadLanes(beside, SAFE.side, width - SAFE.side, []);
+    const target = lanesTouch(boxes, kept) ? spreadLanes(boxes, SAFE.side, width - SAFE.side, []) : kept;
     let eased = columns.map((column, index) => {
       const was = this.offsets.get(column.b) ?? target[index]!;
       return Math.abs(target[index]!) >= Math.abs(was) ? target[index]! : was + (target[index]! - was) * (1 - Math.exp(-dt / MS.spring));

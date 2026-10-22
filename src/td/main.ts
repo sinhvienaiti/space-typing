@@ -63,9 +63,7 @@ const hud = new Hud(byId("tdHud"), act);
 for (const type of ["pointerdown", "keydown"]) window.addEventListener(type, () => audio.resume());
 installKeys(window, {
   // Paused (Esc, or Space's tactical pause), nothing is typed: words wait.
-  send: (command) => {
-    if (!selection.halted) session.send(command);
-  },
+  send: (command) => !selection.halted && (session.send(command), true),
   act,
   onVietnamese: () => (imeWarning = true),
   allowUntrusted: params.get("untrusted") === "1",
@@ -89,7 +87,7 @@ function showHud(): void {
     statusHtml(world, sandbox, selection.halted, audio.muted, notices.filter((notice) => notice !== "")),
     sandbox && selection.panel ? sandboxHtml(world) : "",
     teamHtml(world, selection.agent),
-    stripHtml(world, refused?.t === "rejected" ? (REASON[refused.reason] ?? refused.reason) : ""),
+    stripHtml(world, refused?.t === "rejected" ? (REASON[refused.reason] ?? refused.reason) : "", selection.tactical),
     dockHtml(world, selection),
     actionsHtml(world, selection.tactical),
   ]);
@@ -123,6 +121,7 @@ runFrameLoop({
     timed(costs.update, () => {
       selection.update();
       session.paused = selection.halted;
+      session.orders = selection.tactical; // the hand's orders act at once, typing waits
       session.frame(now);
       const fresh = world.events.rare.splice(0);
       cards.read(fresh, world, now);
@@ -135,7 +134,7 @@ runFrameLoop({
   draw(now) {
     timed(costs.draw, () => {
       view.draw(world, selection);
-      cards.draw(world, now, window.innerWidth, window.innerHeight);
+      cards.draw(world, now, window.innerWidth, window.innerHeight, hud.boxes(window.innerWidth, window.innerHeight));
     });
     painted = true;
   },

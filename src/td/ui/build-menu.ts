@@ -7,6 +7,7 @@
 import type { Selection } from "../app/selection";
 import { ECONOMY, FARM, POWER, TICK_HZ, VILLAGERS } from "../content/rules";
 import { NPC_KIND } from "../sim/stores/npcs";
+import { inRing } from "../sim/systems/agents";
 import { countNpcs, villagerCap } from "../sim/systems/economy";
 import type { World } from "../sim/world";
 import { CALL_ICON, CALL_NAME } from "../view/words/cards";
@@ -48,13 +49,17 @@ function cardHtml(w: World, sel: Selection, b: number): string {
   );
 }
 
-/** The dim call Tab is on: what it asks, and Enter to send the agent, whose help ring would light it (§8). */
+/**
+ * The dim call Tab is on: what it asks, and Enter to send the agent, whose help ring would light it (§8). One already
+ * in a ring waits for room under the cap (or a quiz gave its place), so sending someone would not light it (review R2).
+ */
 function callHtml(w: World, sel: Selection, c: number): string {
   const C = w.calls;
   const kind = C.kind[c]!;
+  const why = inRing(w, C.x[c]!, C.z[c]!) ? "Trong vòng giúp: sáng khi bớt lời gọi đang sáng." : "Ngoài vòng giúp: đưa người tới gần để thẻ sáng và gõ được.";
   return (
     head(CALL_ICON[kind] + " " + CALL_NAME[kind], C.words[c]! - C.done[c]! + " từ · đang mờ") +
-    `<p>Ngoài vòng giúp: đưa người tới gần để thẻ sáng và gõ được.</p><div class="td-row">${button("send", "Gửi " + agentView(w, sel.agent).name, "Enter")}</div>`
+    `<p>${why}</p><div class="td-row">${button("send", "Gửi " + agentView(w, sel.agent).name, "Enter")}</div>`
   );
 }
 

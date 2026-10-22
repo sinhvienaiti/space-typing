@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COLUMN, columnHeights, spreadLanes, type LaneBox } from "../src/td/view/words/lanes";
+import { besidePanels, COLUMN, columnHeights, lanesTouch, spreadLanes, type LaneBox } from "../src/td/view/words/lanes";
 
 /** Word card layout (docs/td/TYPING_DEFENSE_DESIGN.md 23.4; BUILD_NOW §6.1 td-lanes). */
 const CARD = 32;
@@ -79,5 +79,35 @@ describe("the lane spreader", () => {
     const perFrame = (performance.now() - start) / 200;
     console.log("td lanes: " + perFrame.toFixed(4) + " ms a frame for 20 cards");
     expect(perFrame).toBeLessThanOrEqual(0.3);
+  });
+});
+
+describe("columns and the HUD's side panels (review R2)", () => {
+  // 1280 × 720: the chip and the team bar on the left, the dock on the right, the word strip across the middle.
+  const panels = [{ left: 12, top: 12, right: 299, bottom: 175 }, { left: 12, top: 598, right: 299, bottom: 708 }, { left: 984, top: 488, right: 1271, bottom: 656 }, { left: 460, top: 668, right: 820, bottom: 712 }];
+  const row = (xs: number[], half = 75, top = 520): LaneBox[] => xs.map((x) => ({ x, top, bottom: top + 60, half }));
+
+  it("a lane gets the room between the side panels at its height; the strip across the middle is no side panel", () => {
+    expect(besidePanels({ x: 640, top: 520, bottom: 580, half: 70 }, panels, 640)).toMatchObject({ lo: -Infinity, hi: 978 });
+    expect(besidePanels({ x: 400, top: 100, bottom: 160, half: 70 }, panels, 640)).toMatchObject({ lo: 305, hi: Infinity });
+    expect(besidePanels({ x: 640, top: 640, bottom: 700, half: 70 }, panels, 640)).toMatchObject({ lo: 305, hi: 978 });
+  });
+
+  it("four bubbles by the east trees part without covering the dock (the 240 px push alone put one over it)", () => {
+    const lanes = row([560, 700, 760, 790]);
+    const free = spreadLanes(lanes, 8, 1272, []);
+    expect(Math.max(...lanes.map((lane, k) => lane.x + free[k]! + lane.half))).toBeGreaterThan(984);
+    const beside = lanes.map((lane) => besidePanels(lane, panels, 640));
+    const kept = spreadLanes(beside, 8, 1272, []);
+    expect(Math.max(...lanes.map((lane, k) => lane.x + kept[k]! + lane.half))).toBeLessThanOrEqual(978 + 0.01);
+    expect(lanesTouch(lanes, kept)).toBe(false);
+    expect(lanesTouch(lanes, lanes.map(() => 0))).toBe(true);
+  });
+
+  it("with no room between the panels the lanes would touch: that is how the cards know to stand over the HUD instead", () => {
+    const lanes = row([560, 610, 660, 710], 85, 600); // by the team bar and the dock: 4 × 170 px and the gaps, more than the 673 px between
+    const kept = spreadLanes(lanes.map((lane) => besidePanels(lane, panels, 640)), 8, 1272, []);
+    expect(lanesTouch(lanes, kept)).toBe(true);
+    expect(lanesTouch(lanes, spreadLanes(lanes, 8, 1272, []))).toBe(false);
   });
 });
