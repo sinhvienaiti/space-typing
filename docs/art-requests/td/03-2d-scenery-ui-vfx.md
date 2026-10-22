@@ -31,6 +31,7 @@ Instructions for ChatGPT
    (for example art-src/td/scenery/meadow/almond-tree-v1.png) so the owner can save it.
 6. If the owner attaches an image, add the MATCH, SAME, REF, BUILDREF or LAYOUT line from
    section 3.9 that the item asks for, and follow the attached image as that line says.
+   C1 with only 3.png attached uses its own 3.png sentence instead (section 7).
 7. Do not invent new items, ids or file names. Do not change colours given as hex codes.
 8. If a rule is unclear, two rules conflict, or something you need is missing,
    ask the owner before generating. Do not guess.
@@ -116,13 +117,14 @@ Game HUD icon: one single object, centred, filling about 80% of the square, slig
 ### 3.6 VFX (tấm sprite hiệu ứng)
 
 ```text
-Game VFX sprite sheet: chunky rounded shapes, two or three painted tones. Solid pieces have a thin dark ink outline; dust, smoke, water and fire have no outline. On a green, magenta or blue background every edge is crisp and solid: softness is painted as two or three tone bands inside the shape, never as a blurry or see-through fade into the background. On a black background (glowing effects) soft glowing edges are fine. A FLIPBOOK shows the whole motion including the fade-out: in the last frames the shapes break apart and shrink instead of turning see-through. Exactly 16 cells in a 4 x 4 grid on a square 1024 x 1024 image: each cell is 256 x 256 px, the drawing is centred in its cell with at least 24 px of empty space on every side, nothing touches or crosses a cell border, no grid lines, no numbers, no labels. Cells read left to right, top to bottom.
+Game VFX sprite sheet: chunky rounded shapes, two or three painted tones. Solid pieces have a thin dark ink outline; dust, smoke, water and fire have no outline. On a green, magenta or blue background every edge is crisp and solid: softness is painted as two or three tone bands inside the shape, never as a blurry or see-through fade into the background. On a black background (glowing effects) soft glowing edges are fine. A one-shot FLIPBOOK shows the whole motion including the fade-out: in the last frames the shapes break apart and shrink instead of turning see-through. A looping FLIPBOOK has no fade-out: frame 16 flows straight back into frame 1. Exactly 16 cells in a 4 x 4 grid on a square 1024 x 1024 image: each cell is 256 x 256 px, the drawing is centred in its cell with at least 24 px of empty space on every side, nothing touches or crosses a cell border, no grid lines, no numbers, no labels. Cells read left to right, top to bottom.
 ```
 
 - Tự quyết: mọi tấm VFX là lưới 4 × 4 = 16 ô, mỗi ô 256 px. **FLIPBOOK** là 16 khung của một chuyển động. **ATLAS** là 16 mảnh khác nhau; game tự xoay và rải.
 - Hiệu ứng cộng màu (lửa, đốm sáng) nằm trên nền đen thuần (nền K). Hiệu ứng trộn alpha (bụi, mảnh vỡ, giấy, nước, mực) nằm trên nền khóa màu.
 - Tự quyết: bụi, khói, nước vẽ mép gọn, độ mềm nằm trong hình. Mép mờ trên nền khóa màu tách không sạch (sót viền xanh, hồng). Chỉ ảnh nền đen mới được mép tỏa sáng.
-- Lưới lệch một chút vẫn dùng được: miễn các hình không chạm nhau, AI tích hợp tự tách từng hình và xếp lại lưới (mục 13).
+- Lưới lệch một chút vẫn dùng được: miễn các ô không chạm nhau, AI tích hợp tự tìm lại lưới (mục 13). Một khung FLIPBOOK có thể gồm nhiều mảnh (khói tan, mảnh vỡ).
+- X3, X11 là FLIPBOOK lặp: khung 16 nối liền khung 1, không tan, không co nhỏ ở cuối.
 
 ### 3.7 MASK (mặt nạ nhìn từ trên)
 
@@ -373,7 +375,7 @@ Layer at 140 metres: near-distance rolling tea hills, rounded green hills stripe
 - Thanh trợ lực có 4 chân dung tròn (23.5). Khung màu, vòng máu, vòng Tối Thượng, icon nhà, viền đỏ khi hoảng đều do game vẽ. Ảnh chỉ cần nhân vật trên nền khóa màu.
 - Chân dung được 3/4 tự do, có biểu cảm, có lửa và hiệu ứng (23.11). Nhưng giữ đúng màu và đồ của nhân vật.
 - Dáng và màu Thư Đồng chép từ `01-tripo-characters-enemies.md` (mục 6: P1 thân chung, P2–P4 bộ gắn, P6 ảnh mẫu). Có ảnh mẫu `art-src/td/helpers/helper-cham-ref.png` (và `-phay-ref`, `-gach-ref`) thì đính kèm và thêm dòng REF. Khi file 01 và file này khác nhau, theo file 01.
-- Cách ghép Draconis: STYLE + PORTRAIT + LOOK-DRACONIS + phần riêng C1 (+ REF khi đính kèm ảnh mẫu) + nền G.
+- Cách ghép Draconis: STYLE + PORTRAIT + LOOK-DRACONIS + phần riêng C1 (+ REF khi đính kèm ảnh Tripo P18; + câu 3.png khi chỉ đính kèm 3.png) + nền G.
 - Cách ghép Thư Đồng: STYLE + PORTRAIT + LOOK-OWLET + dòng riêng của Thư Đồng đó + dòng biểu cảm (C2–C7) + nền G.
 - Làm ảnh "hoảng" với ảnh "vui" của cùng Thư Đồng đính kèm, kèm dòng REF.
 - Tự quyết: id chân dung Thư Đồng là `<id>-happy` và `<id>-scared`.
@@ -394,15 +396,23 @@ Layer at 140 metres: near-distance rolling tea hills, rounded green hills stripe
 Draconis, the Star-sea Phoenix Dragon: a large, majestic two-legged dragon, noble and ancient, not chibi; a white scaled body and a long tail; big feathered wings in cream-gold whose feather edges shade into fiery red-orange like flames; claws and armour plates in black and gold; calm golden-amber eyes; two horns swept back, black with gold edges.
 ```
 
-- Tự quyết: mắt vàng hổ phách, hai sừng đen viền vàng. 22.2 không nói; chọn cho hợp giáp đen vàng.
+- Tự quyết: mắt vàng hổ phách, hai sừng đen viền vàng. 22.2 không nói; chọn cho hợp giáp đen vàng. Có đính kèm 3.png mà 3.png khác về đầu, sừng, mắt, giáp thì theo 3.png (như file 01, P18).
 - Tự quyết: chân dung không có vệt mực tím ở cánh. Vệt mực mờ dần qua từng bản đồ (22.2), ảnh tĩnh không theo kịp; model 3D lo phần này.
 - Tự quyết (22/10, đổi được): C1, và C23, T1, T2 ở file VS, dùng LOOK-DRACONIS: dáng ảnh 3.png (22.2). Model trong game tạm thời là `heroes/draconis-v2` (rồng đỏ cánh màng); model mới theo dáng này là P18 ở `01-tripo-characters-enemies.md`. Muốn dáng đỏ của v2 thì AI viết lại các prompt này.
 - Khối này cùng dáng với P18 ở file 01; chân dung được vẽ thêm lửa ở mép lông (23.11). Hai file khác nhau về dáng thì theo file 01.
-- Ảnh mẫu (tùy chọn): ảnh Tripo `art-src/td/heroes/draconis.png` (P18) nếu đã có, không thì `art-src/td/refs/3.png`. Đính kèm thì thêm dòng REF.
+- Ảnh mẫu (tùy chọn): có ảnh Tripo `art-src/td/heroes/draconis.png` (P18) thì đính kèm và thêm dòng REF. Chỉ có `art-src/td/refs/3.png` thì không dùng REF: dán câu 3.png dưới C1 ngay trước dòng nền. Câu này chép nguyên văn câu 3.png của P18 ở file 01, nên C1 lọc 3.png giống model P18.
 
 **C1 · `draconis`**
 ```text
 Framing: the head, the neck and the top of the chest, the top of the near wing rising behind the shoulder. Expression: proud, ancient and faintly amused, mouth closed. The red-orange wing edges look like living flame, painted as solid shapes, no loose sparks.
+```
+
+Câu 3.png (chỉ khi đính kèm 3.png mà chưa có ảnh P18; giống từng chữ file 01, P18):
+```text
+Use the attached reference picture 3.png only as a reference for this dragon's look: the head, the
+horns, the eyes, the body shape, the feathered wings, the colours and the armour. Where 3.png and
+this text differ on the head, the horns, the eyes or the armour, follow 3.png. Do not copy its
+fire, glow, pose, background or any detail that this prompt does not describe.
 ```
 
 **LOOK-OWLET** (Thư Đồng, chung cho C2–C7; chép từ file 01, P1: mũ kem viền nâu, mắt đen to, chóp bút đen ló trên vai phải)
@@ -559,17 +569,17 @@ Icon of the Seal Dais, a low round stone stage, not a shrine: three wide white l
 
 **Phần chung nhịp**
 ```text
-Icon of a tempo badge, seen straight from the front (not tilted): a round badge with a thick dark wooden rim and a cream paper face; a small brass pendulum with a short thick rod and a round weight hangs from the top centre of the face; big round dots sit in a row along the lower part of the face.
+Icon of a tempo badge, seen straight from the front (not tilted): a round badge with a thick dark wooden rim and a cream paper face; a small brass pendulum with a short thick rod and a round weight hangs from the top centre of the face.
 ```
 
 | Mã | Phần riêng |
 |---|---|
-| U8 | `Stop: the pendulum hangs perfectly still, straight down, with no motion lines; no dots; the paper face is a muted grey-cream, calm and slightly dim.` |
-| U9 | `6 seconds: the pendulum tilts slightly to one side with one faint curved motion line; one pale, faint teal dot.` |
-| U10 | `4 seconds: the pendulum tilts a little more with two curved motion lines; one solid deep-teal dot (#0B8A78).` |
-| U11 | `3 seconds: the pendulum mid-swing with two curved motion lines; two solid deep-teal dots (#0B8A78).` |
-| U12 | `2 seconds: a wide swing with three curved motion lines; three solid deep-teal dots (#0B8A78).` |
-| U13 | `1 second: the widest swing with bold motion lines; four bright deep-teal dots (#0B8A78); three small wavy heat-shimmer lines rise above the badge.` |
+| U8 | `Stop: the pendulum hangs perfectly still, straight down, with no motion lines; no dots on the face; the paper face is a muted grey-cream, calm and slightly dim.` |
+| U9 | `6 seconds: the pendulum tilted about 10 degrees to one side, with one faint curved motion line; one big round pale, faint teal dot in the lower part of the face.` |
+| U10 | `4 seconds: the pendulum tilted about 20 degrees to one side, with two curved motion lines; one big round solid deep-teal dot (#0B8A78) in the lower part of the face.` |
+| U11 | `3 seconds: the pendulum tilted about 30 degrees to one side, with two curved motion lines; two big round solid deep-teal dots (#0B8A78) in a row along the lower part of the face.` |
+| U12 | `2 seconds: the pendulum tilted about 45 degrees to one side, with three curved motion lines; three big round solid deep-teal dots (#0B8A78) in a row along the lower part of the face.` |
+| U13 | `1 second: the pendulum tilted about 60 degrees to one side, with bold motion lines; four big round bright deep-teal dots (#0B8A78) in a row along the lower part of the face; three small wavy heat-shimmer lines rise above the badge.` |
 
 ### 9.3 Bùa (U14–U16)
 
@@ -798,8 +808,9 @@ Reference sheet, not a game asset: a loose flock of seven small round ghost flam
 - [ ] Các trạng thái của cùng một vật trùng dáng, trùng cỡ.
 
 **VFX (X):**
-- [ ] Đúng 16 hình, xếp 4 × 4, không hình nào chạm hình khác hay mép ảnh.
+- [ ] Đúng 16 ô (khung) xếp 4 × 4. Một khung có thể gồm nhiều mảnh; không mảnh nào chạm khung khác hay mép ảnh.
 - [ ] FLIPBOOK đi đúng thứ tự trái sang phải, trên xuống dưới.
+- [ ] X3, X11: khung 16 nối liền khung 1, không tan, không co nhỏ ở cuối.
 - [ ] Ảnh cộng màu nằm trên nền đen thuần.
 - [ ] Ảnh trên nền khóa màu: mép gọn, không mờ loang ra nền.
 
@@ -807,7 +818,7 @@ Reference sheet, not a game asset: a loose flock of seven small round ghost flam
 
 - **Cảnh:** `scripts/td/prepare-scenery.mjs` (23.10; chưa có, viết ở 1C). Tách nền theo khóa màu, cắt sát, lề 8 px, viền mực 1,5–2 px, nở màu 8 px, pháp tuyến phồng, tấm bóng, atlas 2 × 4096² (High) và 2 × 2048² (Medium), manifest, KTX2 hoặc WebP. Cỡ thật lấy từ cột "Cao thật". S5, S7 dùng hai tấm chéo. S13 (`scenery/shared/`) là decal trên đất: không pháp tuyến phồng, không tấm bóng, không đung đưa.
 - **Icon, đèn lồng, đồng, chân dung:** tách nền, khử viền màu khóa, xuất WebP 1× và 2× (cách làm như `pickups:prepare`). Đầu ra ở `public/assets/td/`. Manifest ghi nguồn: công cụ, gói, ngày, prompt (27.1).
-- **VFX:** cắt lưới 4 × 4. Lưới lệch thì tách từng hình theo vùng nền (các hình không chạm nhau), rồi xếp lại ô 256 px theo thứ tự trái sang phải, trên xuống dưới. Cờ trộn theo cột "Trộn". X1 cho phép tô màu. X10 là mặt nạ cho decal.
+- **VFX:** cắt lưới 4 × 4. Lưới lệch thì tìm 4 cột, 4 hàng theo khe trống, gom mỗi mảnh vào ô có tâm gần nhất, rồi xếp lại ô 256 px theo thứ tự trái sang phải, trên xuống dưới. FLIPBOOK: giữ vị trí của mảnh trong ô, không canh giữa lại từng khung. ATLAS: canh giữa từng mảnh được. Ảnh nền K: trước khi dùng trộn cộng, kẹp mức đen: điểm ảnh tối hơn khoảng 8/255 đặt về 0, để nền không thành ô vuông mờ. Cờ trộn theo cột "Trộn". X1 cho phép tô màu. X10 là mặt nạ cho decal.
 - **Phông xa:** hòa mép 6 %. Xếp 4 ô mỗi vòng theo cột "Đặt quanh vòng". Trụ ở 140 / 220 / 320 m; dải trời sau cùng, phần trên nối màu tới đỉnh vòm. Phóng 2× khi cần.
 - **Ma Trơi:** X11 là thân mỗi đốm. X12 chỉ để tham khảo.
 - **Chân dung:** cắt tròn ở thanh trợ lực. Thư Đồng hoảng dùng ảnh `-scared`.

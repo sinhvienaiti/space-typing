@@ -14,7 +14,7 @@ Instructions for ChatGPT
   (BG-G, BG-M or BG-B). Keep every sentence; do not shorten, soften or "improve" them.
 - One image per subject: one character, creature or object per image. Never put two views or
   two subjects in one image. Extra views (-side, -back, -front) are separate images built with
-  the VIEW lines, with the main image attached as the reference.
+  the VIEW lines, with the approved main image of the same item attached as the only reference.
 - Use the exact size given. Above each image, write its exact file name so the owner can save
   it under that name.
 - No text, letters, numbers, logos or watermarks inside any image. Talismans, slates and
@@ -23,8 +23,10 @@ Instructions for ChatGPT
   For the dressed references (P6), ask the owner to attach helper-owlet.png. For the owlet's
   loose items (P2a, P2b, P3a, P4a, P5a-P5c) that image is only a scale and colour reference:
   draw the object alone, never the owlet.
-- For P18 (Draconis) the owner's reference picture 3.png is recommended. If it is not attached,
-  remind the owner once, then work from the text prompt alone.
+- For the main image of P18 (Draconis) the owner's reference picture 3.png is recommended. If it
+  is not attached, remind the owner once, then work from the text prompt alone.
+- Extra views (-side, -back) never use 2.png or 3.png: do not add their reference sentence and do
+  not remind the owner about them for an extra view.
 - Flat cloth textures (Block T: P2c, P3b, P4b) fill the whole image edge to edge and have no
   background line.
 - Before drawing, list the images you will make (code, file name, size) in a short table.
@@ -43,7 +45,7 @@ Instructions for ChatGPT
 
 **Lưu file.** Ảnh và model nằm trong `art-src/`. Git bỏ qua thư mục này. Bước 5 sao lưu lên Google Drive (xem `docs/MEDIA_STORAGE.md` của repo cha). Không đưa ảnh, tiếng, model lên Git.
 
-**Ảnh mẫu.** Lưu các ảnh mẫu chủ dự án đã gửi vào `art-src/td/refs/`: `2.png` (Lam), `3.png` (Draconis). Git bỏ qua thư mục này, bước 5 sao lưu nó. Nhờ vậy đính kèm được trong ChatGPT, và AI làm sau xem được. P7: đính kèm 2.png là tùy chọn, prompt chữ đã đủ. P18: nên đính kèm 3.png.
+**Ảnh mẫu.** Lưu các ảnh mẫu chủ dự án đã gửi vào `art-src/td/refs/`: `2.png` (Lam), `3.png` (Draconis). Git bỏ qua thư mục này, bước 5 sao lưu nó. Nhờ vậy đính kèm được trong ChatGPT, và AI làm sau xem được. P7: đính kèm 2.png là tùy chọn, prompt chữ đã đủ. P18: nên đính kèm 3.png khi làm ảnh chính. Ảnh góc phụ chỉ đính kèm ảnh chính đã duyệt, không đính kèm 2.png, 3.png.
 
 **Đường dẫn.**
 - Ảnh 2D gốc: `art-src/td/<loại>/<id>.png`. Loại: `heroes`, `helpers`, `units` (lính), `workers` (thợ), `enemies`, `bosses`, `animals`.
@@ -90,7 +92,7 @@ Instructions for ChatGPT
 | P11 | `nuppeppo` | Nuppeppō, khối bột tách đôi | `enemies/nuppeppo.png` | `enemies/nuppeppo.glb` |
 | P12 | `thuong-luong` | Thuồng Luồng, rắn sông giáp nặng | `enemies/thuong-luong.png` (+ `-front`) | `enemies/thuong-luong.glb` |
 | P13 | `tanuki` | Lửng Tanuki, hồi máu bầy | `enemies/tanuki.png` | `enemies/tanuki.glb` |
-| P14 | `troll` | Quỷ Núi Troll, khiên vòm | `enemies/troll.png` | `enemies/troll.glb` |
+| P14 | `troll` | Quỷ Núi Troll, khiên vòm | `enemies/troll.png` (+ `-back`) | `enemies/troll.glb` |
 | P15 | `alicanto` | Chim Vàng Alicanto, trộm vàng | `enemies/alicanto.png` (+ `-front`) | `enemies/alicanto.glb` |
 | P16 | `mam-go` | Mầm Gỗ, quái bầy do boss gọi | `enemies/mam-go.png` | `enemies/mam-go.glb` |
 | — | `ma-troi` | Đàn Ma Trơi: chỉ là VFX | Xem `03-2d-scenery-ui-vfx.md` | — |
@@ -113,8 +115,10 @@ with a small even empty margin on every side, nothing cut off.
 Camera: straight front view at chest height, near-orthographic, no perspective distortion, no tilt.
 Pose: neutral A-pose. Standing straight and facing the viewer, arms straight down and out 30-45
 degrees away from the body, elbows almost straight, hands relaxed unless stated, legs straight and
-slightly apart, both feet flat on an invisible floor. Neutral calm face (a slight closed-mouth
-smile is fine), eyes open.
+slightly apart, both feet flat on an invisible floor. Seen from the front, a clear gap of empty
+background separates each arm from the body from the armpit down, and nothing else (sleeve cloth,
+a bag, a tail, a wing, a cape) touches an arm below the shoulder, except an object gripped in the
+hand. Neutral calm face (a slight closed-mouth smile is fine), eyes open.
 Style: charming storybook fantasy, like a hand-painted matte vinyl toy: chunky rounded shapes, a few
 large details instead of many small ones, a bold silhouette that still reads from a high top-down
 camera. Matte hand-painted colours, soft shading, no glossy shine.
@@ -137,7 +141,8 @@ and animated later.
 Framing: the whole creature from nose (or beak) to tail tip, centred, with a small even empty
 margin on every side, nothing cut off.
 Camera: exact side view of the creature's left side, head pointing to the left edge of the image,
-camera at body height, near-orthographic, no perspective distortion.
+camera at body height, near-orthographic, no perspective distortion. In this side view the far
+wing stays hidden behind the near one; do not offset it or turn the body to show it.
 Pose: neutral and calm. Legs straight and all visible, feet flat on an invisible floor; wings (if
 any) raised and half spread, neither folded nor fully stretched, not covering the body; tail held
 out and curled slightly to one side, clear of the legs. Eyes open, mouth closed.
@@ -198,19 +203,34 @@ shadows, no folds, no wrinkles, no border, no seams, no text, no letters, no log
 
 ### 3.5 Góc phụ
 
-Góc phụ là ảnh riêng. Ghép: khối của mục + dòng VIEW + prompt của mục + dòng nền. Đính kèm ảnh chính khi tạo. Dòng VIEW thay dòng "Camera" của khối.
+Góc phụ là ảnh riêng. Ghép: khối của mục + dòng VIEW + prompt của mục + dòng nền. Khi tạo, chỉ đính kèm ảnh chính đã duyệt của mục đó. Không đính kèm ảnh mẫu 2.png, 3.png, không thêm câu ảnh mẫu. Dòng VIEW thay dòng "Camera" và chữ "facing the viewer" của khối; VIEW FRONT thay cả dòng "Framing". Chữ trái, phải trong prompt của mục tả ảnh chính; dòng VIEW nói cách đổi.
 
 ```text
-[VIEW SIDE] This is an extra view of the same character as the attached front image: identical
-design, colours, proportions, pose and scale. This line replaces the camera line above: exact
-left-side profile, the character faces the left edge of the image, camera at chest height,
-near-orthographic. The arms (or wings) keep exactly the same angle as in the front image.
-[VIEW BACK] This is an extra view of the same character as the attached front image: identical
-design, colours, proportions, pose and scale. This line replaces the camera line above: seen
-straight from behind, near-orthographic, camera at chest height.
-[VIEW FRONT] This is an extra view of the same creature as the attached side image: identical
-design, colours, proportions, pose and scale. This line replaces the camera line above: seen
-straight from the front with the head facing the viewer, near-orthographic, camera at body height.
+[VIEW SIDE] This is an extra view of the same character as the attached front image (the
+approved main image of this item, not a reference picture): identical design, colours,
+proportions, pose and scale. This line replaces the camera line and the words "facing the viewer"
+above: exact left-side profile, the whole character, head included, faces the left edge of the
+image; camera at chest height, near-orthographic. Arms and wings stay exactly where they are in
+the front image and are only seen from the side: arms that angle out to the sides look as if they
+hang straight down beside the body; wings that spread to the left and right point toward and away
+from the camera, so the near wing shows only its edge and hides the far wing. Do not swing arms or
+wings forward or back, and do not turn a wing to show its flat face. Left and right in the prompt
+below (such as "the viewer's right") describe the front image: keep every part on the same side of
+the character's own body; parts on its right side are hidden behind the body in this view.
+[VIEW BACK] This is an extra view of the same character as the attached front image (the
+approved main image of this item, not a reference picture): identical design, colours,
+proportions, pose and scale. This line replaces the camera line and the words "facing the viewer"
+above: seen straight from behind, near-orthographic, camera at chest height; the character faces
+straight away from the camera, the head is not turned and the face does not show. Left and right
+in the prompt below describe the front image and are swapped in this view: a part the prompt puts
+on the viewer's right is on the viewer's left here, and the reverse; every part stays on the same
+side of the character's own body.
+[VIEW FRONT] This is an extra view of the same creature as the attached side image (the approved
+main image of this item): identical design, colours, proportions, pose and scale. This line
+replaces the camera line and the framing line above: seen straight from the front with the head
+facing the viewer, near-orthographic, camera at body height; the whole creature fits in the frame,
+centred, with a small even margin. Parts that are behind the body in this view, such as the rest
+of a long body and the tail, stay hidden.
 ```
 
 ### 3.6 Dòng nền
@@ -246,7 +266,8 @@ straight from the front with the head facing the viewer, near-orthographic, came
 ## 4. Kiểm ảnh trước khi gửi Tripo
 
 - [ ] Một vật duy nhất. Thấy trọn, không bị cắt, lề đều.
-- [ ] Đúng góc: nhân vật nhìn thẳng, tư thế A (Thư Đồng: cánh mở nửa, ngang vai; Draconis: tay buông chéo, cánh xòe nửa sau tay); thú nhìn ngang, đầu quay sang trái; món gắn nhìn 3/4 (hoặc ngang nếu mục ghi).
+- [ ] Đúng góc: nhân vật nhìn thẳng, tư thế A (Thư Đồng: cánh mở nửa, ngang vai; Draconis: tay buông chéo, cánh giơ chữ V trên vai, có khe nền giữa cánh và tay); thú nhìn ngang, đầu quay sang trái; món gắn nhìn 3/4 (hoặc ngang nếu mục ghi).
+- [ ] Nhân vật: có khe nền giữa tay và thân. Không gì (tay áo, túi, đuôi, cánh) chạm tay dưới vai, trừ đồ cầm trong tay.
 - [ ] Nền một màu phẳng đúng mã, không bóng, không chuyển màu.
 - [ ] Không lửa, khói, hạt, quầng sáng, vệt chuyển động, chữ.
 - [ ] Thân đặc, không trong suốt, kể cả hồn ma.
@@ -254,6 +275,7 @@ straight from the front with the head facing the viewer, near-orthographic, came
 - [ ] Tóc, lông, lá thành mảng to. Không sợi mảnh. Không phần lơ lửng.
 - [ ] Ánh sáng đều, không bóng đổ, không bóng loáng.
 - [ ] Ảnh góc phụ cùng nhân vật, cùng tư thế, cùng cỡ.
+- [ ] Ảnh `-back`: đồ lệch một bên nằm ở phía ngược với ảnh chính (đuôi Lam, đuôi Draconis ở bên phải ảnh chính thì ở bên trái ảnh `-back`). Đầu không ngoái lại, không thấy mặt. Ảnh `-side`: tay buông thẳng; cánh to chỉ thấy cạnh, không thấy mặt cánh. Ảnh `-front` của thú: thân dài và đuôi khuất sau thân, không bẻ sang bên.
 - [ ] Màu đúng mô tả. Không dùng màu giữ riêng (mục 3.7).
 - [ ] Texture P2c, P3b, P4b (không gửi Tripo): hoa văn phủ kín ảnh, đều, không viền, không bóng.
 
@@ -275,7 +297,7 @@ straight from the front with the head facing the viewer, near-orthographic, came
 | Tải về | **GLB** (bản có xương nếu đã rig) |
 | Tên file | Đúng dòng "Model 3D" |
 
-- Góc phụ lệch nhiều so với ảnh chính (khác màu, khác dáng): bỏ góc phụ, dùng Image to 3D với ảnh chính.
+- Góc phụ lệch nhiều so với ảnh chính (khác màu, khác dáng): bỏ góc phụ, dùng Image to 3D với ảnh chính. Riêng P15 (góc phụ bắt buộc): làm lại ảnh trước, không bỏ.
 - Model Multiview ra ngược hay méo: đổi ảnh từ ô Left sang ô Right, tạo lại.
 - Rig báo lỗi: tải bản không rig, lưu cùng tên. Blender gắn xương bằng tay (27.4).
 - Clip Tripo có trượt về trước: vẫn dùng được. Blender khóa gốc (23.9: không có chuyển động gốc).
@@ -309,6 +331,7 @@ Ba cú non học việc của Cú Thư: Chấm, Phẩy, Gạch. Chúng đi bộ,
 - Dáng theo 23.11: đứng thẳng, cánh mở nửa ngang vai, hai chân rõ, bảng đá đeo chéo, bút lông cắm sau lưng, mũ học trò vải.
 - Tự quyết: id thân chung `helper-owlet`; mũ vải màu kem viền nâu, mắt đen to, bảng đá xám khung gỗ, dây kem có khóa gỗ vuông, chóp bút đen nhô trên vai phải (22.3 không ghi màu). Mũ kem sáng giúp nhận ra Thư Đồng từ camera cao.
 - Chân dung C2–C7 (khối LOOK-OWLET, `03-2d-scenery-ui-vfx.md`) chép dáng và màu từ mục này. Hai file khác nhau thì theo file này (file 03 cũng ghi vậy).
+- Bảng đá dính liền bụng trong model Tripo. Để Thư Đồng "giơ bảng đá lên" mỗi từ trúng (23.7), Blender tách bảng đá lên một xương riêng và vá chỗ bụng sau bảng bằng màu be của bụng. Không tách được thì làm động tác giơ bằng thân và cánh.
 
 ```text
 Thu Dong, a baby owl apprentice scribe and helper (the shared base body for three helpers): a round
@@ -512,7 +535,7 @@ white dashes. Everything else stays exactly as in the attached base image.
 - Tự quyết: lông mặt, mõm, ngón tay trắng; mặt nạ, tai, đuôi đen; chỏm tai và chóp đuôi tô cobalt (chỗ lửa VFX bám).
 - Tự quyết: mũ trùm đội lên, hai tai xuyên qua, huy hiệu phong bì có cánh ở trước mũ (22.2 chỉ ghi "mũ trùm có huy hiệu").
 - Tự quyết: ống thư đeo chéo sau lưng; túi thư đeo hông phải để thấy từ trước và làm `FX_TOOL` (22.2 ghi "túi thư, ống thư sau lưng").
-- Prompt không dùng tên "Azureflame" và chữ "fire": các chữ đó dễ làm ChatGPT vẽ lửa (23.11).
+- Prompt không dùng tên "Azureflame" và chữ "fire" để tả hình: các chữ đó dễ làm ChatGPT vẽ lửa (23.11). Chữ "fire" chỉ có trong câu cấm (Khối A, câu 2.png).
 
 ```text
 Lam, a young cat warrior and letter courier, chibi proportions about 2.5 heads tall, the head about
@@ -525,19 +548,20 @@ Outfit: a fantasy techwear courier jacket of quilted navy-black fabric in big pu
 length and closed, with thin cobalt-blue rune lines painted along the seams and cuffs (painted, not
 glowing); the hood is up and fitted, the ears standing up through two openings, a small embroidered
 winged-envelope badge on the front of the hood; two dark leather straps crossing the chest in an X
-with a round cobalt buckle where they meet; a chunky mail satchel on Lam's right hip (the viewer's
-left) on a cross-body strap; a fat cylindrical letter tube strapped diagonally across the back, its
-round cap showing above Lam's left shoulder (the viewer's right); fingerless navy gloves with white
-fur fingers and short blunt claw tips; slim dark trousers tucked into thick-soled running shoes,
-navy with white soles and cobalt laces.
+with a round cobalt buckle where they meet; a chunky mail satchel worn flat against the front of
+Lam's right hip (the viewer's left) on a cross-body strap, not sticking out past the hip, with a
+clear gap between it and the right arm; a fat cylindrical letter tube strapped diagonally across the
+back, its round cap showing above Lam's left shoulder (the viewer's right); fingerless navy gloves
+with white fur fingers and short blunt claw tips; slim dark trousers tucked into thick-soled running
+shoes, navy with white soles and cobalt laces.
 A long, thick black cat tail with a cobalt-blue tip, curled out to the viewer's right and up, clear
-of the legs. Hands relaxed and slightly open. Symmetrical except the satchel, the letter tube and
-the tail.
+of the legs and of the left arm and hand. Hands relaxed and slightly open. Symmetrical except the
+satchel, the letter tube and the tail.
 The fur and clothes are plain and matte everywhere: no flames, no glow and no sparks on the ears,
 the shoulders or the tail.
 ```
 
-Chỉ khi chủ dự án đính kèm 2.png, thêm câu này vào cuối prompt (trước dòng nền):
+Chỉ khi làm ảnh chính `lam.png` và chủ dự án đính kèm 2.png, thêm câu này vào cuối prompt (trước dòng nền):
 
 ```text
 Use the attached image only as a reference for head proportions, the face mask, the eyes and the
@@ -545,33 +569,35 @@ matte vinyl-toy material. Do not copy its fire, pose, background or any outfit d
 prompt does not describe.
 ```
 
+Ảnh `-side`, `-back`: chỉ đính kèm `lam.png` đã duyệt. Không đính kèm 2.png, không thêm câu trên.
+
 ### P18 · `draconis` — Draconis Phượng Long (model mới theo 3.png)
 
 | Mục | Giá trị |
 |---|---|
 | Bậc | P (Tướng của Thế giới 1, có từ 1A. Chân dung và tranh truyện dùng dáng này. `draconis-v2` chỉ là model tạm.) |
 | Là gì | Tướng bay, giữ ô 1, phép diện rộng, chống bay. Đậu mái khi trợ lực (8.4). Rồng hai chân theo ảnh 3.png (22.2). |
-| Ảnh 2D | `art-src/td/heroes/draconis.png` · 1536×1024 (cánh xòe nửa nên hình rộng) |
-| Góc phụ (rất nên có) | `draconis-side.png`, `draconis-back.png` · 1536×1024 · Khối A + VIEW SIDE (hoặc VIEW BACK) + prompt + BG-G |
+| Ảnh 2D | `art-src/td/heroes/draconis.png` · 1536×1024 (hai cánh xòe chữ V rộng nên hình rộng) |
+| Góc phụ (rất nên có) | `draconis-side.png`, `draconis-back.png` · 1536×1024 · Khối A + VIEW SIDE (hoặc VIEW BACK) + prompt + BG-G · chỉ đính kèm `draconis.png` đã duyệt; không đính kèm 3.png, không thêm câu 3.png |
 | Model 3D | `art-src/3d/td/heroes/draconis.glb` |
 | Ghép | Khối A + prompt dưới + BG-G (trắng, kem, vàng, đỏ cam, đen: không có xanh lá) |
-| Ảnh mẫu | `art-src/td/refs/3.png`, ảnh chủ dự án gửi. Nên đính kèm, kèm câu thêm ở cuối mục. |
-| Tripo | Multiview to 3D (ảnh chính, `-side`, `-back`) · face limit 30.000 (Tướng to nhất, cánh nhiều khối lông) · rig biped (lỗi thì không rig, 27.4); cánh do Blender gắn xương, vì Tripo không rig được cánh · không xin clip Tripo: Draconis bay, Blender làm `Hero_Fly`, `Hero_Idle_Hover` |
+| Ảnh mẫu | `art-src/td/refs/3.png`, ảnh chủ dự án gửi. Nên đính kèm khi làm ảnh chính `draconis.png`, kèm câu thêm ở cuối mục. Ảnh góc phụ không dùng 3.png. |
+| Tripo | Multiview to 3D (ảnh chính, `-side`, `-back`) · face limit 30.000 (Tướng to nhất, cánh nhiều khối lông) · **không rig, không clip Tripo**: tải GLB không xương. Blender dựng cả khung xương (thân, tay, cánh, chân, đuôi) bằng `build_winged_rig` với preset mới đo trên model này (`"flight": true`, tên xương như `draconis-v2-rig.json`), rồi làm clip bay. Lý do: Tripo không rig được cánh (27.4); GLB đã có xương Tripo thì `build_winged_rig` bị bỏ qua và clip bay không có chuyển động. |
 | Blender thêm | Dựng lại bộ clip của v2 trên khung xương mới, giữ đúng tên: `Hero_Fly`, `Hero_Idle_Hover`, `Hero_Boost`, `Hero_Attack_L`, `Hero_Attack_R`, `Hero_Attack_Both`, `Hero_Cast`, `Hero_Hit`, `Hero_Death`, `Hero_Victory`, `Hero_Intro`. Thêm clip Tướng bay của 23.9 còn thiếu: `Hero_Skill1`, `Hero_Skill2`, `Hero_Ult`, `Hero_Takeoff`, `Hero_Land`, `Hero_Perch_Assist`; nên có `Hero_Perch_Idle`, `Hero_Ult_Echo`, `Hero_Ground_Idle`. Việc của từng clip: xem mục v2 dưới đây. Hàm có sẵn dùng được: `build_winged_rig`, `make_flight_clips`, `make_dragon_clips` (mục 13). |
-| Socket | 6 socket nhân vật của 23.9 (`FX_HAND_R`, `FX_HAND_L`, `FX_HEAD`, `FX_CORE`, `FX_FEET`, `FX_TOOL`), thêm tên của v2: `FX_MOUTH` (cầu lửa, nón lửa), `FX_CORE` (Mảnh Chữ bay vào, 23.8), `FX_WING_L`, `FX_WING_R`, `FX_TAIL`. `FX_TOOL` = `FX_MOUTH` như v2. |
-| Cao trong game | Thân 3,5 m, sải cánh 6 m, bay ở 4–6 m (23.2). To gấp 2–3 lần Tướng khác. Không chibi. |
+| Socket | 6 socket nhân vật của 23.9 (`FX_HAND_R`, `FX_HAND_L`, `FX_HEAD`, `FX_CORE`, `FX_FEET`, `FX_TOOL`), thêm tên của v2: `FX_MOUTH` (cầu lửa, nón lửa), `FX_CORE` (Mảnh Chữ bay vào, 23.8), `FX_WING_L`, `FX_WING_L2`, `FX_WING_R`, `FX_WING_R2`, `FX_TAIL` (5 vệt bay ở cánh và đuôi, theo `src/scene3d/hero.ts`). `FX_TOOL` = `FX_MOUTH` như v2. |
+| Cao trong game | Thân 3,5 m, sải cánh 6 m, bay ở 4–6 m (23.2). To gấp 2–3 lần Tướng khác. Không chibi. Đo 3,5 m từ gót chân tới đỉnh đầu, không tính sừng, cánh, đuôi. Sải cánh 6 m là hai đầu cánh khi duỗi hết trong `Hero_Fly`; dáng nghỉ trong ảnh hẹp hơn. Blender đặt tỉ lệ theo đỉnh đầu, không theo hộp bao, vì đầu cánh giơ cao hơn đầu. |
 | Model tạm | `heroes/draconis-v2`: rồng đỏ cánh màng; clip và bí danh ở mục dưới |
 | Lửa | Cầu lửa, nón lửa, lông lửa, tro là VFX (22.2, 23.8). Không vẽ vào ảnh này. Chóp lông đỏ cam chỉ là màu sơn. |
 | Shader | Vệt Mực Câm tím trên cánh đầu Thế giới 1 là shader (mặt nạ cánh + tham số theo bản đồ, 22.2). Không vẽ vào ảnh. |
 | Hình 2D | Chân dung C1 (`03-2d-scenery-ui-vfx.md`), ảnh trượt C23 và tranh truyện T1, T2 (`03-2d-scenery-ui-vfx-vs.md`) dùng khối LOOK-DRACONIS, cùng dáng với mục này. |
 | Màu áo 2 | Tướng cấp 3 mở "màu áo 2" (15.1): biến thể texture trong Blender, không cần ảnh mới. |
 
-- Tự quyết: mắt vàng hổ phách, hai sừng đen viền vàng, như khối LOOK-DRACONIS ở file 03 (22.2 không nói). Hai file khác nhau thì theo file này.
-- Tự quyết: hai tay buông chéo 30–45°, móng mở; hai cánh giơ lên, xòe nửa, nằm sau tay. Tay, cánh, thân tách rời nhau, nên Tripo dựng dễ và Blender gắn xương dễ (27.4).
+- Tự quyết: mắt vàng hổ phách, hai sừng đen viền vàng, như khối LOOK-DRACONIS ở file 03 (22.2 không nói). Hai file khác nhau thì theo file này. Ảnh chính có đính kèm 3.png mà 3.png khác về đầu, sừng, mắt, giáp thì theo 3.png, vì dáng TD theo 3.png.
+- Tự quyết: hai tay buông chéo 30–45°, móng mở; hai cánh giơ cao thành chữ V trên vai, xòe nửa; lông thấp nhất của cánh cao hơn khuỷu tay, có khe nền giữa cánh và tay. Đuôi nằm thấp, dưới tầm tay. Tay, cánh, thân tách rời nhau, nên Tripo dựng dễ và Blender gắn xương dễ (27.4).
 - Tự quyết: mỗi cánh 5–7 lớp lông to chồng lên nhau, không vẽ từng lông mảnh (23.11). Giáp ít mảnh, mảnh to.
 - Tự quyết: chóp lông đỏ cam là dải hẹp ở đầu lông, không thành mảng lớn, để không lẫn với đỏ nguy hiểm và cam khẩn (23.3).
-- Tự quyết: giữ cả các tên socket khác của v2 (`FX_CAST_L`, `FX_CAST_R`, `FX_HALO`, `FX_FOOT_L`, `FX_FOOT_R`), đặt trùng socket 23.9 như ánh xạ ở mục v2. Đổi model thì mã game không phải sửa.
-- Prompt không dùng chữ "Phoenix", "fire", "flame", "ember": các chữ đó dễ làm ChatGPT vẽ lửa (23.11). Màu chóp lông tả bằng màu quả hồng chín.
+- Tự quyết: giữ cả các tên socket khác của v2 (`FX_CAST_L`, `FX_CAST_R`, `FX_HALO`, `FX_FOOT_L`, `FX_FOOT_R`, `FX_WING_L2`, `FX_WING_R2`), đặt trùng socket 23.9 như ánh xạ ở mục v2. Đổi model thì mã game không phải sửa.
+- Prompt không dùng các chữ "Phoenix", "fire", "flame", "ember" để tả hình: các chữ đó dễ làm ChatGPT vẽ lửa (23.11). Các chữ này chỉ có trong câu cấm (Khối A, câu cuối prompt, câu 3.png). Màu chóp lông tả bằng màu quả hồng chín.
 
 ```text
 Draconis, a great ancient dragon, majestic and NOT chibi: grown-up proportions, an upright
@@ -579,7 +605,8 @@ two-legged body standing on two powerful legs, a huge and heavy build, a strong 
 head that is small compared with the tall body. The whole dragon fits in the frame, both wing tips
 and the tail tip included.
 Body: smooth white scales grouped into a few big plates, a pale cream belly with wide belly bands,
-and a long, thick white tail curled out to the viewer's right, clear of the legs, ending in a blunt
+and a long, thick white tail lying low along the invisible floor and curled out to the viewer's
+right below the level of the hands, clear of the legs and of the left hand, ending in a blunt
 rounded tip.
 Head: a proud dragon head with a short strong snout, mouth closed, calm golden-amber eyes (painted,
 not glowing) and two thick horns swept back, black with gold edges.
@@ -587,23 +614,27 @@ Armour and claws: a few big black armour plates with gold rims on the chest, the
 forearms and the shins (few and big, not many small ones); black claws with gold bases on the
 hands and the feet.
 Instead of the A-pose arm line: the arms hang down and out 30-45 degrees from the body, hands open
-with the claws relaxed, and two very big feathered wings grow from the upper back, raised and half
-spread out to the left and right behind the arms, neither folded nor fully stretched, not covering
-the arms or the body. Each wing is made of five to seven big overlapping layers of broad, solid,
-cream-gold feathers; the tip of every feather is a narrow band painted warm red-orange like a ripe
-persimmon. No single thin feathers, no loose fibres.
+with the claws relaxed, and two very big feathered wings grow from the upper back, raised high and
+half spread in a wide V above the shoulders, neither folded nor fully stretched; the lowest
+feathers of each wing end above the elbows, so a clear gap of empty background separates each wing
+from the arm below it, and no part of an arm overlaps a wing. Each wing is made of five to seven
+big overlapping layers of broad, solid, cream-gold feathers; the tip of every feather is a narrow
+band painted warm red-orange like a ripe persimmon. No single thin feathers, no loose fibres.
 Proud, calm and ancient. Symmetrical except the tail.
 The scales, feathers and armour are plain and matte everywhere: no flames, no glow, no sparks and
 no smoke on the wings, the mouth or the tail.
 ```
 
-Khi chủ dự án đính kèm 3.png (nên làm), thêm câu này vào cuối prompt (trước dòng nền):
+Khi làm ảnh chính `draconis.png` và chủ dự án đính kèm 3.png (nên làm), thêm câu này vào cuối prompt (trước dòng nền):
 
 ```text
-Use the attached image only as a reference for this dragon's look: the head, the horns, the body
-shape, the feathered wings, the colours and the armour. Do not copy its fire, glow, pose,
-background or any detail that this prompt does not describe.
+Use the attached reference picture 3.png only as a reference for this dragon's look: the head, the
+horns, the eyes, the body shape, the feathered wings, the colours and the armour. Where 3.png and
+this text differ on the head, the horns, the eyes or the armour, follow 3.png. Do not copy its
+fire, glow, pose, background or any detail that this prompt does not describe.
 ```
+
+Ảnh `-side`, `-back`: chỉ đính kèm `draconis.png` đã duyệt làm ảnh mặt trước. Không đính kèm 3.png, không thêm câu trên. Chân dung C1 ở file 03 dùng lại câu này khi chỉ có 3.png.
 
 ### Draconis v2 (`heroes/draconis-v2`) — model tạm, không cần ảnh
 
@@ -618,7 +649,7 @@ Model `heroes/draconis-v2` (22.2) chạy trong game cho tới khi có model mớ
 | Blender cần làm | `Hero_Skill1` (Hơi Thở Phượng Hỏa: nón lửa từ miệng 3 s), `Hero_Skill2` (Tiếng Gầm Cổ Tinh), `Hero_Takeoff`, `Hero_Land` (mỗi lần 0,6 s, 8.2), `Hero_Perch_Assist` (đậu mái, thay bí danh của `Hero_Assist`), `Hero_Ult` thật (Mưa Lông Lửa: bay cao rải lông); nên có `Hero_Perch_Idle`, `Hero_Ult_Echo`, `Hero_Ground_Idle`. Khung xương: `scripts/models/presets/draconis-v2-rig.json`. |
 | Socket | Model có `FX_CAST_L`, `FX_CAST_R`, `FX_MOUTH`, `FX_CORE`, `FX_HALO`, `FX_FOOT_L`, `FX_FOOT_R`, `FX_WING_*`, `FX_TAIL`. Cầu lửa và nón lửa ra từ `FX_MOUTH`. Mảnh Chữ bay vào ngực (`FX_CORE`, 23.8). |
 | Shader | Vệt Mực Câm tím trên cánh đầu Thế giới 1, mờ dần qua từng bản đồ (22.2): mặt nạ cánh + một tham số theo bản đồ. |
-| Đậu mái | Đậu ở `FX_perch` của nhà đang trợ lực. Tự quyết (22/10, đổi được): `FX_perch` = `FX_top` + 0,6 m ở mọi nhà có mái (23.9); Pháo cấp 1 và Đài Ấn có điểm đậu riêng (`02-tripo-buildings-props.md`, mục 8). |
+| Đậu mái | Đậu ở `FX_perch` của nhà đang trợ lực. Tự quyết (22/10, đổi được): `FX_perch` = `FX_top` + 0,6 m ở mọi nhà có mái (23.9); Tháp Pháo (cấp 1 không mái, cấp 2–3 chỉ có mái che nửa sau) và Đài Ấn có điểm đậu riêng (`02-tripo-buildings-props.md`, mục 8). |
 | Hình 2D | Chân dung C1 ở `03-2d-scenery-ui-vfx.md`; ảnh trượt Tối Thượng C23, tranh truyện T1, T2 ở `03-2d-scenery-ui-vfx-vs.md`. Các ảnh này theo dáng 3.png (P18), không theo màu v2. |
 
 - Tự quyết: socket chuẩn 23.9 lấy từ socket có sẵn: `FX_HAND_R` = `FX_CAST_R`, `FX_HAND_L` = `FX_CAST_L`, `FX_HEAD` = `FX_HALO`, `FX_FEET` = điểm giữa `FX_FOOT_L` và `FX_FOOT_R` (chỗ chạm mái khi đậu), `FX_TOOL` = `FX_MOUTH` (chỗ thổi đốm lửa khi trợ lực, 23.7).
@@ -708,8 +739,10 @@ strip (no writing, no symbols) hanging from the front of the hat brim and lying 
 down to the eyebrows, thick and stiff like card. A stiff old-fashioned court robe in warm faded
 mustard ochre (earthy yellow-brown with no green tint, not shiny gold) reaching the ankles, with
 wide navy-black bands at the collar, cuffs and hem, and a plain square chest panel with one simple
-cream cloud shape; very long sleeves that cover the hands except the fingertips; black cloth shoes with thick white soles. Arms down in the
-A-pose (the arms-forward hop is animated later).
+cream cloud shape; long, fitted tube sleeves that hang close around each arm and cover the hands
+except the fingertips, with a clear gap of empty background between each sleeve and the robe;
+black cloth shoes with thick white soles. Arms down in the A-pose (the arms-forward hop is animated
+later).
 ```
 
 ### P10 · `cuong-thi-lead-hat` — Mũ Cương Thi Đầu Đàn
@@ -793,8 +826,9 @@ stones edged with dull bronze; a low solid dorsal crest along the spine as one s
 cream belly bands; a broad paddle-shaped tail fin. Colours: deep slate blue body, cream belly, dull
 bronze plate edges, small pearly scales on the cheeks; the body is a cool blue-grey with no green or
 teal tint. Pose instead of legs: the front third of the body rises in one smooth gentle curve so
-the head is held high and level; the rest of the body lies straight along an invisible floor with
-the tail fin at the far right; no coils, no loops, no part of the body crossing another.
+the head is held high and level; the rest of the body lies straight back behind the head along an
+invisible floor, ending in the broad tail fin; no coils, no loops, no part of the body crossing
+another.
 ```
 
 ### P13 · `tanuki` — Lửng Tanuki
@@ -835,10 +869,10 @@ Colours: warm grey-brown fur, dark brown mask and limbs, cream belly and muzzle.
 | Bậc | P (1B: "quái bản đồ 1 + Troll") |
 | Là gì | Quỷ núi Bắc Âu. Khiên vòm đá 4 m: đạn −70 %. Gõ trực tiếp Phá Khiên. Cần 2 chỗ chặn (22.6, 9.2). |
 | Ảnh 2D | `art-src/td/enemies/troll.png` · 1024×1024 |
-| Góc phụ | Không bắt buộc: `troll-back.png` (thấy rõ khiên trên lưng) · 1024×1024 · Khối A + VIEW BACK + prompt + BG-M |
+| Góc phụ (nên có) | `troll-back.png` (thấy rõ khiên đá tròn có rãnh vòng trên lưng) · 1024×1024 · Khối A + VIEW BACK + prompt + BG-M |
 | Model 3D | `art-src/3d/td/enemies/troll.glb` |
 | Ghép | Khối A + prompt dưới + **BG-M** (rêu xanh) |
-| Tripo | Image to 3D · face limit 9.000 · rig biped · clip Tripo: idle, walk |
+| Tripo | Multiview to 3D (ảnh chính ô Front, `troll-back` ô Back) khi có ảnh sau; không có thì Image to 3D · face limit 9.000 · rig biped · clip Tripo: idle, walk |
 | Blender thêm | `Enemy_Move` (đi nặng), `Enemy_Idle`, `Enemy_Attack`, `Enemy_Hit`, `Enemy_Death` (hóa đá, vỡ 3 tảng); nên có `Enemy_Skill` (dựng Vòm Đá) |
 | Socket | `FX_TOOL` (giữa khiên: tâm vòm đá), `FX_HEAD` (cuộn Phá Khiên), `FX_HAND_R`, `FX_HAND_L`, `FX_CORE`, `FX_FEET` |
 | Cao trong game | 4,0 m (quái to). Không chibi (22.1: quái lớn giữ tỉ lệ to). |
@@ -868,10 +902,10 @@ shoulders.
 | Bậc | P (1B) |
 | Là gì | Chim kho báu dân gian Chile. Bay cao. Trộm 15 Vàng từ đống ở Mỏ, tối đa 2 lần. Gõ trực tiếp Bắt (22.6, 9.2). |
 | Ảnh 2D | `art-src/td/enemies/alicanto.png` · 1536×1024 |
-| Góc phụ (nên có) | `alicanto-front.png` · 1024×1024 · Khối B + VIEW FRONT + prompt + BG-G |
+| Góc phụ (bắt buộc) | `alicanto-front.png` · 1024×1024 · Khối B + VIEW FRONT + prompt + BG-G. Ảnh nhìn ngang không cho thấy hai cánh xòe rộng tới đâu; ảnh trước thấy rõ hai cánh xòe chữ V hai bên thân |
 | Model 3D | `art-src/3d/td/enemies/alicanto.glb` |
 | Ghép | Khối B + prompt dưới + BG-G |
-| Tripo | Image to 3D (hoặc Multiview với ảnh trước) · face limit 6.000 · không rig (Blender: `build_winged_rig`; có thể thử rig chim của Tripo) · clip Tripo: không |
+| Tripo | Multiview to 3D: `alicanto-front` vào ô Front, ảnh chính vào ô Left · face limit 6.000 · không rig (Blender: `build_winged_rig`; có thể thử rig chim của Tripo) · clip Tripo: không |
 | Blender thêm | `Enemy_Move` (bay vỗ cánh), `Enemy_Idle` (lượn), `Enemy_Attack` (khép cánh sà xuống, quắp), `Enemy_Hit`, `Enemy_Death` (lông rụng thành đồng bay về HUD); nên có `Enemy_Skill` |
 | Socket | `FX_FEET` (móng: vàng trộm treo ở đây), `FX_HEAD` (cuộn Bắt), `FX_CORE`, `FX_HAND_R`, `FX_HAND_L` (đầu cánh) |
 | Cao trong game | Thân dài khoảng 1,8 m, sải cánh khoảng 3 m (quái nhỏ) |
@@ -888,8 +922,8 @@ glowing) and a short hooked beak, a small crest of three broad stiff feathers; b
 overlapping metal-like feather plates in burnished antique brass and copper (deeper and browner than
 bright coin gold), darker bronze wing tips; a long tail of three broad plate feathers; sturdy
 copper-coloured legs with big curled talons, open and empty; warm copper belly feathers. Pose:
-standing on both legs, wings raised and half spread above the back in a shallow V so both wings show
-without hiding the body, tail feathers held straight out behind, angled slightly to one side.
+standing on both legs, wings raised and half spread above the back in a shallow V, without hiding
+the body, tail feathers held straight out behind, angled slightly to one side.
 ```
 
 ### P16 · `mam-go` — Mầm Gỗ
@@ -1014,7 +1048,7 @@ shoulders. Calm, sorrowful, ancient.
 | Việc | Tình trạng |
 |---|---|
 | Màu model Draconis v2 khác mô tả 22.2 | Tự quyết (22/10, đổi được): dáng ảnh 3.png; model mới P18, v2 là model tạm (mục 7) |
-| Ảnh mẫu 2.png (Lam), 3.png (Draconis) | Tự quyết (22/10, đổi được): chủ dự án lưu ở `art-src/td/refs/`. 2.png tùy chọn; 3.png nên đính kèm cho P18 |
+| Ảnh mẫu 2.png (Lam), 3.png (Draconis) | Tự quyết (22/10, đổi được): chủ dự án lưu ở `art-src/td/refs/`. 2.png tùy chọn; 3.png nên đính kèm cho ảnh chính P18. Ảnh góc phụ không dùng 2.png, 3.png |
 | `root-burst.glb` (22.7) | Không có trong repo, `art-src/` hay `media.md5` (kế hoạch V5 để ở đợt D, chưa làm). Đã thêm ảnh Tripo: `02-tripo-buildings-props.md`, P18 |
 | Lính, thợ không có ở cột model của 27.2 | Lính Giáo vào P (lý do ở mục 8; 27.2 đã ghi từ 22/10); còn lại vào VS |
 | Bộ gắn Phẩy, Gạch ghi ở cả P và VS (27.2) | Xếp vào P (mục 6) |
@@ -1024,4 +1058,6 @@ shoulders. Calm, sorrowful, ancient.
 | Chân dung ở file 03 (LOOK-OWLET, C9–C22) chép từ file này và file VS | Đã đối chiếu ngày 22/10. Sửa ở đây thì báo người giữ file 03 sửa theo |
 | `04-audio.md` A58 từng tả Troll "đập chùy đá" | Đã sửa (22/10): A58 nay là Troll đấm nắm tay đá, khớp P14 |
 | `td-scale.mjs` (23.2) đo hộp bao, nhưng Thuồng Luồng dài 6 m | Tự quyết (22/10, đổi được): `td-scale` đo Thuồng Luồng theo chiều cao đầu ngóc (khoảng 2,4 m), không theo thân dài 6 m |
-| Đậu mái của Draconis | Tự quyết (22/10, đổi được): `FX_perch` = `FX_top` + 0,6 m ở nhà có mái (23.9); Pháo cấp 1, Đài Ấn theo file 02, mục 8 |
+| Đậu mái của Draconis | Tự quyết (22/10, đổi được): `FX_perch` = `FX_top` + 0,6 m ở nhà có mái (23.9); Tháp Pháo (mọi cấp), Đài Ấn theo file 02, mục 8 |
+| `td-scale.mjs` (23.2) đo hộp bao, nhưng đầu cánh Draconis giơ cao hơn đầu | Tự quyết (22/10, đổi được): đo Draconis từ gót chân tới đỉnh đầu (thân 3,5 m), không tính sừng, cánh, đuôi; Blender đặt tỉ lệ theo đỉnh đầu (mục 7, P18) |
+| Draconis P18 qua Tripo: rig biped hay không rig | Tự quyết (22/10, đổi được): không rig. `build_winged_rig` chỉ chạy trên một mesh chưa có xương; Blender dựng cả khung xương và clip bay (mục 7, P18). Muốn dùng rig biped của Tripo thì phải viết thêm hàm gắn xương cánh vào khung Tripo |

@@ -19,20 +19,22 @@ Instructions for ChatGPT
    + the Common SFX tail in section 3.1 (+ a line from 3.2 when the item says so).
    In blocks with one line per id, each line starts with the id and a colon:
    drop that id, keep only the text after the colon.
-   One final prompt per file: one per layer, and one per variant when variants must differ.
+   One final prompt per layer. Variants come from generating the same prompt again.
 3. Voice (codes V..): first build the speaker's voice from its Voice design block (7.2).
    Then the spoken text is only the line text, copied exactly. Never read delivery notes aloud.
    If the voice tool has a separate style or direction field, put a short English
    version of the delivery note there, never in the spoken text.
 4. Music (codes M..): follow section 8 exactly: key, BPM, bar count, loop, layers.
 5. Write the exact save path (folder + id + -v<n> or -en/-vi) above every final prompt.
+   When one prompt makes several variants, list every variant path.
    Never invent other names, ids or items.
 6. One sound per prompt. No music and no speech inside a sound effect unless the item asks.
    Never name commercial games, brands, real people or living artists.
 7. If you can export audio, deliver WAV 48 kHz 24-bit (or the best format you can).
    If not, deliver the final prompts ready to paste into a commercial-licence
    SFX, voice or music generator.
-8. For every file, give one log row: file, tool, plan, date, final prompt.
+8. For every file, give one CSV row in the format of section 2.5 (file,tool,plan,date,prompt,notes).
+   Fill file and prompt; leave tool, plan, date and notes empty for the owner. Do not ask about them.
 9. If something is unclear, rules conflict, or a needed detail is missing, ask the owner. Do not guess.
 ```
 
@@ -65,6 +67,7 @@ Instructions for ChatGPT
 - Chọn gói cho phép dùng thương mại. Ghi tên gói vào sổ nguồn (2.5).
 - File này không nói giá hay tính năng của công cụ nào. Cột cuối chỉ là ví dụ.
 - Tính năng và điều khoản của công cụ đổi theo thời gian. Trước khi dùng, xem gói có cho tải file (WAV hoặc stem) và dùng thương mại không.
+- Câu nhạc ngắn M02–M12 (2–8 s, mục 8.7): dùng công cụ tiếng ngắn và đặt độ dài như bảng, hoặc công cụ nhạc cho đặt độ dài ngắn. Công cụ nhạc chỉ làm bài dài thì không dùng cho các câu này; công cụ đó (ví dụ Suno ở bảng trên) dùng cho M01.
 
 ### 2.2 Tiếng ngắn: từng bước
 
@@ -78,7 +81,7 @@ Instructions for ChatGPT
 
 ### 2.3 Giọng: từng bước
 
-1. Tạo giọng từ khối "Voice design" của người nói (7.2). Nghe thử một câu. Công cụ cần câu mẫu thì dùng một câu của chính người đó (Bà Cú Mực: câu tiếng Việt V19).
+1. Tạo giọng từ khối "Voice design" của người nói (7.2). Nghe thử một câu. Công cụ cần câu mẫu dài (ví dụ khoảng 100 ký tự trở lên) thì nối nhiều câu của chính người đó (ví dụ Draconis V01–V12); chưa đủ dài thì thêm câu của người đó ở `04-audio-vs.md`. Bà Cú Mực: nối V19–V24 bằng tiếng Việt. Không dùng câu mẫu tự sinh bằng tiếng Anh cho Bà Cú Mực.
 2. Lưu giọng trong công cụ, đặt tên bằng tên thư mục người nói (ví dụ `draconis`).
 3. Mỗi câu tạo riêng. Chỉ dán chữ của câu. Tạo 2–3 lần, giữ bản đúng "cách đọc".
 4. Thu ở cao độ tự nhiên. Engine tự nâng +2 bán cung cho lính và Trợ Thủ (24.4).
@@ -98,6 +101,7 @@ Tự quyết: lớp viết sau dấu chấm (`.transient`, `.body`, `.tail`, `.l
 
 - Bản gốc: WAV 48 kHz 24-bit, ngoài Git. Công cụ chỉ cho MP3 (hoặc điện thoại ghi M4A) thì đổi: `ffmpeg -i vao.mp3 -ar 48000 -c:a pcm_s24le ra.wav`.
 - Chủ dự án không cần chỉnh âm lượng hay cắt. Script ffmpeg của AI tích hợp làm việc đó: cắt lặng đầu (giữ 0–5 ms), mờ cuối 10 ms, chuẩn hóa, mã hóa OGG Vorbis, ghi manifest.
+- Tiếng lặp (A23, A44, mọi mục có dòng LOOP): không cắt lặng đầu, không mờ cuối. Script cắt vòng ở điểm qua 0 và nối vòng bằng mờ chéo 10–20 ms, như nhạc (8.4). Nghe chỗ nối 3 lần liền.
 - Bản trong game là OGG Vorbis. Mono cho va chạm và giọng (≤ 1,5 s). Stereo cho nhạc và âm nền; nhạc phát stream (24.9). Công cụ ra stereo cũng được: script trộn về mono.
 - Tự quyết: mọi câu thoại để mono, kể cả câu dài hơn 1,5 s. Tiếng dài hơn 1,5 s nhưng phát ở một chỗ trên bản đồ (goòng, quái, Mộc Tinh) cũng để mono, vì engine pan theo vị trí (24.7).
 - Độ lớn đích: giọng −16 LUFS-I; nhạc −18; âm nền −26; tiếng ngắn đỉnh −1 dBTP; bản trộn cuối −18 … −16 LUFS.
@@ -230,8 +234,8 @@ Short bronze cannon on an earthen mound firing: a round, deep, punchy "thoomp" w
 ```
 
 #### A07 `td.cannon.hit` · Đạn pháo nổ
-Nổ 3 lớp + lớp `low` (đòn nặng, luôn phát). Trúng từ 3 quái trở lên thì thêm lớp `multi` (24.5, mục 3.3). `world` · P4 · một lần · 3 lớp × 3 bản + `low` 2 bản + `multi` 2 bản · mono.
-Lưu: `sfx/td.cannon.hit.transient-v1.wav` … `-v3`, tương tự `.body`, `.tail`; `sfx/td.cannon.hit.low-v1.wav`, `-v2`; `sfx/td.cannon.hit.multi-v1.wav`, `-v2`
+Nổ 3 lớp + lớp `low` (đòn nặng, luôn phát). Trúng từ 3 quái trở lên thì thêm lớp `multi` (24.5, mục 3.3). `world` · P4 · một lần · 3 lớp × 3 bản + `low` 3 bản + `multi` 3 bản · mono. Mỗi lớp 3 bản, vì 24.5 cần 3–6 biến thể mỗi va chạm (2 bản thì nghe A-B-A-B).
+Lưu: `sfx/td.cannon.hit.transient-v1.wav` … `-v3`, tương tự `.body`, `.tail`; `sfx/td.cannon.hit.low-v1.wav` … `-v3`; `sfx/td.cannon.hit.multi-v1.wav` … `-v3`
 - `transient`:
 ```text
 The first crack of a small black-powder blast, a sharp "kssh" snap, about 20 milliseconds, nothing after it.
@@ -590,7 +594,7 @@ Trường theo 24.2. Bảng dùng dấu chấm như trong mã. Số là số kh�
 | A04 | td.archer.hit | world | v1–v3 ×3 | transient 0, body 4, tail 10 (-4 dB) | -3 | 0.04 | P4 | 4 | 25 | 0 | true | 0.12 | 0 | sổ nguồn |
 | A05 | td.archer.wordshot | world | v1–v3 | 1 | -1 | 0.03 | P3 | 2 | 60 | 0 | true | 0.12 | 0 | sổ nguồn |
 | A06 | td.cannon.fire | world | v1–v3 | 1 | -2 | 0.04 | P4 | 3 | 60 | 0 | true | 0.12 | 0 | sổ nguồn |
-| A07 | td.cannon.hit | world | v1–v3 ×3, low v1–v2, multi v1–v2 | transient 0, body 6, tail 12, low 0 (-3 dB); multi 0 khi ≥ 3 quái trong 50 ms (cả tiếng +2 dB) | 0 | 0.04 | P4 | 4 | 30 | 0 | true | 0.20 | 0 | sổ nguồn |
+| A07 | td.cannon.hit | world | v1–v3 ×3, low v1–v3, multi v1–v3 | transient 0, body 6, tail 12, low 0 (-3 dB); multi 0 khi ≥ 3 quái trong 50 ms (cả tiếng +2 dB) | 0 | 0.04 | P4 | 4 | 30 | 0 | true | 0.20 | 0 | sổ nguồn |
 | A08 | td.cannon.wordshot | world | v1–v3 ×2 | clack 0, pop 90 | -1 | 0.03 | P3 | 2 | 80 | 0 | true | 0.12 | 0 | sổ nguồn |
 | A09–A16 | td.mat.* | world | v1–v3 | thay body khi trúng một quái | 0 | 0.05 | P4 | 4 | 25 | 0 | true | 0.12 | 0 | sổ nguồn |
 | A17 | td.barracks.drum | world | v1–v3 | 1; engine phát kèm `td.vo.linh-giao.hup` sau 120 ms | -2 | 0.03 | P3 | 2 | 150 | 0 | true | 0.20 | 0 | sổ nguồn |
@@ -916,6 +920,8 @@ Tự quyết: bản bằng mã làm trước (song-engine, bài 1–2 ô, đúng
 
 Chung: `music` · P3 · stereo · không theo vị trí · một lần · 2 bản. Lưu: `music/<id>-v1.wav`, `-v2.wav`. Độ to: −18 LUFS đo trên cả câu, đỉnh −1 dBTP. Câu nhạc ra giọng khác Đô thì AI tích hợp dịch cao độ về Đô.
 
+Công cụ: dùng công cụ tiếng ngắn và đặt độ dài như bảng dưới, hoặc công cụ nhạc cho đặt độ dài ngắn. Công cụ nhạc chỉ làm bài dài (dùng cho M01) không làm được câu 2–8 s.
+
 Đuôi chung (dán sau mỗi prompt câu nhạc):
 ```text
 Short instrumental music cue in C major, bamboo flute, dan tranh zither, soft strings and village drums, storybook fantasy, no vocals, light natural room sound, ends cleanly with a natural tail under one second.
@@ -938,7 +944,7 @@ Short instrumental music cue in C major, bamboo flute, dan tranh zither, soft st
 Tự quyết: Thắng 6–8 s, Thua 5–6 s; câu Bùng Nổ chờ 4 s chung để nhiều nhà Bùng Nổ không dồn tiếng.
 
 ```text
-td.stinger.wave-start: A rousing call: a festival barrel drum roll into a bright rising three-note bamboo flute call and a zither strum, ending on a held G chord, "here they come", 3 seconds.
+td.stinger.wave-start: A rousing call: a festival barrel drum roll into a bright rising three-note bamboo flute call and a zither strum, ending on a held G chord, 3 seconds.
 td.stinger.wave-clear: A relieved little victory: a playful zither run and a flute phrase falling to a warm C major chord, light hand drum, 3 seconds.
 td.stinger.boss-intro: An ominous swell: deep barrel drums and low strings rising, the flute holding one tense note, ending on an unresolved A minor color, 4.5 seconds.
 td.stinger.boss-phase: A short tense hit: one big drum hit and a rising low string swell with a fluttering flute, ending suspended, 2.5 seconds.

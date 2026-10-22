@@ -267,7 +267,7 @@ The level-2 wall ring for the Bastion: a ring of tall limestone-block walls with
 
 ### V7 · VS · `keep-kit-l3` · Lũy cấp 3: tháp canh hai tầng
 
-- **Lắp vào:** chụp lên chòi canh trên đỉnh `keep`, che kín chòi cũ. `FX_top`, `FX_word` dời lên tầng trên. `FX_crew` ở lại chòi nỏ (V6).
+- **Lắp vào:** chụp lên chòi canh trên đỉnh `keep`, che kín chòi cũ. `FX_top`, `FX_perch`, `FX_word` dời lên tầng trên. `FX_crew` ở lại chòi nỏ (V6).
 - **Ảnh:** `art-src/td/kits/keep-kit-l3.png` · 1024×1024 · **Tham chiếu:** `keep.png` → **Model:** `art-src/3d/td/kits/keep-kit-l3.glb` · face 4000
 - **Prompt =** A-BUILD + B-VILLAGE + K-KIT + prompt dưới + BG-G · **Ảnh phụ:** không.
 
@@ -297,7 +297,7 @@ The level-2 roof and railing for the Archer Tower: a pyramid roof of terracotta 
 
 ### V10 · VS · `archer-kit-l3` · Tháp Cung cấp 3: chòi hai tầng
 
-- **Lắp vào:** đế ván đặt trên chóp bằng của mái cấp 2. `FX_top`, `FX_word`, `FX_crew`, `FX_muzzle` dời lên tầng mới.
+- **Lắp vào:** đế ván đặt trên chóp bằng của mái cấp 2. `FX_top`, `FX_perch`, `FX_word`, `FX_crew`, `FX_muzzle` dời lên tầng mới.
 - **Ảnh:** `art-src/td/kits/archer-kit-l3.png` · 1024×1024 · **Tham chiếu:** `archer.png` → **Model:** `art-src/3d/td/kits/archer-kit-l3.glb` · face 4000
 - **Prompt =** A-BUILD + B-VILLAGE + K-KIT + prompt dưới + BG-G · **Ảnh phụ:** không.
 
@@ -307,7 +307,7 @@ The level-3 upper storey for the Archer Tower: a small square bamboo lookout hut
 
 ### V11 · VS · `cannon-kit-l2` · Tháp Pháo cấp 2: viền đá, mái che
 
-- **Lắp vào:** vòng đá đặt trên mặt tường ụ; mái che phủ nửa sau sàn pháo; giữa để trống cho nòng.
+- **Lắp vào:** vòng đá đặt trên mặt tường ụ; mái che phủ nửa sau sàn pháo; giữa để trống cho nòng. `FX_perch` dời từ mép sau tường ụ lên mép sau mái che (file chính, mục 8).
 - **Ảnh:** `art-src/td/kits/cannon-kit-l2.png` · 1024×1024 · **Tham chiếu:** `cannon.png` → **Model:** `art-src/3d/td/kits/cannon-kit-l2.glb` · face 4000
 - **Prompt =** A-BUILD + B-VILLAGE + K-KIT + prompt dưới + BG-G · **Ảnh phụ:** không.
 

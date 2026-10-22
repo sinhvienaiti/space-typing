@@ -17,7 +17,8 @@ Instructions for ChatGPT
 6. With each image, give the exact file name and the full save path from the item,
    for example art-src/td/buildings/keep.png.
 7. The owner may attach an approved image as a style sample. Match only its painting style,
-   materials, lighting and camera angle. Never copy its shape or its parts.
+   materials and lighting. The camera always follows the item's own Camera line or the A-BUILD
+   block, never the sample. Never copy its shape or its parts.
 8. If anything is unclear, or two rules disagree, ask the owner. Do not guess.
 ```
 
@@ -25,7 +26,7 @@ Instructions for ChatGPT
 
 1. Mở một cuộc trò chuyện mới với ChatGPT. Gõ, ví dụ: `Trong repo sinhvienaiti/space-typing, nhánh feat/space-typing-2026-10-18, đọc docs/art-requests/td/02-tripo-buildings-props.md và tạo ảnh cho mục P1–P4.` Luôn ghi tên repo và nhánh: file chưa có ở `main`.
 2. Xem từng ảnh theo bảng kiểm ở mục 3.7. Chưa đạt thì bảo ChatGPT làm lại.
-3. Khi ảnh Lũy (P1) đã đạt, đính kèm `keep.png` làm ảnh mẫu phong cách cho mọi món sau. Thiết kế 27.4 dặn: prompt chung + ảnh mẫu.
+3. Khi ảnh Lũy (P1) đã đạt, đính kèm `keep.png` làm ảnh mẫu phong cách cho mọi nhà sau. Đồ nhìn ngang (P4, P9, P11) không đính kèm `keep.png`. ChatGPT chỉ theo nét vẽ, chất liệu, ánh sáng của ảnh mẫu; góc nhìn theo dòng Camera của từng món. Thiết kế 27.4 dặn: prompt chung + ảnh mẫu.
 4. Tải ảnh PNG gốc. Lưu đúng tên, đúng thư mục ghi ở món đó. Thư mục chưa có thì tạo.
 5. Mở Tripo, chọn **Image to 3D**, đặt như mục 5. Tải **GLB**. Lưu đúng đường dẫn `art-src/3d/td/...` ghi ở món.
 6. Ở thư mục gốc repo `typing-game`: chạy `node games/space-typing/scripts/models/index-3d-sources.mjs`, rồi `pnpm media:push`.
@@ -125,7 +126,7 @@ Socket là điểm Blender gắn vào model (23.9). Ảnh không vẽ socket, nh
 | `FX_assist` | Ổ trợ lực, quay về phía Lũy (8.4). Tướng đi bộ đứng trên bục (23.7). Draconis đậu ở `FX_perch`. | Góc trước bên phải, trên mép vòng | Bục gỗ thấp một bậc, bàn viết nhỏ nghiêng ở mép trước bục |
 | `FX_core` | Lõi nhà: chữ gõ xong bay vào, dây trợ lực nối vào | Giữa mặt trước | Mề đay đá tròn khắc nét cọ, không chữ |
 | `FX_top` | Gốc cột chữ (giữa đỉnh mái) | Đỉnh mái | Chóp mái bằng, dày, chắc; không cột cờ, không đồ trang trí cao |
-| `FX_perch` | Chỗ Draconis đậu khi trợ lực (8.4, 23.9) | `FX_top` + 0,6 m; nhà không mái: xem P3, P16 | Như `FX_top`: chóp mái chắc |
+| `FX_perch` | Chỗ Draconis đậu khi trợ lực (8.4, 23.9) | `FX_top` + 0,6 m; Tháp Pháo, Đài Ấn: xem P3, P16, mục 8 | Như `FX_top`: chóp mái chắc |
 | `FX_word` | Chỗ thẻ chữ bật ra | Ngay trên `FX_top` | Như trên |
 | `FX_lantern_0..4` | 5 đèn lồng Nhiệt | Dưới mép mái trước, cách đều, đánh số trái sang phải (Đài Ấn: xem P16) | Xà mái trước thẳng, dày, không treo gì |
 | `FX_crew` | Chỗ tổ thợ làm việc. Thư Đồng đứng cạnh tổ thợ (22.3, 23.7). | Ghi ở từng nhà | Một khoảng sàn trống đủ cho tổ thợ và 1 Thư Đồng |
@@ -138,7 +139,7 @@ Tự quyết: mỗi nhà có một mề đay đá tròn ở mặt trước làm 
 Tự quyết: đèn lồng là ảnh 2D (27.2), nên ảnh chỉ chừa xà mái trước trống; nhà không mái dùng cột hoặc móc, ghi ở từng món; đèn đánh số 0–4 từ trái sang phải nhìn từ trước.
 Tự quyết: ảnh nhà để trống góc sau trái (trừ cờ chữ của Lũy). Cờ cấp chung (P17) gắn ở đó từ cấp 1 và hiện 1–3 vạch (23.8: "cờ có vạch cấp").
 Tự quyết (22/10, đổi được): tổ thợ ở trên cao (chòi canh Lũy, từ cấp 2 là chòi nỏ; sàn canh Tháp Cung; ban công Tháp Thư Pháp) thì Thư Đồng đi vào cửa nhà rồi hiện ở `FX_crew`; khi hoảng thì hiện lại ở cửa và chạy về Lũy. Vì vậy các nhà này có cửa rõ ở mặt trước.
-Draconis đậu ở `FX_perch` khi trợ lực (8.4, 22.2, 23.9), nên đỉnh mái phải chắc. Pháo cấp 1 và Đài Ấn không có mái: điểm đậu riêng ghi ở P3, P16 và mục 8.
+Draconis đậu ở `FX_perch` khi trợ lực (8.4, 22.2, 23.9), nên đỉnh mái phải chắc. Tháp Pháo và Đài Ấn có điểm đậu riêng (P3, P16, mục 8): Pháo cấp 1 và Đài Ấn không có mái; Pháo cấp 2–3 chỉ có mái che nửa sau, giữa để trống cho nòng.
 
 ### 3.4 Phong cách làng Văn Điền (CivKit "Liên Minh Làng")
 
@@ -322,7 +323,7 @@ The Archer Tower, tall and slim, almost twice as tall as it is wide. A round foo
 | Model 3D | `art-src/3d/td/buildings/cannon.glb` |
 | Vòng, cao | M · r 2,3 m (Ø 4,6 m) · thân ụ có tường khoảng 3 m; có nòng thì đỉnh khoảng 4 m |
 | Bóng hình | Thấp, tròn, nặng, rộng hơn cao, nòng to ở giữa. Nhìn từ trên: vòng tròn đất có mâm xoay ở tâm. |
-| Socket | `FX_assist`: bục ở góc trước phải, chân ụ · `FX_core`: mề đay trên tường ụ, phía trên bậc thang · `FX_top`, `FX_word`: điểm trên tâm mâm xoay (cấp 1 chưa có mái) · `FX_lantern_0..4`: chốt gỗ trên đầu 5 cột ở nửa trước tường ụ · `FX_crew`: sàn pháo bên trái, cạnh giá đạn (Bác Đồng, cậu Lửa) · `FX_muzzle`: miệng nòng (ở model P4) · `FX_banner`: góc sau trái tường ụ · `FX_perch`: mép sau tường ụ (cấp 1 không mái) · Trục quay nòng: tâm mâm xoay |
+| Socket | `FX_assist`: bục ở góc trước phải, chân ụ · `FX_core`: mề đay trên tường ụ, phía trên bậc thang · `FX_top`, `FX_word`: điểm trên tâm mâm xoay (cấp 1 chưa có mái) · `FX_lantern_0..4`: chốt gỗ trên đầu 5 cột ở nửa trước tường ụ · `FX_crew`: sàn pháo bên trái, cạnh giá đạn (Bác Đồng, cậu Lửa) · `FX_muzzle`: miệng nòng (ở model P4) · `FX_banner`: góc sau trái tường ụ · `FX_perch`: mép sau tường ụ (cấp 1 không mái; cấp 2–3 dời lên mép sau mái che, xem mục 8) · Trục quay nòng: tâm mâm xoay |
 | Chừa cho cấp sau | Mặt trên tường ụ phẳng (L2: vòng đá ốp lên). Nửa sau sàn pháo trống phía trên (L2: mái che). Góc sau trái trống (L3: cờ đỏ). Nòng tách riêng (L3: đổi nòng vằn). |
 | Chất liệu | Ụ đất nện vàng đất, có vân lớp ngang. Sàn ván gỗ. Mâm xoay gỗ nâu sẫm. Đạn sắt đen. |
 | Không vẽ | Nòng pháo, thợ, khói, lửa, đèn lồng, mái che, cờ. |
@@ -693,7 +694,7 @@ A burst of giant tree roots erupting from the ground, made as one solid piece: f
 | Chiều cao Pháo | Tự quyết (22/10, đổi được): giữ dáng thấp tròn khoảng 4 m (P3, 23.12). 23.2 ghi Tháp Pháo 3,5–4,5 m, ngoại lệ của dòng Nhà đánh; `td-scale` dùng mức này cho Pháo. |
 | Socket | Theo dòng "Socket" của từng món. Thêm tầng (bộ cấp 3, Lũy 3–4) thì dời `FX_top`, `FX_perch`, `FX_word`, `FX_crew`, `FX_muzzle` lên; ghi vị trí theo từng cấp. |
 | Thư Đồng | Đứng cạnh tổ thợ ở `FX_crew` (22.3, 23.7), không đứng trên bục. Tổ thợ ở trên cao (Lũy, Tháp Cung, Tháp Thư Pháp): Thư Đồng đi vào cửa nhà, hiện ở `FX_crew`; khi hoảng thì hiện lại ở cửa rồi chạy về Lũy. |
-| Đậu mái | Tự quyết (22/10, đổi được): `FX_perch` = `FX_top` + 0,6 m ở mọi nhà có mái, để thân Draconis không che gốc cột chữ (23.4, 23.9). Pháo cấp 1 và Đài Ấn không có mái, dù Draconis đậu ở đó (22.2): Pháo đậu ở mép sau tường ụ, Đài Ấn ở mép sau mặt đài. |
+| Đậu mái | Tự quyết (22/10, đổi được): `FX_perch` = `FX_top` + 0,6 m ở mọi nhà có mái, để thân Draconis không che gốc cột chữ (23.4, 23.9). Pháo cấp 1 và Đài Ấn không có mái, dù Draconis đậu ở đó (22.2): Pháo đậu ở mép sau tường ụ, Đài Ấn ở mép sau mặt đài. Pháo cấp 2–3: mái che của bộ cấp 2 (`cannon-kit-l2`, file VS, V11) phủ đúng chỗ đó và giữa vẫn để trống cho nòng, nên `FX_perch` dời lên mép sau mái che, không đặt trên tâm mâm xoay. Nhánh Pháo, nhánh Đài Ấn: như cấp 1 (mép sau). |
 | `level-pennant` | Gắn ở `FX_banner` mọi nhà trừ Lũy, từ cấp 1. Tô màu họ nhà (23.3). Đổi texture 1, 2, 3 vạch theo cấp. Bùng Nổ: sóng vải bằng shader. Ẩn khi nhà có cờ riêng ở góc đó (Pháo, Trại Lính cấp 3); khi đó dán vạch lên cờ riêng. |
 | `cannon-barrel` | Trục quay đứng ở tâm mâm xoay của `cannon`. Quay theo mục tiêu. Góc nâng khoảng 40°. Giật lùi trong `Building_Fire`. `FX_muzzle` ở miệng nòng. |
 | `gold-mine-cart` | Chạy ra vào trên ray trong `Building_Work`. |

@@ -59,18 +59,18 @@ Instructions for ChatGPT
 ## 3. Cách làm một đợt
 
 1. Mở cuộc trò chuyện mới với ChatGPT (đã nối repo GitHub). Gõ, ví dụ:
-   - Ảnh: `Trong repo sinhvienaiti/space-typing, nhánh feat/space-typing-2026-10-18, đọc docs/art-requests/td/02-tripo-buildings-props.md và tạo ảnh cho mục P1. Trên mỗi ảnh ghi tên file và đường dẫn lưu.`
+   - Ảnh: `Trong repo sinhvienaiti/space-typing, nhánh feat/space-typing-2026-10-18, đọc docs/art-requests/td/02-tripo-buildings-props.md và tạo ảnh cho mục P1. Ghi tên file và đường dẫn lưu ngay phía trên mỗi ảnh, trong tin nhắn. Không vẽ chữ vào ảnh.`
    - Nhiều mục: `Trong repo sinhvienaiti/space-typing, nhánh feat/space-typing-2026-10-18, đọc docs/art-requests/td/01-tripo-characters-enemies.md và tạo ảnh cho mục P1-P4.`
    - Tiếng: `Trong repo sinhvienaiti/space-typing, nhánh feat/space-typing-2026-10-18, đọc docs/art-requests/td/04-audio.md và làm prompt cho mục A01-A08.`
    - Bộ file nằm ở nhánh `feat/space-typing-2026-10-18` của repo `sinhvienaiti/space-typing`, chưa có ở `main`. Tin nhắn luôn ghi tên repo và nhánh. ChatGPT đọc file trên GitHub, nên file phải đã được commit và push lên nhánh đó.
-   - Khi làm P18 Draconis (file 01), đính kèm thêm `art-src/td/refs/3.png` (xem bước 3).
+   - Khi làm ảnh chính P18 Draconis `draconis.png` (file 01), đính kèm thêm `art-src/td/refs/3.png` (xem bước 3). 3.png chỉ dùng cho ảnh chính P18 (và chân dung C1 khi chưa có ảnh P18). Ảnh `-side`, `-back` chỉ đính kèm `draconis.png` đã duyệt.
 2. Kiểm ảnh theo bảng kiểm của file đó: 01 mục 4, 02 mục 3.7, 03 mục 12. Chưa đạt thì bảo ChatGPT làm lại và nói rõ lỗi.
 3. Lưu đúng tên, đúng thư mục ghi ở mục. Đường dẫn tính từ thư mục game `games/space-typing/`. Thư mục chưa có thì tạo.
    - Ảnh 2D: `art-src/td/<loại>/<id>.png`. Cảnh vật: `art-src/td/scenery/<vùng>/<id>-v<n>.png`.
    - Model Tripo: cùng đường dẫn, thêm `3d/` sau `art-src/`, đuôi `.glb`. Ví dụ `art-src/td/enemies/troll.png` → `art-src/3d/td/enemies/troll.glb`.
    - Tiếng gốc (WAV 48 kHz 24-bit): `art-src/td/audio/<nhóm>/<id>[-v<n>].wav`. Chi tiết ở 04 mục 2.4.
    - Cùng một tên file có thể nằm ở hai thư mục: `buildings/keep.png` là ảnh gửi Tripo, `ui/buildings/keep.png` là icon. Lưu đúng thư mục.
-   - Ảnh mẫu chủ dự án đã gửi: lưu `2.png` (Lam), `3.png` (Draconis), `4.webp` (khối tán) vào `art-src/td/refs/`. Git bỏ qua thư mục này, `pnpm media:push` sao lưu nó. Nhờ vậy đính kèm được trong ChatGPT, và AI làm sau xem được. Đính kèm là tùy chọn khi prompt chữ đã đủ (P7 Lam, S12, C1); riêng P18 Draconis nên đính kèm 3.png.
+   - Ảnh mẫu chủ dự án đã gửi: lưu `2.png` (Lam), `3.png` (Draconis), `4.webp` (khối tán) vào `art-src/td/refs/`. Git bỏ qua thư mục này, `pnpm media:push` sao lưu nó. Nhờ vậy đính kèm được trong ChatGPT, và AI làm sau xem được. Đính kèm là tùy chọn khi prompt chữ đã đủ (P7 Lam, S12, C1); riêng ảnh chính P18 Draconis nên đính kèm 3.png. Ảnh góc phụ (`-side`, `-back`) không đính kèm ảnh mẫu, chỉ đính kèm ảnh chính đã duyệt.
 4. Tripo (chỉ ảnh của file 01, 02): Image to 3D; Multiview to 3D khi mục có ảnh góc phụ. Tách nền bật, texture HD, PBR bật, Quad tắt, Smart Low Poly tắt. Face limit, rig và clip theo từng mục. Tải GLB, đổi tên đúng dòng "Model 3D". Chi tiết ở 01 mục 5 và 02 mục 5.
 5. Sao lưu. Ở thư mục gốc `typing-game`:
    - có GLB mới thì chạy trước `node games/space-typing/scripts/models/index-3d-sources.mjs` (thiếu bước này thì push từ chối);
@@ -99,7 +99,7 @@ Instructions for ChatGPT
 
 | File | P | VS | Sau | Ghi chú |
 |---|---|---|---|---|
-| 01 | 27 | — | 7 | 21 model; góc phụ nên có ở P1, P7, P12, P15, P17, P18 |
+| 01 | 27 | — | 7 | 21 model; góc phụ bắt buộc ở P15, nên có ở P1, P7, P12, P14, P17, P18 |
 | 01-vs | — | 45 | — | 21 mã và 24 bộ gắn thợ (K01–K24) |
 | 02 | 18 | — | 7 | 21 model (P8 là 4 đống vàng) |
 | 02-vs | — | 70 | — | 70 model |
@@ -113,6 +113,7 @@ Instructions for ChatGPT
 - Cột "Lưu": đường dẫn sau `art-src/td/`. Cột "Model 3D": đường dẫn sau `art-src/3d/td/`. `—` là không có model.
 - Cảnh vật bậc P có hai biến thể `-v1`, `-v2`.
 - Tiếng: cột "Lưu" là thư mục. Tên file theo 04 mục 2.4: `<id>-v<n>.wav`; tiếng nhiều lớp `<id>.<lớp>-v<n>.wav`; câu thoại `<id>-en.wav` (Bà Cú Mực `<id>-vi.wav`). Số bản ghi ở từng mục.
+- Nhạc M01–M12: AI làm bản bằng mã trước (04 mục 8.1, 8.7). Bản bằng công cụ AI là bản nâng cấp, tùy chọn. Câu nhạc ngắn M02–M12 cần công cụ đặt được độ dài 2–8 s (04 mục 2.1).
 
 Tổng: 236 mục bậc P (01: 27, 02: 18, 03: 70, 04: 121).
 
@@ -140,7 +141,7 @@ Tổng: 236 mục bậc P (01: 27, 02: 18, 03: 70, 04: 121).
 | P11 | `nuppeppo` | Nuppeppō | 01 | `enemies/nuppeppo.png` | `enemies/nuppeppo.glb` | |
 | P12 | `thuong-luong` | Thuồng Luồng | 01 | `enemies/thuong-luong.png` (+ `-front`) | `enemies/thuong-luong.glb` | |
 | P13 | `tanuki` | Lửng Tanuki | 01 | `enemies/tanuki.png` | `enemies/tanuki.glb` | |
-| P14 | `troll` | Quỷ Núi Troll | 01 | `enemies/troll.png` | `enemies/troll.glb` | |
+| P14 | `troll` | Quỷ Núi Troll | 01 | `enemies/troll.png` (+ `-back`) | `enemies/troll.glb` | |
 | P15 | `alicanto` | Chim Vàng Alicanto | 01 | `enemies/alicanto.png` (+ `-front`) | `enemies/alicanto.glb` | |
 | P16 | `mam-go` | Mầm Gỗ | 01 | `enemies/mam-go.png` | `enemies/mam-go.glb` | |
 | P17 | `moc-tinh` | Boss Mộc Tinh | 01 | `bosses/moc-tinh.png` (+ `-side`, `-back`) | `bosses/moc-tinh.glb` | |
@@ -363,10 +364,10 @@ Chủ dự án giao AI tự quyết các việc dưới đây (22/10). Mọi dò
 |---|---|---|
 | Dáng Draconis | Theo ảnh 3.png (22.2): rồng hai chân, thân trắng, cánh lông vũ vàng kem, chóp lông tô đỏ cam, móng và giáp đen vàng. Model mới là P18 (01 mục 7). `draconis-v2` (rồng đỏ cánh màng) là model tạm. C1, C23, T1, T2, V70 theo dáng này. | "Draconis giữ dáng đỏ v2: bỏ P18, viết lại C1, C23, T1, T2, V70." |
 | Chiều cao Tháp Pháo | Giữ dáng thấp tròn khoảng 4 m (23.12). 23.2 ghi Pháo 3,5–4,5 m, ngoại lệ của dòng Nhà đánh; `td-scale` theo mức này (02 P3, mục 8). | "Pháo cao như nhà đánh: làm lại P3 với ụ cao hơn." |
-| Socket đậu `FX_perch` | `FX_top` + 0,6 m ở mọi nhà có mái (23.9). Pháo cấp 1 đậu ở mép sau tường ụ, Đài Ấn ở mép sau mặt đài (02 mục 8). | "Đổi chỗ Draconis đậu ở nhà <tên>." |
+| Socket đậu `FX_perch` | `FX_top` + 0,6 m ở mọi nhà có mái (23.9). Pháo cấp 1 đậu ở mép sau tường ụ, cấp 2–3 ở mép sau mái che; Đài Ấn ở mép sau mặt đài (02 mục 8). | "Đổi chỗ Draconis đậu ở nhà <tên>." |
 | Cờ cấp chung `level-pennant` | Một cờ chung cho mọi nhà trừ Lũy. Game tô màu họ nhà. Blender làm 3 texture 1, 2, 3 vạch (02 P17). | "Bỏ cờ chung, làm cờ riêng theo bộ cấp." |
 | Thư Đồng ở nhà có tổ thợ trên cao | Đi vào cửa nhà, hiện ở `FX_crew`; hoảng thì hiện lại ở cửa, chạy về Lũy (02 mục 3.3, mục 8). | "Thư Đồng đứng dưới chân nhà, không vào trong." |
 | Món thêm vào P ngoài 27.2 | Giữ hết, lý do ở 01 mục 2, 02 mục 2.1, 03 mục 4, 04 mục 5. 27.2 nay ghi thêm Lính Giáo + giáo, Draconis dáng mới, Rễ Trồi. | "Chuyển <mã> sang VS." |
 | Âm thanh bậc P | 70 id tiếng ngắn. "Hô" của lính ở P là tiếng "Hup!"; câu hô có lời ở VS. Các Tự quyết khác của file 04 giữ nguyên (04 mục 5, 7.4). | "Bớt tiếng P còn <số> id." hoặc "Đưa câu hô có lời của lính vào P." |
-| Ảnh mẫu 2.png, 3.png, 4.webp | Lưu ở `art-src/td/refs/` (Git bỏ qua, `pnpm media:push` sao lưu). Đính kèm khi cần; P18 nên đính kèm 3.png (mục 3). | "Lưu ảnh mẫu ở <thư mục khác>." |
+| Ảnh mẫu 2.png, 3.png, 4.webp | Lưu ở `art-src/td/refs/` (Git bỏ qua, `pnpm media:push` sao lưu). Đính kèm khi cần; ảnh chính P18 nên đính kèm 3.png, ảnh góc phụ thì không (mục 3). | "Lưu ảnh mẫu ở <thư mục khác>." |
 | Cỡ Thuồng Luồng trong `td-scale` | Đo chiều cao đầu ngóc (khoảng 2,4 m), không đo thân dài 6 m (01 P12, mục 13). | "Đo Thuồng Luồng theo chiều dài thân." |

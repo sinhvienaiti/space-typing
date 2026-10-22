@@ -15,7 +15,7 @@ Instructions for ChatGPT
   (BG-G, BG-M or BG-B). Keep every sentence; do not shorten, soften or "improve" them.
 - One image per subject: one character, creature or object per image. Never put two views or
   two subjects in one image. Extra views (-side, -back, -front) are separate images built with
-  the VIEW lines, with the main image attached as the reference.
+  the VIEW lines, with the approved main image of the same item attached as the only reference.
 - Use the exact size given. Above each image, write its exact file name so the owner can save
   it under that name.
 - No text, letters, numbers, logos or watermarks inside any image. Scrolls stay blank.
@@ -41,8 +41,10 @@ with a small even empty margin on every side, nothing cut off.
 Camera: straight front view at chest height, near-orthographic, no perspective distortion, no tilt.
 Pose: neutral A-pose. Standing straight and facing the viewer, arms straight down and out 30-45
 degrees away from the body, elbows almost straight, hands relaxed unless stated, legs straight and
-slightly apart, both feet flat on an invisible floor. Neutral calm face (a slight closed-mouth
-smile is fine), eyes open.
+slightly apart, both feet flat on an invisible floor. Seen from the front, a clear gap of empty
+background separates each arm from the body from the armpit down, and nothing else (sleeve cloth,
+a bag, a tail, a wing, a cape) touches an arm below the shoulder, except an object gripped in the
+hand. Neutral calm face (a slight closed-mouth smile is fine), eyes open.
 Style: charming storybook fantasy, like a hand-painted matte vinyl toy: chunky rounded shapes, a few
 large details instead of many small ones, a bold silhouette that still reads from a high top-down
 camera. Matte hand-painted colours, soft shading, no glossy shine.
@@ -63,7 +65,8 @@ and animated later.
 Framing: the whole creature from nose (or beak) to tail tip, centred, with a small even empty
 margin on every side, nothing cut off.
 Camera: exact side view of the creature's left side, head pointing to the left edge of the image,
-camera at body height, near-orthographic, no perspective distortion.
+camera at body height, near-orthographic, no perspective distortion. In this side view the far
+wing stays hidden behind the near one; do not offset it or turn the body to show it.
 Pose: neutral and calm. Legs straight and all visible, feet flat on an invisible floor; wings (if
 any) raised and half spread, neither folded nor fully stretched, not covering the body; tail held
 out and curled slightly to one side, clear of the legs. Eyes open, mouth closed.
@@ -95,19 +98,34 @@ Never draw: outlines, fire, flames, smoke, sparks, particles, glow, aura, motion
 letters, logos, a frame, ground, a shadow, a second object.
 ```
 
-Góc phụ: khối của mục + dòng VIEW + prompt của mục + dòng nền. Đính kèm ảnh chính. Dòng VIEW thay dòng "Camera" của khối.
+Góc phụ: khối của mục + dòng VIEW + prompt của mục + dòng nền. Chỉ đính kèm ảnh chính đã duyệt của mục đó. Dòng VIEW thay dòng "Camera" và chữ "facing the viewer" của khối; VIEW FRONT thay cả dòng "Framing". Chữ trái, phải trong prompt của mục tả ảnh chính; dòng VIEW nói cách đổi.
 
 ```text
-[VIEW SIDE] This is an extra view of the same character as the attached front image: identical
-design, colours, proportions, pose and scale. This line replaces the camera line above: exact
-left-side profile, the character faces the left edge of the image, camera at chest height,
-near-orthographic. The arms (or wings) keep exactly the same angle as in the front image.
-[VIEW BACK] This is an extra view of the same character as the attached front image: identical
-design, colours, proportions, pose and scale. This line replaces the camera line above: seen
-straight from behind, near-orthographic, camera at chest height.
-[VIEW FRONT] This is an extra view of the same creature as the attached side image: identical
-design, colours, proportions, pose and scale. This line replaces the camera line above: seen
-straight from the front with the head facing the viewer, near-orthographic, camera at body height.
+[VIEW SIDE] This is an extra view of the same character as the attached front image (the
+approved main image of this item, not a reference picture): identical design, colours,
+proportions, pose and scale. This line replaces the camera line and the words "facing the viewer"
+above: exact left-side profile, the whole character, head included, faces the left edge of the
+image; camera at chest height, near-orthographic. Arms and wings stay exactly where they are in
+the front image and are only seen from the side: arms that angle out to the sides look as if they
+hang straight down beside the body; wings that spread to the left and right point toward and away
+from the camera, so the near wing shows only its edge and hides the far wing. Do not swing arms or
+wings forward or back, and do not turn a wing to show its flat face. Left and right in the prompt
+below (such as "the viewer's right") describe the front image: keep every part on the same side of
+the character's own body; parts on its right side are hidden behind the body in this view.
+[VIEW BACK] This is an extra view of the same character as the attached front image (the
+approved main image of this item, not a reference picture): identical design, colours,
+proportions, pose and scale. This line replaces the camera line and the words "facing the viewer"
+above: seen straight from behind, near-orthographic, camera at chest height; the character faces
+straight away from the camera, the head is not turned and the face does not show. Left and right
+in the prompt below describe the front image and are swapped in this view: a part the prompt puts
+on the viewer's right is on the viewer's left here, and the reverse; every part stays on the same
+side of the character's own body.
+[VIEW FRONT] This is an extra view of the same creature as the attached side image (the approved
+main image of this item): identical design, colours, proportions, pose and scale. This line
+replaces the camera line and the framing line above: seen straight from the front with the head
+facing the viewer, near-orthographic, camera at body height; the whole creature fits in the frame,
+centred, with a small even margin. Parts that are behind the body in this view, such as the rest
+of a long body and the tail, stay hidden.
 ```
 
 ```text
@@ -720,8 +738,8 @@ dark umber-brown feathers with a copper sheen painted along the feather edges, t
 into large overlapping plates; a big hooked ivory beak, fierce golden-brown painted eyes, black
 curved talons, open and empty; around its neck a heavy necklace of big seashells and old bronze
 coins (bronze, not bright gold) on a thick cord, resting on the chest. Wings raised and half spread
-above the back in a shallow V, both wings visible, each wing made of a few broad layered feather
-masses with blunt rounded tips; a broad fan tail held out behind.
+above the back in a shallow V, without hiding the body, each wing made of a few broad layered
+feather masses with blunt rounded tips; a broad fan tail held out behind.
 ```
 
 ## 8. Thú
