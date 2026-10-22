@@ -61,13 +61,20 @@ export function compileDeck(entries: readonly DeckEntry[]): Deck {
   };
 }
 
-/** A short meaning for a card: notes in brackets left out, the first sense, then more while it stays within 22 letters (BUILD_1A6 §7). */
+/**
+ * A short meaning for a card: notes in brackets left out, the first sense, then more while it stays within 22 letters
+ * (BUILD_1A6 §7). One over 26 keeps its words whole: up to its last comma that fits, else its last whole word and "…"
+ * (review R2: "chưa bao giờ, không bao g…").
+ */
 export function gloss(deck: Deck, word: number): string {
   const senses = (deck.vi[word] ?? "").replace(/\s*\([^)]*\)/g, "").split(";").map((sense) => sense.trim());
   const [first = "", ...rest] = senses.filter((sense) => sense !== "");
   let out = first;
   for (const sense of rest) if (out.length + sense.length + 2 <= 22) out += "; " + sense;
-  return out.length > 26 ? out.slice(0, 25) + "…" : out;
+  if (out.length <= 26) return out;
+  const comma = out.lastIndexOf(",", 26);
+  const space = out.lastIndexOf(" ", 25);
+  return comma > 0 ? out.slice(0, comma) : out.slice(0, space > 0 ? space : 25) + "…";
 }
 
 export const wordText = (deck: Deck, word: number): string =>

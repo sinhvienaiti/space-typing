@@ -11,6 +11,7 @@ import { compileDeck } from "../src/td/typing/decks";
 import { dockHtml } from "../src/td/ui/build-menu";
 import { actionsHtml, REASON, statusHtml, stripHtml } from "../src/td/ui/hud";
 import { teamHtml } from "../src/td/ui/team-bar";
+import { pips } from "../src/td/view/words/cards";
 import { built, run, send, world } from "./td/fixtures";
 import { callWord, type } from "./td/typing";
 
@@ -117,9 +118,32 @@ describe("cards and buttons (BUILD_1A6 §8–§9)", () => {
     run(w, 1);
     const sel = new Selection(w, () => undefined);
     sel.call = w.calls.id(w.buildings.call[mine]!);
-    expect(dockHtml(w, sel)).toMatch(/⛏️ Đào.*2 từ · đang mờ.*Gửi Draconis/s);
+    expect(dockHtml(w, sel)).toMatch(/⛏️ Đào.*2 từ · đang mờ.*Ngoài vòng giúp.*Gửi Draconis/s);
+    w.agents.x[0] = w.buildings.x[mine]!; // in the ring, still dim: it waits for room, sending someone would not light it
+    w.agents.z[0] = w.buildings.z[mine]! + 4;
+    expect(dockHtml(w, sel)).toMatch(/Trong vòng giúp: sáng khi bớt lời gọi đang sáng/);
     expect(actionsHtml(w, false)).not.toContain("Space");
     send(w, { t: "sandbox", op: { op: "mode", value: "relax" } });
     expect([actionsHtml(w, false), actionsHtml(w, true)].map((html) => /data-act="space">([^<]+)/.exec(html)?.[1])).toEqual(["Tạm dừng", "Chạy tiếp"]);
+  });
+});
+
+describe("the tactical pause and the word dots (review R2)", () => {
+  it("the strip says the game waits, beside the locked word, where the eyes are", () => {
+    const deck = compileDeck([{ id: "g", text: "good", level: 1 }]);
+    const w = world({ deck, mode: "relax" });
+    expect(stripHtml(w, "", true)).toMatch(/^<em class="td-warn td-halt">Tạm dừng · Space<\/em><span class="td-chain"/);
+    callWord(w, 0);
+    type(w, "g", 60, true);
+    expect(stripHtml(w, "", true)).toContain('<b class="td-word"><span>g</span>ood</b><em class="td-warn td-halt">Tạm dừng');
+    expect(stripHtml(w, "")).not.toContain("Tạm dừng");
+  });
+
+  it("dots count the words a call still asks, the current one included, then the typed ones; none for a one-word call", () => {
+    const w = world();
+    const chop = makeCall(w, CALL_KIND.chop, 4, -1, 0, -1, -1);
+    w.calls.done[chop] = 1;
+    expect(pips(w, chop)).toBe("●●●○");
+    expect(pips(w, makeCall(w, CALL_KIND.power, 1, -1, 0, -1, -1))).toBe("");
   });
 });

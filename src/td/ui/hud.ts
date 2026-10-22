@@ -9,6 +9,7 @@ import { chainTier } from "../sim/systems/chain";
 import { earlyCallBonus } from "../sim/systems/waves";
 import type { World } from "../sim/world";
 import { gloss, wordText } from "../typing/decks";
+import type { Rect } from "../view/words/lanes";
 
 /** In update() order; td-chip is the status panel the scenarios look for. */
 export const PANELS = ["chip", "sandbox", "team", "strip", "dock", "actions"] as const;
@@ -50,9 +51,9 @@ export function statusHtml(w: World, sandbox: boolean, paused: boolean, muted: b
 /**
  * The compact word strip (TK 23.4): the locked word, its typed part in jade, or a note; the chain and its tier. A
  * quiz's word stays hidden past what is typed (its first letter shown) under its meaning; the learn mode adds the
- * meaning and the IPA (BUILD_1A6 §7).
+ * meaning and the IPA (BUILD_1A6 §7). In the tactical pause it says so where the eyes are: keys wait (review R2).
  */
-export function stripHtml(w: World, note: string): string {
+export function stripHtml(w: World, note: string, tactical = false): string {
   const { router, deck, chain } = w.typing;
   const word = router.lock >= 0 ? wordText(deck, w.words.word[router.lock]!) : "";
   const typed = router.lock >= 0 ? w.words.typed[router.lock]! : 0;
@@ -60,9 +61,11 @@ export function stripHtml(w: World, note: string): string {
   const shown = quiz ? word.slice(0, Math.max(1, typed)) + "_".repeat(word.length - Math.max(1, typed)) : word;
   const item = router.lock >= 0 ? w.words.word[router.lock]! : -1;
   const mean = item < 0 || !(quiz || w.mode === "learn") ? "" : gloss(deck, item) + (quiz || deck.ipa[item] === "" ? "" : " " + deck.ipa[item]);
+  const locked = `<b class="td-word"><span>${shown.slice(0, typed)}</span>${shown.slice(typed)}</b>`;
   let main = `<em>Gõ chữ đầu của một thẻ để khóa từ</em>`;
-  if (note !== "") main = `<em class="td-warn">${note}</em>`;
-  else if (router.lock >= 0) main = `<b class="td-word"><span>${shown.slice(0, typed)}</span>${shown.slice(typed)}</b>` + (mean === "" ? "" : `<small class="td-mean">${mean}</small>`);
+  if (tactical) main = (router.lock >= 0 ? locked : "") + `<em class="td-warn td-halt">Tạm dừng · Space</em>`; // the card keeps the meaning
+  else if (note !== "") main = `<em class="td-warn">${note}</em>`;
+  else if (router.lock >= 0) main = locked + (mean === "" ? "" : `<small class="td-mean">${mean}</small>`);
   else if (router.group >= 0) main = `<b class="td-word">${String.fromCharCode(97 + router.group)}…</b>`;
   const pips = [1, 2, 3, 4].map((tier) => `<i${tier <= chainTier(chain) ? ' class="on"' : ""}></i>`).join("");
   return main + `<span class="td-chain" title="Bậc Chuỗi ${chainTier(chain)}">Chuỗi <b>${chain}</b>${pips}</span>`;
@@ -75,6 +78,9 @@ export const actionsHtml = (w: World, tactical: boolean): string =>
 export class Hud {
   private readonly panels: HTMLElement[];
   private readonly html: string[] = [];
+  private rects: Rect[] = [];
+  private changed = 0;
+  private seen = "";
 
   constructor(root: HTMLElement, act: (action: string) => void) {
     this.panels = PANELS.map((name) => root.appendChild(Object.assign(document.createElement("div"), { className: "td-panel td-" + name })));
@@ -91,6 +97,16 @@ export class Hud {
       if (text === this.html[k]) return;
       this.html[k] = text;
       this.panels[k]!.innerHTML = text;
+      this.changed += 1;
     });
+  }
+
+  /** The panels on screen (CSS px), measured again only when one changed or the window did: the word cards keep off them. */
+  boxes(width: number, height: number): readonly Rect[] {
+    const key = this.changed + ":" + width + "x" + height;
+    if (key === this.seen) return this.rects;
+    this.seen = key;
+    this.rects = this.panels.map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0).map((r) => ({ left: r.left, top: r.top, right: r.right, bottom: r.bottom }));
+    return this.rects;
   }
 }

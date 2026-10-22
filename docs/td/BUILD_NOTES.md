@@ -526,3 +526,30 @@ Worktree `games/.wt-td-1a6`, nhánh `feat/td-1a6`, trên R1 và bản sửa revi
 - Bot mới, báo cáo, cổng 5 và 7 (mục 3.6: bot gõ chưa lợi hơn bot không gõ). Bot nên gõ cả Hỏi bài.
 - Ở zoom 1 cả sân 96 m nằm trong 660 px (1280 × 720): làng nhỏ, chấm NPC chỉ ~10 px. Bộ ảnh cho chủ dự án nên có thêm một ảnh zoom 2× vào làng.
 - Còn từ R1: Bắn mạnh tạo cuối đêm sống tối đa 3 s sang ngày.
+
+### 4.6 Review R2 (phản biện độc lập, 23/10)
+
+Đọc diff `fc5aad95..4913aea1` theo `BUILD_1A6.md` §7–§10 và ý của kế hoạch (kéo không đẩy, bỏ qua không mất gì, thư giãn, học); dựng lại từng lỗi bằng test thăm dò và trình duyệt thật (CDP, phím và chuột thật, cổng 3130, 1280 × 720 và 1920 × 1080); thử 14 đột biến luật R2: test bắt 9, 4 cái lọt nay có test riêng (dưới bảng).
+
+| # | Mức | Lỗi (cách dựng lại) | Sửa |
+|---|---|---|---|
+| 1 | TB | Dấu chấm điểm (Chớp, Hoàn hảo…) che nghĩa 1 s: ở lời gọi nhiều từ (Gặt, Chặt, Xây, Đào) thẻ nghĩa dời lên trên từ kế, dấu vẫn ở chỗ cũ nên nằm đè chữ ("rather · [Chớp] hơi"; đo: dấu chồng thẻ nghĩa) | Dấu đi theo thẻ nghĩa, đứng trên nó; đo lại 12 mẫu mỗi cỡ: chồng 0 px |
+| 2 | TB | Tạm dừng chiến thuật: lệnh tay xếp hàng mà không hiện gì tới khi chạy tiếp, người chơi bấm lại: "Mua 4 hạt" hai lần thành 8 hạt (60 vàng), bấm cây hai lần thành bỏ đánh dấu (chuột thật) | Trong tạm dừng chiến thuật, lệnh tay chạy ngay, đóng dấu tick đang chờ (`Session.orders`); bước của tick đó cũng chạy lệnh trước mọi hệ, nên nhật ký chạy lại ra cùng thế giới. Phím gõ và Backspace vẫn chờ; lúc thua không nhận. `replayTo` (`sim/world.ts`) và `scripts/td/replay.ts` cộng các lệnh đóng dấu đúng tick đang chờ (ảnh chụp giữa lúc dừng). Tạm dừng thường (Esc, ▶) vẫn xếp hàng như 1A |
+| 3 | TB | Space theo thói quen sau một từ ("rather" rồi Space sau 60 ms) bật tạm dừng ở Thư giãn và Học; phím của từ kế (đến đã khóa) bị bỏ im lặng; báo dừng chỉ ở góc trái trên | Space trong 800 ms sau một chữ game đã nhận là dấu cách giữa từ: bị nuốt (`WORD_SPACE_MS`, `installKeys`); chữ bị bỏ vì đang dừng không tính, nên Space để chạy tiếp ăn ngay; nút "Tạm dừng" không bị chặn. Dải chữ ghi "Tạm dừng · Space" cạnh từ đang khóa |
+| 4 | TB | Nghĩa ở chế độ Học 13,5 px trên thẻ ở 1280 × 720 (dải chữ 13 px), ngọc trên giấy 3,9 : 1; nghĩa Hỏi bài xanh 3,7 : 1 | Nghĩa ≥ 18 px, ngọc đậm `#07695c` (6 : 1); nghĩa Hỏi bài `#1f5bb5` (5,9 : 1). Đo lại: không chữ nào của thẻ < 18 px |
+| 5 | Thấp | 4 lời gọi sáng (Thử thách, cụm cây đông nam), thẻ Lũy mở ở dock, 1280 × 720: thẻ "maybe" bị đẩy (lệch 5, 240 px) đè mép trái dock | Cột tránh bảng HUD hai bên ở chiều cao của nó khi còn chỗ (`besidePanels`, đặt lại mỗi lượt tách); không còn chỗ (`lanesTouch`) thì như cũ: thẻ đè HUD chứ không đè nhau. Vòng tách 8 → 40 lượt để hội tụ. Đo lại: không thẻ nào đè bảng ở cả hai cỡ |
+| 6 | Thấp | Nghĩa dài cắt giữa chữ: 12/765 từ ("chưa bao giờ, không bao g…", "cơ sở kinh …") | Cắt ở dấu phẩy cuối còn vừa, không thì ở chữ trọn cuối và "…"; test chạy cả bộ từ thật |
+| 7 | Thấp | Thẻ dock của lời gọi mờ luôn ghi "Ngoài vòng giúp" kể cả khi lời gọi ở trong vòng mà chờ chỗ (trần đầy, Hỏi bài nhường): gửi người tới không làm nó sáng | Ghi "Trong vòng giúp: sáng khi bớt lời gọi đang sáng" |
+| 8 | Thấp | Hàng Chế độ của hộp cát vẫn cắt "Cân bằng" ở 1280 × 720 (mục 4.1 nói đã hết) | Bốn nút thành 2 × 2 |
+
+Test thêm (mỗi test đỏ trên mã R2, trừ 4 test chặn đột biến): `td-input` (Space sau chữ bị nuốt, sau chữ bị bỏ thì không; tạm dừng chiến thuật chạy lệnh ngay, phím chờ, `replayTo` giữa lúc dừng và sau đó cùng mã băm, tạm dừng thường vẫn xếp hàng), `td-hud` (dải chữ khi dừng; thẻ dock của lời gọi mờ trong vòng), `td-lanes` (bảng hai bên, có chỗ thì không đè dock, hết chỗ thì `lanesTouch`), `td-learn` (cắt nghĩa ở dấu phẩy hoặc chữ trọn, cả bộ từ thật). Chặn đột biến lọt: Hỏi bài lấy từ cũ nhất có chữ đầu trống (`td-learn`), Tab bỏ qua lời gọi sáng, bấm thợ xây đang làm thì tới công trường của lời gọi (`td-input`), chấm từ ●●●○ (`td-hud`). Đột biến còn lọt: cổng phím trong `main.ts` (nay `Session` cũng giữ phím trong tạm dừng chiến thuật), dòng nghĩa của thẻ ở chế độ Học và trần tiếng báo (DOM và âm: chỉ kiểm bằng trình duyệt); Hỏi bài tạo ban đêm chỉ file vàng bắt (đóng ngay trong tick, không ai thấy).
+
+**Lệch của R2 (mục 4.2):** giữ cả 9. Số 1 (Hỏi bài nhường) hợp ý "bỏ được"; số 5 giữ, thêm tránh HUD (số 5 bảng trên). **Lệch mới của review:** §8 "lệnh xếp hàng và chạy ở tick kế khi bỏ dừng" thành lệnh chạy ngay trên tick đang chờ (số 2), vì người chơi không thấy lệnh đã nhận; tick đóng dấu và thứ tự như cũ, nên nhật ký và file vàng không đổi. Space không dừng trong 800 ms sau một chữ (số 3).
+
+**Không sửa (thấp, ghi lại):** chế độ Học ở Lũy 1 không có Hỏi bài (chưa có Thư Đồng; §6 chỉ Thư Đồng hỏi); Hỏi bài sáng mà chưa có từ (chữ đầu của mọi từ trong sổ đang bận) giữ một chỗ trần không thấy, nhường khi trần đầy; Esc khi đang tạm dừng chiến thuật bật thêm tạm dừng thường (Esc như 1A); lời gọi ra vào mép vòng giúp kêu lại tiếng báo (đo 100 s ở Thư giãn: Hỏi bài sáng lại 7 lần; trần 3 tiếng/giây); mũi tên mép tính theo khung sân ở zoom 1, đúng phía; phím Tab qua hết nhà rồi mới tới lời gọi mờ (đúng §8). Kế hoạch Q10 "Cân bằng: tạm dừng chỉ xem" khác §8 "Esc … tạm dừng (như 1A)": giữ như 1A.
+
+**Tất định:** Node chạy lại nhật ký trình duyệt ra cùng mã băm: tour R2 (Học, Hỏi bài, tạm dừng, một Đêm; 1280 × 720: 5.000 tick, 121 lệnh; 1920 × 1080: 5.002 tick, 124 lệnh) và kịch bản tạm dừng (giữa lúc dừng có lệnh đã chạy, và sau khi chạy tiếp) ở cả hai cỡ. File vàng không đổi (`--check` khớp: luật sim không đổi).
+
+**Số sau review:** 5.955 dòng (+105: app 614, UI và view 1.177, gõ 419, sim lõi 962; còn lại như mục 4.3). `tsc` hai cấu hình sạch; `npx vitest run` 406 file, 2.685 đạt, 1 bỏ qua (TD 19 file, 219 test); `vite build` đạt (thư mục ngoài repo). Trình duyệt sau sửa: tour R2 đạt mọi kiểm ở hai cỡ, không lỗi console.
+
+**Cho R3:** kịch bản bấm Space để dừng phải chờ ≥ 800 ms sau phím chữ cuối; trong tạm dừng chiến thuật lệnh tay (và `__td.send` không phải phím) chạy ngay, phím chờ tới khi chạy tiếp; so mã băm với `scripts/td/replay.ts` (đã dùng `replayTo`).

@@ -40,7 +40,21 @@ describe("decks carry meanings for the view (§7)", () => {
       { id: "a", text: "sad", level: 1, vi: "buồn; buồn bả; buồn rầu" }, { id: "b", text: "good", level: 1, vi: "tốt; hay" }, { id: "c", text: "long", level: 1, vi: long },
       { id: "d", text: "none", level: 1 }, { id: "e", text: "lot", level: 1, vi: "nhiều, vô số (theo sau bởi of)" },
     ]);
-    expect([0, 1, 2, 3, 4].map((word) => gloss(d, word))).toEqual(["buồn; buồn bả", "tốt; hay", long.slice(0, 25) + "…", "", "nhiều, vô số"]);
+    expect([0, 1, 2, 3, 4].map((word) => gloss(d, word))).toEqual(["buồn; buồn bả", "tốt; hay", "một nghĩa rất dài không…", "", "nhiều, vô số"]);
+  });
+
+  it("a long meaning keeps its words whole: up to its last comma that fits, else its last whole word (review R2)", () => {
+    const d = compileDeck([
+      { id: "a", text: "never", level: 1, vi: "chưa bao giờ, không bao giờ" }, { id: "b", text: "teacher", level: 1, vi: "giáo viên, thầy giáo, cô giáo" },
+      { id: "c", text: "built", level: 1, vi: "(xà phòng) có thêm chất phụ gia tẩy rửa" },
+    ]);
+    expect([0, 1, 2].map((word) => gloss(d, word))).toEqual(["chưa bao giờ", "giáo viên, thầy giáo", "có thêm chất phụ gia tẩy…"]);
+    const real = realDeck();
+    for (let word = 0; word < real.count; word += 1) {
+      const text = gloss(real, word);
+      expect(text.length, real.vi[word]).toBeLessThanOrEqual(26);
+      if (text.endsWith("…")) expect(real.vi[word]).toContain(text.slice(0, -1) + " "); // cut between words
+    }
   });
 });
 
@@ -86,6 +100,15 @@ describe("quizzes (§6, §7)", () => {
     const C = w.calls;
     expect([C.agent[c!], C.state[c!], C.bright[c!], C.words[c!], C.x[c!], C.z[c!]]).toEqual([1, CALL_STATE.open, 1, 1, w.agents.x[1], w.agents.z[1]]);
     expect(wordText(deck, w.words.word[C.word[c!]!]!)).toBe("grape");
+  });
+
+  it("asks the oldest word of the book whose first letter is free and that is not live already", () => {
+    const w = school();
+    for (const text of ["grape", "lemon", "river"]) review(w, wordOf(deck, text), true);
+    callWord(w, wordOf(deck, "grape")); // live on another call: its letter is taken
+    run(w, 1);
+    const [c] = quizzes(w);
+    expect(wordText(deck, w.words.word[w.calls.word[c!]!]!)).toBe("lemon");
   });
 
   it("typed right: the word leaves the book, +1 knowledge and +1 for the whole Perfect call; typed sloppy it stays, +1 only", () => {

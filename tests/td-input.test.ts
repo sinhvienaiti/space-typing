@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { installKeys, KEY_ACTIONS, keyAction } from "../src/td/app/input";
+import { installKeys, KEY_ACTIONS, keyAction, WORD_SPACE_MS } from "../src/td/app/input";
 import { Selection } from "../src/td/app/selection";
 import { Session } from "../src/td/app/session";
+import { hashHex } from "../src/td/sim/hash";
+import { createWorld, replayTo } from "../src/td/sim/world";
 import type { CommandBody } from "../src/td/sim/commands";
 import { BUILD } from "../src/td/content/rules";
 import { canPlace, nextSpot, spotCandidates } from "../src/td/sim/placement";
@@ -9,7 +11,8 @@ import { CELL } from "../src/td/sim/nav/grid";
 import { FARM } from "../src/td/content/rules";
 import { MODE } from "../src/td/sim/stores/agents";
 import { PLOT } from "../src/td/sim/stores/buildings";
-import { CALL_STATE } from "../src/td/sim/stores/calls";
+import { CALL_KIND, CALL_STATE } from "../src/td/sim/stores/calls";
+import { makeCall } from "../src/td/sim/systems/calls";
 import { NPC_KIND } from "../src/td/sim/stores/npcs";
 import { stand } from "../src/td/sim/systems/agents";
 import { countNpcs, plotAt } from "../src/td/sim/systems/economy";
@@ -73,19 +76,42 @@ describe("keys by event.code (BUILD_NOW §5.4)", () => {
     let vietnamese = 0;
     let handler: (event: KeyboardEvent) => void = () => undefined;
     const target = { addEventListener: (_: string, fn: typeof handler) => (handler = fn) } as unknown as Window;
-    installKeys(target, { send: (command) => sent.push(command), act: (action) => acts.push(action), onVietnamese: () => (vietnamese += 1), allowUntrusted: false });
-    const fire = (event: Press) => {
+    installKeys(target, { send: (command) => sent.push(command) > 0, act: (action) => acts.push(action), onVietnamese: () => (vietnamese += 1), allowUntrusted: false });
+    const fire = (event: Press, timeStamp = 10) => {
       let prevented = false;
-      handler({ isTrusted: true, shiftKey: false, timeStamp: 10, preventDefault: () => (prevented = true), ...event } as unknown as KeyboardEvent);
+      handler({ isTrusted: true, shiftKey: false, timeStamp, preventDefault: () => (prevented = true), ...event } as unknown as KeyboardEvent);
       return prevented;
     };
-    expect([fire({ key: "A", code: "KeyA", shiftKey: true }), fire({ key: "Backspace", code: "Backspace" }), fire({ key: " ", code: "Space" }), fire({ key: "Tab", code: "Tab" })]).toEqual([true, true, true, true]);
+    expect([fire({ key: "A", code: "KeyA", shiftKey: true }), fire({ key: "Backspace", code: "Backspace" }), fire({ key: " ", code: "Space" }, 10 + WORD_SPACE_MS), fire({ key: "Tab", code: "Tab" })]).toEqual([true, true, true, true]);
     expect(fire({ key: "ô", code: "" })).toBe(false); // UniKey's accented letter: nothing to type, the player is told
     expect(fire({ key: "Process", code: "KeyA", keyCode: 229 })).toBe(false);
     expect(fire({ key: "F5", code: "F5" })).toBe(false);
     expect(sent).toEqual([{ t: "key", letter: 0, atMs: 10 }, { t: "backspace", atMs: 10 }]);
     expect(acts).toEqual(["space", "next"]);
     expect(vietnamese).toBe(2);
+  });
+
+  it("a Space right after a letter the game took is a space between words, swallowed; later, or after keys a pause dropped, it pauses (review R2)", () => {
+    const acts: string[] = [];
+    let taken = true;
+    let handler: (event: KeyboardEvent) => void = () => undefined;
+    const target = { addEventListener: (_: string, fn: typeof handler) => (handler = fn) } as unknown as Window;
+    installKeys(target, { send: () => taken, act: (action) => acts.push(action + "@" + at), onVietnamese: () => undefined, allowUntrusted: false });
+    let at = 0;
+    const fire = (key: string, code: string, ms: number) => {
+      at = ms;
+      let prevented = false;
+      handler({ isTrusted: true, shiftKey: false, key, code, timeStamp: ms, preventDefault: () => (prevented = true) } as unknown as KeyboardEvent);
+      return prevented;
+    };
+    expect(fire(" ", "Space", 100)).toBe(true); // no letter yet: the pause
+    fire("g", "KeyG", 1000);
+    expect([fire(" ", "Space", 1150), fire(" ", "Space", 1000 + WORD_SPACE_MS - 1)]).toEqual([true, true]); // swallowed, still not the page's
+    fire(" ", "Space", 1000 + WORD_SPACE_MS);
+    taken = false; // paused: the letter is dropped, so the Space that ends the pause comes through at once
+    fire("o", "KeyO", 3000);
+    fire(" ", "Space", 3050);
+    expect(acts).toEqual(["space@100", "space@" + (1000 + WORD_SPACE_MS), "space@3050"]);
   });
 });
 
@@ -291,21 +317,40 @@ describe("the tactical pause (BUILD_1A6 §8)", () => {
     expect(sel.tactical).toBe(false);
   });
 
-  it("paused, the session steps nothing and holds what the hand sends; it acts on the next tick once the game runs again", () => {
+  it("the tactical pause steps nothing, yet the hand's orders act at once on the tick the world waits on, so none is given twice; keys wait; a replay meets the run (review R2)", () => {
     const session = new Session({ seed: 1, mode: "relax" });
-    const sel = new Selection(session.world, (command) => session.send(command));
-    session.frame(0);
+    const w = session.world;
+    const sel = new Selection(w, (command) => session.send(command));
+    const frame = (now: number) => {
+      session.paused = sel.halted;
+      session.orders = sel.tactical;
+      return session.frame(now);
+    };
+    frame(0);
     sel.act("space");
-    session.paused = sel.halted;
     sel.act("seeds"); // a farm card's button, pressed while paused
     sel.act("build");
     sel.act("send");
-    expect([session.frame(1000), session.world.tick, session.log, sel.building]).toEqual([0, 0, [], false]);
-    sel.act("space");
-    session.paused = sel.halted;
-    expect(session.frame(1017)).toBe(1);
+    session.send({ t: "key", letter: 0, atMs: 5 }); // a key that got in anyway waits for the game
+    expect([frame(1000), w.tick, w.seeds, w.buildings.live(1).length, sel.building]).toEqual([0, 0, 8, 1, false]);
     expect(session.log.map((command) => [command.t, command.tick])).toEqual([["buySeeds", 0], ["build", 0]]);
-    expect([session.world.seeds, session.world.buildings.live(1).length]).toEqual([8, 1]);
+    const mid = createWorld({ seed: 1, mode: "relax" });
+    replayTo(mid, session.log, w.tick); // a browser run seen mid-pause (scripts/td/replay.ts)
+    expect(hashHex(mid)).toBe(hashHex(w));
+    sel.act("space");
+    expect(frame(1017)).toBe(1);
+    expect(session.log.map((command) => [command.t, command.tick])).toEqual([["buySeeds", 0], ["build", 0], ["key", 0]]);
+    for (let now = 1034; now < 3000; now += 17) frame(now);
+    const after = createWorld({ seed: 1, mode: "relax" });
+    replayTo(after, session.log, w.tick);
+    expect(hashHex(after)).toBe(hashHex(w));
+    sel.act("pause"); // the plain pause (Esc, ▶) holds orders until the game runs, as in 1A
+    sel.act("seeds");
+    frame(3100);
+    expect([w.seeds, sel.paused]).toEqual([8, true]);
+    sel.act("pause");
+    frame(3117);
+    expect(w.seeds).toBe(12);
   });
 });
 
@@ -323,6 +368,9 @@ describe("Tab and clicks to calls (BUILD_1A6 §8)", () => {
 
   it("Tab goes through the buildings, then the dim calls, each nearest the agent first; Enter sends the agent by the call's building", () => {
     const { w, sel, keys, mine, c } = dimMine();
+    const lit = makeCall(w, CALL_KIND.build, 2, -1, 0, -1, -1); // the Bastion's, in the hero's ring: bright, so Tab passes it by
+    run(w, 1);
+    expect(w.calls.bright[lit]).toBe(1);
     const seen = [1, 2, 3, 4].map(() => (keys("next"), [sel.focus, sel.call]));
     expect(seen).toEqual([[w.buildings.id(0), -1], [w.buildings.id(mine), -1], [-1, w.calls.id(c)], [w.buildings.id(0), -1]]);
     keys("prev");
@@ -347,6 +395,18 @@ describe("Tab and clicks to calls (BUILD_1A6 §8)", () => {
     expect(keys().find((event) => event.t === "agentOrdered")).toMatchObject({ building: w.buildings.id(mine) });
     sel.toCall(-1); // a call gone: nothing
     expect(keys().filter((event) => event.t === "agentOrdered")).toEqual([]);
+  });
+
+  it("a click on a builder at work sends the agent by its call: to the site, not where the builder stands (review R2)", () => {
+    const { w, sel, keys } = hand({ gold: 1000 });
+    const site = build(w, "archer", -16, -4);
+    const N = w.npcs;
+    const builder = () => N.live().find((n) => N.kind[n] === NPC_KIND.builder && N.call[n]! >= 0) ?? -1;
+    for (let tick = 0; tick < 60 * 30 && builder() < 0; tick += 1) run(w, 1);
+    const n = builder();
+    expect(w.calls.b[N.call[n]!]).toBe(site);
+    sel.click({ x: N.x[n]!, z: N.z[n]! }, false);
+    expect(keys().find((event) => event.t === "agentOrdered")).toMatchObject({ agent: 0, building: w.buildings.id(site) });
   });
 });
 

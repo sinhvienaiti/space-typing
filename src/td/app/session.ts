@@ -3,9 +3,11 @@
  * (the sandbox's 0.75 / 1 / 2), at most 10 a frame (docs/td/TYPING_DEFENSE_DESIGN.md
  * 25.5). Input becomes commands stamped with the tick they act on, and every
  * command goes into the log a replay feeds back through the same step.
+ * Paused, nothing steps; in the tactical pause (`orders`) the hand's orders
+ * still act at once, on the tick the world waits on (BUILD_1A6 §8, review R2).
  */
 import { MAX_STEPS_PER_FRAME, TICK_HZ } from "../content/rules";
-import type { Command, CommandBody } from "../sim/commands";
+import { applyCommand, type Command, type CommandBody } from "../sim/commands";
 import { createWorld, step, type World, type WorldOptions } from "../sim/world";
 
 const STEP_MS = 1000 / TICK_HZ;
@@ -16,6 +18,8 @@ export class Session {
   readonly world: World;
   readonly log: Command[] = [];
   paused = false;
+  /** While paused, orders act at once (the tactical pause); typing still waits for the game. */
+  orders = false;
   private readonly pending: CommandBody[] = [];
   private carry = 0;
   private last = -1;
@@ -33,7 +37,10 @@ export class Session {
   frame(now: number): number {
     const elapsed = this.last < 0 ? 0 : Math.min(MAX_FRAME_MS, Math.max(0, now - this.last));
     this.last = now;
-    if (this.paused) return 0;
+    if (this.paused) {
+      if (this.orders) this.order();
+      return 0;
+    }
     this.carry += elapsed * this.world.speed;
     let steps = Math.floor(this.carry / STEP_MS);
     if (steps > MAX_STEPS_PER_FRAME) {
@@ -44,6 +51,22 @@ export class Session {
     }
     for (let index = 0; index < steps; index += 1) this.tick();
     return steps;
+  }
+
+  /**
+   * The orders sent so far act now, stamped with the tick the world waits on. That tick's step applies its commands
+   * before anything moves, so a replay of the log reaches the same world (sim/world.ts replayTo); an order that showed
+   * nothing until the game ran again was given twice (review R2: 4 seeds bought as 8, a tree marked and unmarked).
+   * Keys and Backspace wait for the game; a lost run takes no command (step).
+   */
+  private order(): void {
+    if (this.world.phase === "defeat") return;
+    const typing = (body: CommandBody): boolean => body.t === "key" || body.t === "backspace";
+    const now = this.pending.filter((body) => !typing(body)).map((body) => ({ ...body, tick: this.world.tick }) as Command);
+    if (now.length === 0) return;
+    this.pending.splice(0, this.pending.length, ...this.pending.filter(typing));
+    this.log.push(...now);
+    for (const command of now) applyCommand(this.world, command);
   }
 
   /** One step now, with every queued command stamped with this tick. */
