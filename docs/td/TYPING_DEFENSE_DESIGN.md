@@ -2097,7 +2097,7 @@ Id viết kebab-case, dùng thẳng trong `src/td/content`. **[1A] [1B] [VS]** l
 | Lam | Đấu sĩ nhanh, cận chiến | Chạy 6,5 m/s + lướt | 10 m | Tốc | Tháp Cung, Trại Lính | Cobalt `#2F6BFF` | 1B (khối tạm), model thật khi có Tripo |
 | Tre | Hỗ trợ, kỹ sư | Chạy 4,5 m/s + bắc cầu | 8 m | Mượt | Mỏ, Ruộng, Trại Gỗ, Lũy, sửa nhà | Lục tre `#A8D05A` | VS |
 
-**Draconis — Phượng Long Biển Sao** (`draconis`, EN *Star-sea Phoenix Dragon*). Model có sẵn `heroes/draconis-v2`.
+**Draconis — Phượng Long Biển Sao** (`draconis`, EN *Star-sea Phoenix Dragon*). Model có sẵn `heroes/draconis-v2`. (model tạm: rồng đỏ cánh màng; dáng TD theo ảnh 3.png bên dưới; model mới là P18 trong `docs/art-requests/td/01-tripo-characters-enemies.md`)
 - **Ngoại hình** (như ảnh 3.png): rồng hai chân, thân trắng, đuôi dài; cánh lông vũ vàng kem viền đỏ cam như lửa; móng và giáp đen vàng. Không chibi, to gấp 2–3 tướng khác. Đầu Thế giới 1 cánh có vệt mực tím, mờ dần qua từng bản đồ.
 - **Chỉ số cấp 1:** máu 650; giáp 30 %, KP 30 %; cầu lửa 22–34 P, nổ 1,8 m, mỗi 1,6 s, tầm 9 m, đánh đất và bay; hồi sinh 20 s; không chặn.
 - **Kỹ năng:**
@@ -2446,6 +2446,7 @@ Camera mặc định 55° ở 58 m.
 | Boss | 7–10 m | 150–220 px |
 | Cây lớn (2D) | 6–10 m | 90–160 px |
 
+- Tháp Pháo thấp tròn (23.12): 3,5–4,5 m, ngoại lệ của dòng Nhà đánh.
 - Kịch bản `td-scale.mjs` đo hộp bao trên ảnh chụp. Lệch quá 20 % thì báo lỗi.
 
 ### 23.3 Màu có nghĩa
@@ -2697,7 +2698,7 @@ Cột tối đa 240 px.
 | Nhà | `Building_Idle`, `Building_Fire` | `Building_Work`, `Building_Hit`, `Building_Ruin` (phần lớn bằng shader) | — |
 
 - **Khung xương thật (skinned) tối đa 8 cùng lúc:** Tướng, ≤ 3 Trợ Thủ, boss, ≤ 3 quái tinh nhuệ gần camera. Mọi thứ khác dùng VAT (nướng clip thành texture) hoặc shader trên instanced mesh; model Tripo có khung xương mà vẽ instanced phải nướng tư thế đứng.
-- **Socket:** nhân vật `FX_HAND_R`, `FX_HAND_L`, `FX_HEAD`, `FX_CORE`, `FX_FEET`, `FX_TOOL`; nhà `FX_muzzle`, `FX_core`, `FX_top` (chỗ cột chữ mọc, giữa đỉnh mái), `FX_word`, `FX_assist` (bục trợ lực), `FX_crew`, `FX_banner`, `FX_pile` (Mỏ), `FX_lantern_0..4`.
+- **Socket:** nhân vật `FX_HAND_R`, `FX_HAND_L`, `FX_HEAD`, `FX_CORE`, `FX_FEET`, `FX_TOOL`; nhà `FX_muzzle`, `FX_core`, `FX_top` (chỗ cột chữ mọc, giữa đỉnh mái), `FX_perch` (chỗ Draconis đậu khi trợ lực, cao hơn `FX_top` 0,6 m để không che gốc cột chữ), `FX_word`, `FX_assist` (bục trợ lực), `FX_crew`, `FX_banner`, `FX_pile` (Mỏ), `FX_lantern_0..4`.
 - **Ai làm gì:** Tripo (chủ dự án) dựng model từ ảnh 2D, tự rig dạng người hoặc bốn chân, clip tại chỗ (đứng, đi, chạy). Blender (AI, `scripts/models/blender/space_typing_model_tools.py`) chuẩn hóa cỡ và hướng, giảm tam giác, gắn socket, làm clip đánh, chiêu, trợ lực, thắng, chết theo bảng này. **AI không dựng model bằng mã.** Việc mới cho bộ Blender: `--kind helpers|units|buildings`, ánh xạ xương Tripo sang vai trò, `make_ground_hero_clips`, `make_helper_clips`, `make_soldier_clips`, `make_worker_clips`, `bake_vat.py`, ảnh xem trước cho chủ dự án duyệt.
 
 ### 23.10 Cảnh vật 2D
@@ -3273,9 +3274,11 @@ Mỗi thế giới: một nền văn minh (CivKit), 1–2 dạng địa hình ch
 
 | Bậc | Model Tripo | Ảnh 2D | Âm thanh |
 |---|---|---|---|
-| **P** (cho 1B, 1C) | Thư Đồng (1 model + 3 bộ gắn); 6 nhà (Lũy, Tháp Cung, Tháp Pháo, Trại Lính, Mỏ Vàng, Ruộng Lúa; Đài Ấn nếu kịp); 7 quái có model (Cương Thi, Nuppeppō, Thuồng Luồng, Tanuki, Troll, Alicanto, Mầm Gỗ; Ma Trơi là VFX); Mộc Tinh; Lam nếu kịp; túi vải, giỏ tre, Rương Boss | Cảnh bản đồ 1 (~12 loại × 2 biến thể đầu), 1 phông xa; chân dung Draconis, 3 Thư Đồng (vui, hoảng), Bà Cú Mực; đèn lồng 3 trạng thái; 3 bùa; icon 6 nhà, 6 nhịp | **~40–60 tiếng:** bắn và trúng của Cung, Pháo, nỏ Lũy (3 lớp, 3 biến thể chính); trống, giáo, hô, chết của lính; cuốc, goòng, lúa; Từ Vàng, cụm chốt, Bùng Nổ 5 nhà; túi, rương; tiếng đi, đánh, chết của 7 quái; Mộc Tinh (gỗ, rễ, gầm); UI xây, nâng, bán. **~30–35 câu thoại:** Draconis 12, Chấm 6, Bà Cú Mực 6, tổ thợ 6 nhà × "Người tới" + "Bùng Nổ". Nhạc: 1 bản bản đồ 1 + câu nhạc ngắn. Tiếng phím và "chữ ra" tổng hợp bằng mã. |
+| **P** (cho 1B, 1C) | Thư Đồng (1 model + 3 bộ gắn); 6 nhà (Lũy, Tháp Cung, Tháp Pháo, Trại Lính, Mỏ Vàng, Ruộng Lúa; Đài Ấn nếu kịp); 7 quái có model (Cương Thi, Nuppeppō, Thuồng Luồng, Tanuki, Troll, Alicanto, Mầm Gỗ; Ma Trơi là VFX); Mộc Tinh; Lam nếu kịp; túi vải, giỏ tre, Rương Boss; Lính Giáo + giáo; Draconis dáng mới (P18, sau Đợt đầu); Rễ Trồi (chưa có file `root-burst.glb`) | Cảnh bản đồ 1 (~12 loại × 2 biến thể đầu), 1 phông xa; chân dung Draconis, 3 Thư Đồng (vui, hoảng), Bà Cú Mực; đèn lồng 3 trạng thái; 3 bùa; icon 6 nhà, 6 nhịp | **~40–60 tiếng:** bắn và trúng của Cung, Pháo, nỏ Lũy (3 lớp, 3 biến thể chính); trống, giáo, hô, chết của lính; cuốc, goòng, lúa; Từ Vàng, cụm chốt, Bùng Nổ 5 nhà; túi, rương; tiếng đi, đánh, chết của 7 quái; Mộc Tinh (gỗ, rễ, gầm); UI xây, nâng, bán. **~30–35 câu thoại:** Draconis 12, Chấm 6, Bà Cú Mực 6, tổ thợ 6 nhà × "Người tới" + "Bùng Nổ". Nhạc: 1 bản bản đồ 1 + câu nhạc ngắn. Tiếng phím và "chữ ra" tổng hợp bằng mã. |
 | **VS** | Tre; bộ gắn Phẩy, Gạch; Thư Pháp, Nhà Thuốc, Trại Gỗ; bộ cấp L2, L3 mọi nhà; Lũy cấp 3–4; 18 model nhánh; đống đổ nát 4 cỡ; Oni, Tất Phương, Ma Da, Dokkaebi, Chồn Liềm; Đại Bàng Tinh; ~12 mốc cảnh; trâu, heo đất, chuồn chuồn | Cảnh 3 bản đồ (~25 loại, ≥ 4 biến thể); phông 3 bản đồ; chân dung đủ (3 Tướng, 10 tổ thợ, 2 boss); ảnh trượt Tối Thượng 3; tranh truyện 2 mỗi Tướng; atlas cảnh Neon cho bản đồ thử | Thoại đủ: 3 Tướng × 19 câu × 2–3 bản; 3 Thư Đồng × 6; tổ thợ 10 × 7; Bà Cú Mực 12; lính 3 loại × 5–7; boss 2 × 6; câu hô quái. Tiếng: 14 loài × 4 nhóm × 3–4 biến thể; mọi vũ khí và va chạm; âm nền 3 bản đồ × 2 lớp. Nhạc: 3–4 bản + 1 boss + câu ngắn. |
 | **Sau** | Thế giới 2+, trang phục | Thư Thành đầy đủ, bách khoa | CGI C4, giọng Việt đầy đủ |
+
+- Bộ prompt theo bậc: `docs/art-requests/td/README.md`. Món thêm ngoài bảng này có lý do ở từng file.
 
 ### 27.3 Chi phí asset (rẻ → đắt)
 
