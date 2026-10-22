@@ -5,11 +5,16 @@
 // Gạch walks his A* path over a bridge (picture td-1a-route) while the words
 // are typed for real at 70 WPM through CDP Input.dispatchKeyEvent; wave 1 is
 // called once he is at the mine, wave 2 as soon as it may be, then all four
-// buildings go to 1 s for 10 s (tier-2 pairs come with 3–4 busy buildings).
-// Every sample checks the cards: no two overlap, text ≥ 18 px, inside the
-// screen's safe area and clear of the HUD chip, first letters never ambiguous.
-// Picture td-1a-four-slots: words up at all four buildings. A Node replay of
-// the run's log must reach the browser's hash (§7 gate 4).
+// buildings go to 1 s for 10 s. A tier-2 pair needs ≤ 5 free first letters,
+// which four 1 s streams reach only at a peak (12 held, 5 resting), so unless
+// a pair has shown already a last phase sets the sandbox E to 45 and types at
+// 45 WPM, where peaks come about four times a minute (Node, 60 seeds: a pair
+// within 60 s in all), until a pair is on screen, for at most 120 s: picture
+// td-1a-tier2, both cards of the pair underlining two letters (TK 6.5). Every
+// sample checks the cards: no two overlap, text ≥ 18 px, inside the screen's
+// safe area and clear of the HUD chip, first letters never ambiguous. Picture
+// td-1a-four-slots: words up at all four buildings. A Node replay of the run's
+// log must reach the browser's hash (§7 gate 4).
 //   URL=http://127.0.0.1:3110/ OUT_DIR=… node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-slots.mjs --width=1280 --height=720
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
@@ -20,7 +25,8 @@ import { DEV_URL, gesture, out } from "./common.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const td = (code) => "(() => { const t = window.__td; if (!t) return null; " + code + " })()";
 const WPM = Number(process.env.WPM ?? 70);
-const KEY_MS = 60000 / (WPM * 5);
+/** The last phase: the sandbox E and the typist's pace that bring tier-2 pairs (see above), and how long it may look for one. */
+const TIER2 = { expected: 45, wpm: 45, maxMs: 120000 };
 /** The preset: building, x, z, the agent sent there (0 Draconis, 1 Chấm, 2 Phẩy, 3 Gạch). */
 const PRESET = [["cannon", 7, 12, 0], ["archer", -8, 12, 1], ["barracks", 3, 18, 2], ["gold-mine", -34, 8, 3]];
 const STREAM = { x0: -25.5, x1: -22.5 };
@@ -59,7 +65,7 @@ const LOOK = td(`
   const live = new Set(words.map((w) => w.text));
   const cards = [...document.querySelectorAll(".td-card")]
     .filter((el) => Number(el.style.opacity) > 0.05 && !el.classList.contains("is-ash") && live.has(el.children[1].textContent))
-    .map((el) => { const r = el.getBoundingClientRect(); return { text: el.children[1].textContent, left: r.left, top: r.top, right: r.right, bottom: r.bottom, font: parseFloat(getComputedStyle(el).fontSize) }; });
+    .map((el) => { const r = el.getBoundingClientRect(); return { text: el.children[1].textContent, left: r.left, top: r.top, right: r.right, bottom: r.bottom, font: parseFloat(getComputedStyle(el).fontSize), underlined: el.children[1].querySelectorAll(".l").length }; });
   const chip = document.querySelector(".td-chip").getBoundingClientRect();
   const s = t.state();
   return { words, cards, chip: { left: chip.left, top: chip.top, right: chip.right, bottom: chip.bottom }, gach: s.agents[3], phase: s.phase, wave: s.wave, nextWaveAt: s.nextWaveAt, tick: s.tick,
@@ -95,6 +101,8 @@ export default async function (page) {
   const shots = [];
   let routeShot = null;
   let fourShot = null;
+  let tier2Shot = null;
+  let tier2Card = null;
   let routeOnBridges = null;
   let gachInWater = false;
   let gachArrivedAt = -1;
@@ -104,10 +112,13 @@ export default async function (page) {
   let minFont = Infinity;
   let keys = 0;
   let calls = 0;
+  // "waves" until wave 2 ends, "dense" for 10 s at 1 s, "tier2" until a pair is on screen, then "done".
+  let phase = "waves";
+  let phaseUntil = 0;
   let wave2Ended = false;
-  let denseUntil = 0;
+  let keyMs = 60000 / (WPM * 5);
   const started = Date.now();
-  while ((!wave2Ended || Date.now() < denseUntil) && Date.now() - started < 240000) {
+  while (phase !== "done" && Date.now() - started < 360000) {
     const tickAt = Date.now();
     const look = await page.eval(LOOK);
     if (look === null) break;
@@ -123,7 +134,16 @@ export default async function (page) {
     // The cards.
     const bad = ambiguity(words);
     if (bad.length > 0 && problems.length < 12) problems.push("ambiguous: " + JSON.stringify(bad));
-    tier2 += words.filter((word) => word.tier === 2).length > 0 ? 1 : 0;
+    // A tier-2 pair with both cards up: the word dealt at tier 2 and the older one sharing its first letter.
+    const cardOf = (text) => cards.find((c) => c.text === text);
+    const paired = words.find((word) => word.tier === 2 && cardOf(word.text) && words.some((o) => o !== word && o.text[0] === word.text[0] && cardOf(o.text)));
+    tier2 += paired !== undefined ? 1 : 0;
+    if (paired !== undefined && tier2Shot === null) {
+      const older = words.find((o) => o !== paired && o.text[0] === paired.text[0]);
+      tier2Card = { words: [older.text, paired.text], underlined: [cardOf(older.text).underlined, cardOf(paired.text).underlined] };
+      tier2Shot = await page.shot(out("td-1a-tier2-" + size + ".png"));
+      if (phase === "tier2") phase = "done";
+    }
     for (const card of cards) {
       minFont = Math.min(minFont, card.font);
       const inside = card.left >= 8 - 0.5 && card.right <= look.width - 8 + 0.5 && card.top >= 0 && card.bottom <= look.height - 8 + 0.5;
@@ -147,11 +167,14 @@ export default async function (page) {
       await page.eval(td(`t.send({ t: "callWave" }); return true;`));
       calls += 1;
     }
-    if (!wave2Ended && (look.phase === "defeat" || (await page.eval(td("return t.events().some((e) => e.t === 'waveEnd' && e.wave === 2);"))))) {
-      wave2Ended = true;
-      denseUntil = Date.now() + 10000;
+    if (phase === "waves" && (look.phase === "defeat" || (await page.eval(td("return t.events().some((e) => e.t === 'waveEnd' && e.wave === 2);"))))) {
+      wave2Ended = look.phase !== "defeat";
+      [phase, phaseUntil] = wave2Ended ? ["dense", Date.now() + 10000] : ["done", 0];
       await page.eval(td(`for (const id of ${JSON.stringify(ids)}) t.send({ t: "setTempo", building: id, idx: 6 }); return true;`));
-    }
+    } else if (phase === "dense" && Date.now() >= phaseUntil) {
+      [phase, phaseUntil, keyMs] = tier2Shot === null ? ["tier2", Date.now() + TIER2.maxMs, 60000 / (TIER2.wpm * 5)] : ["done", 0, keyMs];
+      if (phase === "tier2") await page.eval(td(`t.send({ t: "sandbox", op: { op: "expected", value: ${TIER2.expected} } }); return true;`));
+    } else if (phase === "tier2" && Date.now() >= phaseUntil) phase = "done";
     // The typist: the locked word first, else the most urgent; a tier-2 pair takes its second letter.
     const locked = words.find((word) => word.locked);
     const target = locked ?? words.slice().sort((a, b) => a.left - b.left)[0];
@@ -160,16 +183,16 @@ export default async function (page) {
       await press(page, locked ? target.text[target.typed] : target.text[0]);
       keys += 1;
       if (pair) {
-        await page.sleep(KEY_MS);
+        await page.sleep(keyMs);
         await press(page, target.text[1]);
         keys += 1;
       }
     }
-    await page.sleep(Math.max(0, KEY_MS - (Date.now() - tickAt)));
+    await page.sleep(Math.max(0, keyMs - (Date.now() - tickAt)));
   }
   if (routeShot === null) routeShot = await page.shot(out("td-1a-route-" + size + ".png"));
   if (fourShot === null) fourShot = await page.shot(out("td-1a-four-slots-" + size + ".png"));
-  shots.push(routeShot, fourShot);
+  shots.push(routeShot, fourShot, ...(tier2Shot === null ? [] : [tier2Shot]));
 
   const final = await page.eval(
     td("return { flags: t.flags(), state: t.state(), stats: t.stats(), typing: t.typing(), hash: t.hash(), log: t.log(), spawns: t.events().filter((e) => e.t === 'wordSpawn').map((e) => e.building), rejected: t.events().filter((e) => e.t === 'rejected') };"),
@@ -192,6 +215,7 @@ export default async function (page) {
     gachRouteOverBridge: routeOnBridges === true && !gachInWater,
     fourBuildingsDeal: dealtBy.every((n) => n > 0) && maxBuildings >= 4,
     twoWavesTyped: wave2Ended && final?.state?.phase !== "defeat",
+    tier2PairOnScreen: tier2 > 0 && tier2Card?.underlined.every((n) => n === 2) === true,
     cardsNeverOverlapOrLeaveSafeArea: problems.filter((p) => !p.startsWith("ambiguous")).length === 0,
     cardText18px: minFont >= 18,
     firstLettersDistinct: problems.filter((p) => p.startsWith("ambiguous")).length === 0,
@@ -214,6 +238,7 @@ export default async function (page) {
     dealtBy,
     maxBuildingsWithLiveWords: maxBuildings,
     samplesWithTier2: tier2,
+    tier2Card,
     minCardFontPx: minFont,
     stats: { streamSpawned: stats.streamSpawned, streamDone: stats.streamDone, streamMissed: stats.streamMissed, keys: stats.keys, keyErrors: stats.keyErrors, wordShots: stats.wordShots, kills: stats.kills, damageHero: stats.damageHero, goldWord: stats.goldWord, wavesCleared: stats.wavesCleared },
     typing: final?.typing,

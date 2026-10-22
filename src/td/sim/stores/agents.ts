@@ -7,7 +7,7 @@ export const MODE = { stand: 0, walk: 1, takeoff: 2, fly: 3, land: 4 } as const;
 
 /**
  * The hero (slot 0) and the helpers (slots 1–3, content order), there from the start (TK 5, 8). `goal`:
- * the building it is sent to (−1: just the point gx, gz); `at`: the one it assists (−1: none) until 4.5 m off.
+ * the building it is sent to (−1: just the point gx, gz); `at`: the one it assists (−1: none), sent elsewhere until 4.5 m off or stopped.
  */
 export class AgentStore extends Slots {
   readonly x = new Float64Array(this.cap);

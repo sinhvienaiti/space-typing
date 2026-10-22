@@ -153,6 +153,36 @@ describe("orders (TK 5.1, 8.3, 25.9)", () => {
     expect(w.stats[STAT.streamSpawned]).toBe(after);
   });
 
+  it("recalled to a place within 4.5 m of its spot, an agent lets go where it stops; so does one whose slot closes", () => {
+    const w = field(3, { deck: smallDeck(["apple", "bread", "cider", "dream", "eagle", "fable", "grape", "house"]) });
+    // The archer's socket (−10, 40) is 4.5 m from Phẩy's place in the row beside the Bastion (−5.5, 40).
+    const archer = build(w, "archer", -13, 40);
+    ready(w);
+    const A = w.agents;
+    const assisted = () => {
+      send(w, { t: "assignUnit", agent: 2, building: w.buildings.id(archer) });
+      arrive(w);
+      run(w, T(1));
+      expect(w.buildings.rateMul[archer]).toBeCloseTo(1 + PRESENCE, 12);
+    };
+    const letsGoAtHome = (order: Parameters<typeof send>[1]) => {
+      send(w, order);
+      const left = stepsUntil(w, (fresh) => fresh.some((e) => e.t === "agentLeft"));
+      expect(left.at(-1)).toMatchObject({ t: "agentLeft", agent: 2, building: w.buildings.id(archer) });
+      expect([A.mode[2], A.x[2], A.z[2], A.at[2], w.buildings.assist[archer]]).toEqual([MODE.stand, -5.5, 40, -1, -1]);
+      const dealt = w.stats[STAT.streamSpawned]!;
+      run(w, T(10));
+      expect(w.stats[STAT.streamSpawned]).toBe(dealt);
+      expect(w.buildings.rateMul[archer]).toBe(1);
+    };
+    assisted();
+    letsGoAtHome({ t: "recall", agent: 2 });
+    // Its slot closing (the Bastion back to level 2) sends it home the same way, and it holds no assist there.
+    assisted();
+    letsGoAtHome({ t: "sandbox", op: { op: "keepLevel", value: 2 } });
+    expect(slotsOpen(w)).toBe(2);
+  });
+
   it("undoing an assisted building lets its agent go and sends it home", () => {
     const w = field(4);
     const archer = build(w, "archer", -16, -4);
@@ -240,6 +270,63 @@ describe("the hero fights when idle (TK 8.1, 22.2)", () => {
     near();
     run(w, T(4));
     expect(w.stats[STAT.damageHero]).toBe(dealt);
+    // Recalled, it rests right there (its place is that perch): it lets go at once and fights again.
+    near();
+    expect(send(w, { t: "recall", agent: 0 }).some((e) => e.t === "agentLeft" && e.agent === 0)).toBe(true);
+    expect([w.agents.at[0], w.buildings.assist[0]]).toEqual([-1, -1]);
+    run(w, T(4));
+    expect(w.stats[STAT.damageHero]).toBeGreaterThan(dealt);
+  });
+
+  it("throws nothing while taking off, flying or landing: only standing on the ground", () => {
+    const w = field(1);
+    w.phase = "battle";
+    w.lives = 1e6;
+    const archer = build(w, "archer", -16, -4);
+    ready(w);
+    const A = w.agents;
+    // An enemy in reach as Draconis lifts off from its place, another by the archer's eave as it lands there.
+    enemyAt(w, "thuong-luong", 0, w.lanes[0]!.length - 8);
+    send(w, { t: "assignUnit", agent: 0, building: w.buildings.id(archer) });
+    const lane = w.lanes[0]!;
+    const byEave = Array.from({ length: Math.floor(lane.length) }, (_, d) => d).sort((a, b) => {
+      const [pa, pb] = [lane.point(a, 0, { x: 0, z: 0 }), lane.point(b, 0, { x: 0, z: 0 })];
+      return Math.hypot(pa.x - A.gx[0]!, pa.z - A.gz[0]!) - Math.hypot(pb.x - A.gx[0]!, pb.z - A.gz[0]!);
+    })[0]!;
+    const modes = new Set<number>();
+    while (A.at[0] !== archer) {
+      if (A.mode[0] === MODE.land && !modes.has(MODE.land)) enemyAt(w, "thuong-luong", 0, byEave);
+      modes.add(A.mode[0]!);
+      step(w);
+      expect(A.atkCd[0], "a fireball in mode " + A.mode[0]).toBe(0);
+    }
+    expect([...modes].sort()).toEqual([MODE.takeoff, MODE.fly, MODE.land]);
+    expect(Math.hypot(lane.point(byEave, 0, { x: 0, z: 0 }).x - A.x[0]!, lane.point(byEave, 0, { x: 0, z: 0 }).z - A.z[0]!)).toBeLessThan(6);
+  });
+});
+
+describe("a mine's pile with someone there (TK 11.5)", () => {
+  it("comes home whenever someone arrives, even back within 5 s of the last collection, then every 5 s", () => {
+    const w = field(4);
+    const mine = build(w, "gold-mine", 26, -30);
+    ready(w);
+    w.phase = "battle";
+    const pileHome = (events: RareEvent[]) => events.filter((e) => e.t === "pileCollected").map((e) => e.tick);
+    send(w, { t: "assignUnit", agent: 3, building: w.buildings.id(mine) });
+    w.buildings.pile[mine] = 4000;
+    const first = stepsUntil(w, (fresh) => fresh.some((e) => e.t === "agentArrived"));
+    expect(pileHome(first)).toEqual([first.at(-1)!.tick]);
+    // Off past 4.5 m and straight back: it arrives again well inside 5 s, and the pile comes home on that tick.
+    send(w, { t: "recall", agent: 3 });
+    stepsUntil(w, (fresh) => fresh.some((e) => e.t === "agentLeft"));
+    w.buildings.pile[mine] = 7000;
+    send(w, { t: "assignUnit", agent: 3, building: w.buildings.id(mine) });
+    const back = stepsUntil(w, (fresh) => fresh.some((e) => e.t === "agentArrived"));
+    expect(back.at(-1)!.tick - first.at(-1)!.tick).toBeLessThan(T(5));
+    expect(pileHome(back)).toEqual([back.at(-1)!.tick]);
+    expect(w.buildings.pile[mine]).toBe(0);
+    w.buildings.pile[mine] = 2000;
+    expect(pileHome(stepsUntil(w, (fresh) => pileHome(fresh).length > 0))).toEqual([back.at(-1)!.tick + T(5)]);
   });
 });
 

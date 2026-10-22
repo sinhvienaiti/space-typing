@@ -25,7 +25,7 @@ function estimate(cell: number, size: number, col: number, row: number): number 
 /** f, then h, then the cell, as one exact integer: f < 2^20, h < 2^11, cell < 2^14. */
 const key = (f: number, h: number, cell: number): number => (f * 2048 + h) * 16384 + cell;
 
-/** Writes the cells from `start` to `goal` into `out` and returns how many (0: no way). It searches from the goal, so parents read from the start walk forward. */
+/** Writes the cells from `start` to `goal` into `out` and returns how many (0: no way). It searches from the goal, so parents read from the start walk forward; the start may be blocked (a walker always leaves the cell it stands on). */
 export function findPath(grid: WalkGrid, start: number, goal: number, out: Int32Array): number {
   const total = grid.cells.length;
   if (total > 16384) throw new Error("td nav: heap keys hold 14 cell bits, " + total + " cells asked");
@@ -63,7 +63,7 @@ export function findPath(grid: WalkGrid, start: number, goal: number, out: Int32
       const [dx, dz] = STEPS[k]!;
       const next = cell + dx + dz * size;
       const cost = g[cell]! + COST[k]!;
-      if (!grid.open(cell, dx, dz) || closed[next] === search || (opened[next] === search && cost >= g[next]!)) continue;
+      if (!grid.open(cell, dx, dz, start) || closed[next] === search || (opened[next] === search && cost >= g[next]!)) continue;
       g[next] = cost;
       parent[next] = cell;
       opened[next] = search;
@@ -75,6 +75,20 @@ export function findPath(grid: WalkGrid, start: number, goal: number, out: Int32
     }
   }
   return 0;
+}
+
+/** Of the open cells within 6 cells of (x, z), the nearest by centre (ties to the smaller index) from which `goal` can be walked to, else the nearest open one; −1 with none open. `out` is findPath's scratch. */
+export function nearestOpen(grid: WalkGrid, x: number, z: number, goal: number, out: Int32Array): number {
+  const near: number[] = [];
+  for (let dz = -6; dz <= 6; dz += 1) {
+    for (let dx = -6; dx <= 6; dx += 1) {
+      const cell = grid.cell(x + dx, z + dz);
+      if (cell >= 0 && grid.cells[cell] === 0) near.push(cell);
+    }
+  }
+  const d2 = (c: number) => (grid.centerX(c) - x) * (grid.centerX(c) - x) + (grid.centerZ(c) - z) * (grid.centerZ(c) - z);
+  near.sort((p, q) => d2(p) - d2(q) || p - q);
+  return near.find((cell) => findPath(grid, cell, goal, out) > 0) ?? near[0] ?? -1;
 }
 
 /** Whether the segment from (x0, z0) to (x1, z1) crosses open cells only: samples under 1 m apart, each step to a neighbouring cell passing grid.open (a corner needs both cells beside it). */

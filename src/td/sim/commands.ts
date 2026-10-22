@@ -189,7 +189,7 @@ export function placeBuilding(w: World, def: number, x: number, z: number, node:
   const slot = w.buildings.add(def, x, z, spec.hp[0], w.tick, w.tick + spec.buildTicks, paid, node);
   if (slot < 0) return -1;
   if (spec.placement !== "fixed") w.grid.stamp(x, z, spec.radius, CELL.building, true);
-  rerouteAgents(w, x, z, spec.radius);
+  rerouteAgents(w);
   if (spec.barracks !== null) {
     const point = { x, z };
     let best = Infinity;

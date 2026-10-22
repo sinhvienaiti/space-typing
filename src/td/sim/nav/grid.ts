@@ -1,17 +1,23 @@
 /**
  * The walking grid (docs/td/TYPING_DEFENSE_DESIGN.md 25.9): 1 m cells over
- * the 96 × 96 m field. A cell is blocked by water (bridges excepted) or by a
- * building disc; Thư Đồng walk it, and placement checks that every assist
- * socket stays reachable from the Bastion on it.
+ * the 96 × 96 m field. A cell is blocked by any painted water not on a bridge
+ * or by a building disc; Thư Đồng walk it, and placement checks that every
+ * assist socket stays reachable from the Bastion on it.
  */
-import type { MapDef, Rect } from "../../content/types";
+import type { MapDef } from "../../content/types";
 
 export const CELL = { water: 1, building: 2, probe: 4 } as const;
 
 /** 8 neighbours as [dx, dz]; a diagonal needs both of its sides open. */
 export const STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]] as const;
 
-const inside = (rect: Rect, x: number, z: number) => x >= rect.x0 && x <= rect.x1 && z >= rect.z0 && z <= rect.z1;
+/** Whether the 1 m cell from (x, z) to (x + 1, z + 1) holds painted water no one bridge covers: the whole cell, not its centre, so a walker anywhere in an open cell stays on grass or on a bridge as drawn. */
+function wet(map: MapDef, x: number, z: number): boolean {
+  return map.water.some((rect) => {
+    const [x0, x1, z0, z1] = [Math.max(x, rect.x0), Math.min(x + 1, rect.x1), Math.max(z, rect.z0), Math.min(z + 1, rect.z1)];
+    return x0 < x1 && z0 < z1 && !map.bridges.some((b) => b.x0 <= x0 && x1 <= b.x1 && b.z0 <= z0 && z1 <= b.z1);
+  });
+}
 
 export class WalkGrid {
   readonly size: number;
@@ -23,9 +29,7 @@ export class WalkGrid {
     this.origin = -map.halfM;
     this.cells = new Uint8Array(this.size * this.size);
     for (let index = 0; index < this.cells.length; index += 1) {
-      const x = this.centerX(index);
-      const z = this.centerZ(index);
-      if (map.water.some((rect) => inside(rect, x, z)) && !map.bridges.some((rect) => inside(rect, x, z))) this.cells[index] = CELL.water;
+      if (wet(map, this.centerX(index) - 0.5, this.centerZ(index) - 0.5)) this.cells[index] = CELL.water;
     }
   }
 
@@ -58,12 +62,12 @@ export class WalkGrid {
     }
   }
 
-  /** Whether a step from `index` by (dx, dz) lands on an open cell without cutting a corner. */
-  open(index: number, dx: number, dz: number): boolean {
+  /** Whether a step from `index` by (dx, dz) lands on an open cell (or on `pass`) without cutting a corner. */
+  open(index: number, dx: number, dz: number, pass = -1): boolean {
     const col = (index % this.size) + dx;
     const row = Math.floor(index / this.size) + dz;
     if (col < 0 || row < 0 || col >= this.size || row >= this.size) return false;
-    if (this.cells[row * this.size + col] !== 0) return false;
+    if (this.cells[row * this.size + col] !== 0 && row * this.size + col !== pass) return false;
     return dx === 0 || dz === 0 || (this.cells[index + dx] === 0 && this.cells[index + dz * this.size] === 0);
   }
 }

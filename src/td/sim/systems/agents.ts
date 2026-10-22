@@ -4,7 +4,7 @@
  */
 import { ticks } from "../../content/compile";
 import { ASSIST, EMIT, TICK_HZ } from "../../content/rules";
-import { findPath, pullPath } from "../nav/astar";
+import { findPath, nearestOpen, pullPath } from "../nav/astar";
 import { socketCell, type Point } from "../placement";
 import { SOURCE } from "../stats";
 import { MODE, PATH_MAX, type AgentStore } from "../stores/agents";
@@ -93,7 +93,7 @@ function beyond(w: World, a: number, b: number, limit: number): boolean {
   return dx * dx + dz * dz > limit * limit;
 }
 
-/** Moves agent a `left` m straight toward (x, z), stopping there (a negative `left` backs away); returns what is left over, −1 short of it. */
+/** Moves agent a `left` m straight toward (x, z), stopping there; returns what is left over, −1 short of it. */
 function toward(A: AgentStore, a: number, x: number, z: number, left: number): number {
   const dx = x - A.x[a]!;
   const dz = z - A.z[a]!;
@@ -127,7 +127,7 @@ function walk(w: World, a: number): void {
   else plan(w, a); // the path needed more than PATH_MAX points: on from here next tick
 }
 
-/** Step 3: the hero's timed takeoff, straight flight and timed landing, the helpers' walks; an assist begins on the ground within 3 m of the spot, ends 4.5 m away. */
+/** Step 3: the hero's timed takeoff, straight flight and timed landing, the helpers' walks; an assist begins on the ground within 3 m of the spot and, the agent sent elsewhere, ends 4.5 m away or where it stops (home may lie closer). */
 export function agentsStep(w: World): void {
   const A = w.agents;
   const hero = w.c.content.hero;
@@ -139,7 +139,7 @@ export function agentsStep(w: World): void {
     }
     if (A.mode[a] === MODE.walk) walk(w, a);
     const goal = A.goal[a]!;
-    if (A.at[a]! >= 0 && A.at[a] !== goal && beyond(w, a, A.at[a]!, ASSIST.exitM)) leave(w, a);
+    if (A.at[a]! >= 0 && A.at[a] !== goal && (A.mode[a] === MODE.stand || beyond(w, a, A.at[a]!, ASSIST.exitM))) leave(w, a);
     if (goal >= 0 && A.at[a] !== goal && A.mode[a]! <= MODE.walk && !beyond(w, a, goal, ASSIST.enterM)) arrive(w, a, goal);
   }
 }
@@ -154,13 +154,17 @@ export function heroAttack(w: World): void {
   A.atkCd[0] = level.period;
 }
 
-/** A building went down at (x, z), radius r (TK 25.9): a helper it covers backs out to r + 0.75 m, where its cell's centre is past the rim; it and every walker find their way again. */
-export function rerouteAgents(w: World, x: number, z: number, r: number): void {
+/** A building went down (TK 25.9): a helper it covers steps to the centre of the nearest open cell that still leads to its goal, never into water or another building; it and every walker find their way again. */
+export function rerouteAgents(w: World): void {
   const A = w.agents;
+  const grid = w.grid;
   for (let a = 1; a < A.top; a += 1) {
-    const covered = w.grid.cells[w.grid.cell(A.x[a]!, A.z[a]!)] !== 0;
-    const d = Math.sqrt((A.x[a]! - x) * (A.x[a]! - x) + (A.z[a]! - z) * (A.z[a]! - z));
-    if (covered) toward(A, a, x, d > 0 ? z : z + 1, d > 0 ? d - r - 0.75 : -r - 0.75); // from the very centre it backs out north
+    const covered = grid.cells[grid.cell(A.x[a]!, A.z[a]!)] !== 0;
+    const to = covered ? nearestOpen(grid, A.x[a]!, A.z[a]!, grid.cell(A.gx[a]!, A.gz[a]!), cells) : -1;
+    if (to >= 0) {
+      A.x[a] = grid.centerX(to);
+      A.z[a] = grid.centerZ(to);
+    }
     if (covered || A.mode[a] === MODE.walk) plan(w, a);
   }
 }

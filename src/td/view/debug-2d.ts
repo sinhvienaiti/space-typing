@@ -257,24 +257,41 @@ export class DebugView {
     ctx.setLineDash([]);
   }
 
-  /** The assist line to the building's centre; a walker's path ahead, dashed; Thư Đồng as lettered discs, Draconis a winged triangle over its shadow. */
+  /** The assist line; a walker's path ahead, dashed; Thư Đồng as lettered discs, Draconis a winged triangle over its shadow. */
   private agents(w: World): void {
     const { ctx } = this;
     const A = w.agents;
+    const B = w.buildings;
     for (let a = 0; a < A.top; a += 1) {
       if (a >= slotsOpen(w) && A.goal[a]! < 0 && A.mode[a] === MODE.stand) continue; // a closed slot's helper waits inside the Bastion
       const view = a === 0 ? w.c.content.hero.view : w.c.content.helpers[a - 1]!.view;
-      const x = A.x[a]!;
-      const z = A.z[a]!;
-      if (A.at[a]! >= 0) this.polyline([x, z, w.buildings.x[A.at[a]!]!, w.buildings.z[A.at[a]!]!], view.color, 0);
+      const left = (A.until[a]! - w.tick) / ((A.mode[a] === MODE.land ? w.c.content.hero.landS : w.c.content.hero.takeoffS) * TICK_HZ);
+      const up = A.mode[a] === MODE.fly ? 1 : A.mode[a] === MODE.takeoff ? 1 - left : A.mode[a] === MODE.land ? left : 0; // height 0–1: the body lifts off its shadow
+      let x = A.x[a]!;
+      let z = A.z[a]!;
+      // Perched on an eave, or low over one, Draconis is drawn 1 m out from it: the letter and the level marks stay readable.
+      for (let b = 0; a === 0 && b < B.top; b += 1) {
+        if (B.used[b] === 0) continue;
+        const dx = A.x[a]! - B.x[b]!;
+        const dz = A.z[a]! - B.z[b]!;
+        const d = Math.sqrt(dx * dx + dz * dz);
+        const out = (w.c.buildings[B.def[b]!]!.radius + 1 - d) * (1 - up);
+        if (d === 0 || out <= 0) continue;
+        x += (dx / d) * out;
+        z += (dz / d) * out;
+      }
+      // The assist line stops 0.3 r inside the rim: joined to the building, off its letter and level marks.
+      const at = A.at[a]!;
+      const tx = at >= 0 ? B.x[at]! - x : 0;
+      const tz = at >= 0 ? B.z[at]! - z : 0;
+      const reach = at >= 0 ? 1 - (0.7 * w.c.buildings[B.def[at]!]!.radius) / Math.sqrt(tx * tx + tz * tz) : 0;
+      if (reach > 0) this.polyline([x, z, x + tx * reach, z + tz * reach], view.color, 0);
       if (A.mode[a] === MODE.walk) this.polyline([x, z, ...A.path.subarray((a * PATH_MAX + A.next[a]!) * 2, (a * PATH_MAX + A.pathN[a]!) * 2)], view.color, 7);
       if (a > 0) {
         this.disc(x, z, 0.85, view.color, COLOR.ink, 1.5);
         this.text(view.short, x, z, 10, COLOR.ink);
         continue;
       }
-      const left = (A.until[a]! - w.tick) / ((A.mode[a] === MODE.land ? w.c.content.hero.landS : w.c.content.hero.takeoffS) * TICK_HZ);
-      const up = A.mode[a] === MODE.fly ? 1 : A.mode[a] === MODE.takeoff ? 1 - left : A.mode[a] === MODE.land ? left : 0; // height 0–1: the body lifts off its shadow
       if (up > 0) this.disc(x + 0.9 * up, z + 1.4 * up, 0.9, "rgba(43, 33, 24, 0.25)", null);
       ctx.translate(x, z - 0.8 * up);
       Object.assign(ctx, { fillStyle: view.color, strokeStyle: COLOR.ink, lineWidth: this.px(1.5) });

@@ -31,19 +31,37 @@
 - Bù 174 dòng chỗ trùng thật: kiểu đã biên dịch suy ra từ hàm biên dịch (như `Typing`) thay vì khai lại từng trường; CSS trang một luật một dòng như CSS thẻ; bảng màu `debug-2d` và cờ tập kết; cột của vòng sự kiện là trường; kiểu dữ liệu thuần (`AttackSpec`, `HeroDef`, `MapDef`, quái đã biên dịch) gộp dòng.
 - Còn vượt phần của 1A.2: 4.582 − 4.459 = 123 dòng. Không cắt thêm chú thích luật (chúng giữ tham chiếu TK). Phần này trừ vào phần của 1A.3–1A.5, ước lượng lại bằng số thật ở 1.2.
 
-### 1.2 Phần cho từng mốc còn lại (ước lượng lại sau review 1A.2)
+### 1.2 Phần cho từng mốc còn lại (ước lượng lại sau review 1A.3)
 
 Mốc đang làm: **1A.3**. Test `td-boundary` đọc dòng này và cột "Cộng dồn tối đa" của mốc đó, rồi hỏng khi tổng vượt (ngoài trần cứng 5.500). Bắt đầu mốc mới thì đổi dòng trên trước khi viết mã.
 
 | Mốc | Phần mới (ước lượng theo mã thật đã có) | Tối đa | Cộng dồn tối đa |
 |---|---|---|---|
 | 1A.2 Gõ lõi (xong, gồm sửa review) | 1.703 thật | — | 4.582 |
-| 1A.3 Người và ô (xong) | 337 thật (mục 1.4): `nav/astar` 107, kho `agents` 36, hệ `agents` 174, `stream` −29, nối `commands` `world` `placement` `compile` `events` `main` +13, vẽ người, đường A*, dây +36 | 340 | 4.922 |
-| 1A.4 Điều khiển, HUD | Kê từng phần: phím lệnh ở `app/input` +75 (hôm nay 35); `app/selection` + chỗ trống gợi ý trong sim 80; chuột và camera 70; thanh nhà (nhịp, gửi, tập kết, hoàn tác, cấp, "Mỗi từ", gợi ý nhịp) gộp với menu xây 85; thanh 4 chân dung 35; HUD (chuyển chip trạng thái ra khỏi `main.ts`, −25) 30; chip Tải, Chuỗi 30; hộp cát 50; CSS 45; ân hạn ra lệnh 5. Cộng 505, nên cắt theo BUILD_NOW §10 trước khi làm: danh sách rê chuột của chip Tải là `title`, hộp cát dựng từ một bảng điều khiển | 500 | 5.422 |
-| 1A.5 Bot, báo cáo | Bot, chính sách, báo cáo nằm ở `tests/` và `scripts/`; `src/` chỉ thêm móc đo | 40 | 5.462 |
+| 1A.3 Người và ô (xong, gồm sửa review) | 378 thật: 337 của mốc (mục 1.4: `nav/astar` 107, kho `agents` 36, hệ `agents` 174, `stream` −29, nối `commands` `world` `placement` `compile` `events` `main` +13, vẽ người, đường A*, dây +36) và 41 của bản sửa review 1A.3 (mục 1.6: `nav` +18, hệ `agents` +4, `debug-2d` +17, `cards` +2) | 340 + 41 | 4.960 |
+| 1A.4 Điều khiển, HUD | 535 trước khi cắt, 500 sau khi cắt (bảng dưới) | 500 | 5.460 |
+| 1A.5 Bot, báo cáo | Bot, chính sách, báo cáo nằm ở `tests/` và `scripts/`; `src/` chỉ thêm móc đo | 40 | 5.500 |
 
-- Còn 38 dòng tới trần cứng 5.500. Mục tiêu 5.000 không giữ được; BUILD_NOW §2 cho vượt mục tiêu nhưng không vượt trần.
-- Mốc nào vượt phần của mình thì bù ngay trong mốc đó, không đẩy sang mốc sau. Test chặn theo cột "Cộng dồn tối đa", nên vượt là đỏ ngay trong mốc.
+Ước lượng lại 1A.4 (review 1A.3, mục 5), tính cả `move` và đốm sáng dọc dây trợ lực mà 1A.3 dời sang, cùng 41 dòng của bản sửa review 1A.3. Bản sửa đó dùng hết 38 dòng dự phòng dưới trần, nên phần của 1A.4 giữ 500 mà phải chứa thêm hai việc. Cắt theo BUILD_NOW §10 (cắt UI trước, không cắt luật, test) trước khi viết mã 1A.4:
+
+| Phần của 1A.4 | Trước | Sau review 1A.3 | Cắt |
+|---|---|---|---|
+| Phím lệnh ở `app/input` (hôm nay 35) | 75 | 75 | |
+| `app/selection` + chỗ trống gợi ý trong sim | 80 | 80 | |
+| Chuột và camera | 70 | 50 | Bỏ kéo chân dung thả lên nhà (§10 nêu tên) và Shift + phải "Thư Đồng rảnh gần nhất". Còn: trái chọn, phải vào nhà để gửi, lăn zoom, kéo camera |
+| `move`: lệnh sim (người trong ô mở, điểm trong sân, Thư Đồng cần ô trống), phải vào đất | — | 16 | |
+| Thanh nhà (nhịp, gửi, tập kết, hoàn tác, cấp, "Mỗi từ", gợi ý nhịp) gộp menu xây, thay vòng menu (§10) | 85 | 80 | Bỏ lăn chuột trên huy hiệu nhịp; nhịp đổi bằng núm trên thanh, `Minus` / `Equal` |
+| Thanh 4 chân dung | 35 | 35 | |
+| HUD (chuyển chip trạng thái ra khỏi `main.ts`, −25) | 30 | 30 | |
+| Chip Tải, Chuỗi | 30 | 30 | Danh sách rê chuột của chip Tải là `title` (đã cắt từ trước) |
+| Hộp cát | 50 | 45 | Dựng từ một bảng điều khiển; "Đặt sẵn 4 ô" là một bảng dữ liệu như kịch bản `td-1a-slots` |
+| CSS | 45 | 40 | Không có bóng kéo, không có vòng menu |
+| Ân hạn ra lệnh | 5 | 5 | |
+| Đốm sáng dọc dây mỗi phím đúng (view đọc `wordKey`) | — | 14 | |
+| **Cộng** | **505** | **535 → 500** | **−35** |
+
+- Không còn dòng dự phòng: 4.960 + 500 + 40 = 5.500, đúng trần cứng. Mục tiêu 5.000 không giữ được; BUILD_NOW §2 cho vượt mục tiêu nhưng không vượt trần.
+- Từ 1A.4, mốc nào vượt phần của mình thì bù ngay trong mốc đó (cắt thêm UI theo §10, không cắt luật, test), không đẩy sang mốc sau. Test chặn theo cột "Cộng dồn tối đa", nên vượt là đỏ ngay trong mốc. 1A.4 bù được bằng chỗ trùng thật thì trả lại theo thứ tự: lăn chuột trên huy hiệu nhịp, Shift + phải.
 
 ### 1.3 Lệch so với BUILD_NOW, TK ở 1A.2 (có lý do)
 
@@ -67,19 +85,19 @@ Mốc đang làm: **1A.3**. Test `td-boundary` đọc dòng này và cột "Cộ
 
 ### 1.4 Sau 1A.3
 
-| Nhóm | Sau sửa review 1A.2 | Sau 1A.3 | Đổi |
-|---|---|---|---|
-| Trang, Platform | 87 | 87 | 0 |
-| Nội dung | 571 | 572 | +1 (`hero` đã biên dịch) |
-| Gõ thuần | 453 | 453 | 0 |
-| Sim lõi (`sim/*.ts`) | 774 | 786 | +12 |
-| Kho | 331 | 367 | +36 (`agents`) |
-| Đường (`nav/`) | 108 | 215 | +107 (`astar`) |
-| Hệ chiến đấu | 585 | 585 | 0 |
-| Hệ gõ (gồm `agents` theo BUILD_NOW §2) | 629 | 774 | +145 (`agents` 174, `stream` −29) |
-| App | 330 | 330 | 0 (`state()` dựng bằng `live().map`, thêm người) |
-| View, UI | 714 | 750 | +36 |
-| **Tổng** | **4.582** | **4.919** | **+337 / 340** |
+| Nhóm | Sau sửa review 1A.2 | Sau 1A.3 | Đổi | Sau sửa review 1A.3 (mục 1.6) |
+|---|---|---|---|---|
+| Trang, Platform | 87 | 87 | 0 | 87 |
+| Nội dung | 571 | 572 | +1 (`hero` đã biên dịch) | 572 |
+| Gõ thuần | 453 | 453 | 0 | 453 |
+| Sim lõi (`sim/*.ts`) | 774 | 786 | +12 | 786 |
+| Kho | 331 | 367 | +36 (`agents`) | 367 |
+| Đường (`nav/`) | 108 | 215 | +107 (`astar`) | 233 (+14 `nearestOpen`, +4 `grid`) |
+| Hệ chiến đấu | 585 | 585 | 0 | 585 |
+| Hệ gõ (gồm `agents` theo BUILD_NOW §2) | 629 | 774 | +145 (`agents` 174, `stream` −29) | 778 (+4 `agents`) |
+| App | 330 | 330 | 0 (`state()` dựng bằng `live().map`, thêm người) | 330 |
+| View, UI | 714 | 750 | +36 | 769 (+17 `debug-2d`, +2 `cards`) |
+| **Tổng** | **4.582** | **4.919** | **+337 / 340** | **4.960 (+41)** |
 
 Bản đầu của 1A.3 dài 5.013 dòng (vượt 91 trước khi có phần vẽ). Để vừa phần 340 dòng, không cắt luật nào của TK 25.9 và BUILD_NOW §3.4; đã đổi:
 
@@ -87,25 +105,41 @@ Bản đầu của 1A.3 dài 5.013 dòng (vượt 91 trước khi có phần v�
 - A* tìm từ đích về người đi, nên đọc cha từ người đi ra đúng thứ tự đi, không cần đảo mảng.
 - Đặt nhà thì mọi Thư Đồng đang đi tìm đường lại (TK: chỉ người bị cắt). Cùng kết quả cho người bị cắt; người không bị cắt có thể đổi sang đường dài bằng. Một lần A* ≤ 0,13 ms (trung vị).
 - Đường chỉ tính khi ra lệnh (bước 1), không có cờ "tìm lại ở bước 3".
-- `move` (Tướng tới một điểm) dời sang 1A.4 cùng chuột phải vào đất: BUILD_NOW §4 ghi là lệnh 1A, nhưng mục 1A.3 ở §1 không có.
-- Đốm sáng chạy dọc dây trợ lực mỗi phím đúng (BUILD_NOW §5.1) chưa vẽ: cần view đọc sự kiện phím. Để 1A.4 hoặc 1C.
+- `move` (Tướng tới một điểm) dời sang 1A.4 cùng chuột phải vào đất: BUILD_NOW §4 ghi là lệnh 1A, nhưng mục 1A.3 ở §1 không có. Đã tính vào phần của 1A.4 (mục 1.2).
+- Đốm sáng chạy dọc dây trợ lực mỗi phím đúng (BUILD_NOW §5.1) chưa vẽ: cần view đọc sự kiện phím (`wordKey`). Làm ở 1A.4, đã tính vào phần của mốc đó (mục 1.2).
 - Bỏ `KEEP_SLOT` không ai dùng; `stream.ts` mất phần người có mặt ngay (−29).
 
-Còn 3 dòng tới cột "Cộng dồn tối đa" của 1A.3, cho bản sửa review. Phần của 1A.4 (500) và 1A.5 (40) không đổi; còn 38 dòng tới trần 5.500.
+Sau 1A.3 còn 3 dòng tới cột "Cộng dồn tối đa" của mốc, cho bản sửa review. Bản sửa review 1A.3 tốn 41 dòng (mục 1.6), viết thẳng, không nén dòng; review 1A.3 (mục 5) yêu cầu tính phần này vào ước lượng lại 1A.4, nên phần vượt lấy từ 38 dòng dự phòng dưới trần, và 1A.4 cắt UI như bảng ở mục 1.2.
 
 ### 1.5 Lệch so với BUILD_NOW, TK ở 1A.3 (có lý do)
 
-- **Chỗ đứng trợ lực:** Thư Đồng ở ổ (mép vòng + 1 m, phía Lũy); Draconis đậu trên mép mái phía Lũy (đúng bán kính nhà), để hình tam giác không che chữ cái của nhà. Lũy tự nó không có "phía Lũy": ổ của Lũy quay về nam (đất trống, xa đường).
-- **Vào và ra việc đo từ chỗ đứng:** vào khi đứng trên đất trong 3,0 m (Draconis: sau khi hạ cánh xong); ra khi xa quá 4,5 m. TK 8.4 đo "từ mép vòng", TK 25.9 và BUILD_NOW §3.4 đo "của ổ": theo ổ. Có trễ giữa 3,0 và 4,5 m: người được gửi đi vẫn trợ lực tới khi xa 4,5 m (Draconis: 0,6 s cất cánh + 0,75 s bay); tới nhà mới trước thì nhà cũ ngắt trước.
+- **Chỗ đứng trợ lực:** Thư Đồng ở ổ (mép vòng + 1 m, phía Lũy); Draconis đậu trên mép mái phía Lũy (đúng bán kính nhà); bản vẽ đặt hình tam giác ra ngoài mép 1 m khi đậu hay bay thấp, để không che chữ cái và vạch cấp (review 1A.3, mục 4). Lũy tự nó không có "phía Lũy": ổ của Lũy quay về nam (đất trống, xa đường).
+- **Vào và ra việc đo từ chỗ đứng:** vào khi đứng trên đất trong 3,0 m (Draconis: sau khi hạ cánh xong); ra khi xa quá 4,5 m, hoặc khi người đã được gửi đi nơi khác dừng lại. Chỗ nghỉ có thể nằm trong 4,5 m của chỗ trợ lực (Draconis nghỉ đúng chỗ trợ lực Lũy; nhà đặt sát hàng nghỉ của Thư Đồng): chỉ đo 4,5 m thì gọi về không bao giờ ngắt, Draconis không đánh nữa, và hạ cấp Lũy để lại hai nhà được trợ lực với một ô (review 1A.3, mục 2). TK 8.4 đo "từ mép vòng", TK 25.9 và BUILD_NOW §3.4 đo "của ổ": theo ổ. Có trễ giữa 3,0 và 4,5 m: người được gửi đi vẫn trợ lực tới khi xa 4,5 m (Draconis: 0,6 s cất cánh + 0,75 s bay); tới nhà mới trước thì nhà cũ ngắt trước.
 - **Nghỉ ở đâu:** Thư Đồng đứng một hàng cách Lũy 5,5 m về phía tây, cách nhau 2,4 m (TK 23.7 "đứng cạnh Lũy"; `ASSIST.homeSideM`, `homeGapM`). Draconis nghỉ ở chỗ đứng trợ lực Lũy (mép mái nam), nên gửi tới Lũy từ chỗ nghỉ không phải bay.
 - **Đổi chỗ khi người gửi đi không có nhà:** người bị thay về chỗ nghỉ.
 - **Lệnh mới lúc đang hạ cánh:** cất cánh lại (0,6 s). Lúc đang cất cánh hay đang bay: đổi đích trên không.
 - **Tướng tự đánh:** chỉ khi đứng trên đất và không trợ lực (không đánh lúc cất, bay, hạ); cầu lửa vào quái đi xa nhất trong 9 m, không nhận hào quang. Quái không đánh Draconis (1A).
-- **Thư Đồng bị nhà mới đè lên** (đang đi qua đúng chỗ đặt): lùi ra theo bán kính tới r + 0,75 m (ô của nó chắc chắn trống) rồi tìm đường lại. TK 12.5 không có bước kiểm người đứng.
+- **Thư Đồng bị nhà mới đè lên** (đang đi qua đúng chỗ đặt): bước sang tâm ô trống gần nhất (trong 6 ô, hòa thì ô có chỉ số nhỏ hơn) mà từ đó còn đi tới được đích, không bao giờ vào nước hay nhà khác; không ô nào tới được thì ô trống gần nhất. Bản đầu 1A.3 lùi theo bán kính tới r + 0,75 m, nên người cạnh suối bị đẩy vào ô nước và kẹt tới hết ván (review 1A.3, mục 1). A* cũng nhận ô xuất phát bị chặn: người đứng trên ô chặn vẫn đi ra được khi được gửi. TK 12.5 không có bước kiểm người đứng.
 - **Hoàn tác nhà đang được trợ lực:** dây trợ lực ngắt ngay (nhà mất), người được gửi tới đó về chỗ nghỉ; đường tính sau khi ô của nhà đã mở.
-- **Hạ cấp Lũy trong hộp cát:** người ở ô đã đóng về chỗ nghỉ; trợ lực ngắt khi xa 4,5 m như mọi lần rời. Lệnh cho ô đóng bị từ chối (`noSlot`). Thư Đồng ở ô đóng không vẽ khi đứng ở chỗ nghỉ (TK 23.7: mở ô thì "Thư Đồng chạy ra").
+- **Hạ cấp Lũy trong hộp cát:** người ở ô đã đóng về chỗ nghỉ; trợ lực ngắt khi xa 4,5 m hoặc khi người dừng ở chỗ nghỉ, như mọi lần rời. Lệnh cho ô đóng bị từ chối (`noSlot`). Thư Đồng ở ô đóng không vẽ khi đứng ở chỗ nghỉ (TK 23.7: mở ô thì "Thư Đồng chạy ra").
+- **Ô trên suối:** ô bị chặn khi có phần nước vẽ không nằm trọn trên một cầu (xét cả ô, không chỉ tâm ô). Cầu vẽ rộng 3 m (z 24,5–27,5), nên phần đi được là 2 m giữa (z 25–27); ô bờ nửa trên cầu vẫn mở. Người đi không bao giờ bước lên nước vẽ (review 1A.3, mục 3).
+- **Dây trợ lực** dừng ở 0,3 r bên trong mép nhà, không tới tâm như BUILD_NOW §5.1: dây tới tâm cắt ngang chữ cái và vạch cấp (review 1A.3, mục 4).
+- **Thẻ của từ cũ trong cặp tầng 2** cũng gạch chân hai chữ đầu: bộ định tuyến cần hai phím cho cả hai từ của cặp (TK 6.5 "Thẻ gạch chân hai chữ đầu"). Chỉ đổi ở view; `W.tier` vẫn là tầng lúc phát. Thấy khi làm kịch bản tầng 2 (review 1A.3, mục 7).
+- **Cột thẻ bay qua nhà bên cạnh:** hai nhà gần nhau (bố cục "Đặt sẵn 4 ô": Trại Lính cách Tháp Pháo 7 m) thì cột thẻ của nhà dưới bay lên qua đĩa nhà trên. TK 23.4 cho thẻ bay lên từ mái nhà mình làm đồng hồ, bộ xếp làn chỉ tách thẻ với thẻ và với HUD; giữ nguyên ở 1A (phần này của review 1A.3, mục 4 không sửa).
 - **Sự kiện:** `agentOrdered`, `agentArrived`, `agentLeft` (TK 25.11) thay sự kiện `assist` của 1A.2.
 - **Test 1A.2 đổi theo:** `assisted()` chờ mọi người tới nơi; `td-letters` cài `Letters` riêng trước từ đầu tiên (Lũy phát trong lúc Thư Đồng còn đi) và nhận các từ đang sống lúc bắt đầu; `td-sim-perf`, `td-aura`, `td-heat-chain` chờ người tới trước khi đo.
+
+### 1.6 Sửa review 1A.3
+
+Bản sửa đầu bị ngắt trước khi commit. Bản này giữ phần đúng của nó (luật, test, pha tầng 2), viết lại thẳng những chỗ nó nén dòng chỉ để vừa 3 dòng còn lại (gán qua mảng, nối lệnh vẽ sau `Object.assign`), rồi làm nốt phần còn thiếu. 41 dòng, tính ở mục 1.2.
+
+1. **Thư Đồng bị đẩy vào nước khi nhà mới đè lên (cao).** `rerouteAgents` đưa người bị đè sang tâm ô trống gần nhất còn đi tới được đích (`nearestOpen` ở `nav/astar.ts`); `findPath` nhận ô xuất phát bị chặn (`grid.open(…, pass)`). Test `td-nav`: lúc Gạch đi tới cầu nam (10 thời điểm cách nhau 10 tick), Tháp Cung đặt đè lên Gạch ở mọi chỗ hợp lệ cách nhau 0,5 m, 361 lần, có 13 lần cách cũ đẩy vào ô nước: Gạch luôn tới mỏ; ô trống gần nhất bị vây kín thì bỏ qua; người đứng trên ô nước được gửi lại thì đi ra. Dò lại của review: probe-d tới mỏ; probe-g 875 chỗ đặt, không ai kẹt (15 chỗ chặn lối ra cầu nam, Gạch đi vòng cầu bắc, tới chậm hơn ≤ 3,5 s).
+2. **Trợ lực không ngắt khi chỗ nghỉ trong 4,5 m (vừa).** Ngắt khi người không còn được gửi tới nhà đó và đã dừng, hoặc xa quá 4,5 m (mục 1.5). Test `td-agents`: Phẩy ở Tháp Cung (−13; 40) được gọi về chỗ nghỉ cách ổ đúng 4,5 m thì ngắt khi dừng, nhà thôi phát và hết có mặt; hạ Lũy về cấp 2 cũng vậy; Draconis trợ lực Lũy được gọi về thì ngắt ngay trong tick đó và lại ném cầu lửa. probe-a, probe-b, probe-e: hết lỗi.
+3. **Đường đi cắt góc cầu qua nước vẽ (thấp).** Xét cả ô (mục 1.5). Test `td-nav` đo mọi đoạn đã kéo dây với nước và cầu như được vẽ, mẫu 2 cm: 150 đường trên sân có nhà, 400 đường ngẫu nhiên qua suối. probe-f: 1.238 đường, không đoạn nào trên nước vẽ.
+4. **Dây trợ lực đè chữ cái, Draconis che vạch cấp (thấp).** Dây dừng ở 0,3 r trong mép; Draconis vẽ ra ngoài mép 1 m khi đậu hay bay thấp. Thẻ bay qua đĩa nhà bên cạnh: không sửa, lý do ở mục 1.5.
+5. **Ước lượng 1A.4 chưa tính `move`, đốm sáng, bản sửa review (thấp).** Ước lượng lại ở mục 1.2: cần 535, phần 500, cắt 35 dòng UI theo BUILD_NOW §10, ghi trước khi làm 1A.4.
+6. **Test bỏ sót (thấp).** Test mới: mỏ có người tới lại trong 5 s sau lần gom thì đống về kho ngay lúc tới, rồi mỗi 5 s; Tướng không bắn lúc cất cánh, bay, hạ cánh; `clearLine` gặp tường dày 1 ô ở 400 độ dài, độ dốc, vị trí; A* so với A* mẫu trên 300 sân (240 sân dày, nơi các đường bằng chi phí gặp nhau); cùng các test của mục 1–3. Đột biến (bản sao worktree, 12 file test TD): 36 đột biến, 30 của review và 6 cho bản sửa, cả 36 bị bắt, gồm 4 đột biến sống của review. Đột biến "hòa về ô lớn hơn" làm A* lặp mãi nên bị bắt bằng cách treo. Giới hạn 0,5 ms một lần A* (TK 25.12) vẫn chặn theo trung vị: chạy riêng `td-nav`, trung vị 0,14 ms, p95 0,48–0,50 ms; chạy cả bộ, p95 1,6–2,3 ms là do các luồng Vitest khác chiếm CPU, không phải do A*, nên chặn p95 chỉ làm test chập chờn.
+7. **Chưa kịch bản nào thấy cặp tầng 2 (thấp).** `td-1a-slots` thêm pha tầng 2 và cổng `tier2PairOnScreen` (mục 2). Khi nhìn cặp, thẻ của từ cũ chỉ gạch một chữ: sửa ở view (mục 1.5).
 
 ## 2. Chạy cổng trong worktree
 
@@ -144,7 +178,7 @@ Chạy thêm một lần mỗi kịch bản `td-1a-*` với `--width=1920 --heig
 
 `td-1a-stream.mjs` gõ đợt 1 ở nhịp 4 s (mỗi lúc một từ), rồi cho tháp sang nhịp 1 s trong 12 s: đòi ≥ 2 từ sống cùng lúc và một lần đổi khóa mềm cố ý, chụp thêm `td-1a-stream-dense`. Tầng 2 cần 3–4 nhà bận nên để `td-1a-slots` (1A.3) kiểm.
 
-`td-1a-slots.mjs` (1A.3) làm "Đặt sẵn 4 ô" bằng lệnh: Lũy cấp 4, 1.000 Vàng hộp cát, Tháp Pháo (7, 12), Tháp Cung (−8, 12), Trại Lính (3, 18) ở khúc nhập, Mỏ trên N3 (−34, 8); Draconis tới Pháo (ái lực), Chấm tới Cung, Phẩy tới Trại Lính, Gạch tới Mỏ (đúng sở trường). Chụp `td-1a-route` khi Gạch đang đi (đường A* nét đứt qua cầu nam), gõ 70 WPM, gọi đợt 1 khi Gạch tới mỏ, gọi đợt 2 ngay khi được, rồi cả bốn nhà nhịp 1 s trong 10 s; chụp `td-1a-four-slots` khi bốn nhà cùng có từ. Mỗi lần nhìn đều kiểm thẻ: không chồng, chữ ≥ 18 px, trong vùng an toàn và không dưới chip HUD, chữ đầu không mơ hồ. Đường của Gạch chỉ qua suối ở cầu. Với lệnh Vite thường, kịch bản này vẫn đạt (bằng từ dự phòng); `td-1a-boot` hỏng hai cổng phông như mục trên.
+`td-1a-slots.mjs` (1A.3) làm "Đặt sẵn 4 ô" bằng lệnh: Lũy cấp 4, 1.000 Vàng hộp cát, Tháp Pháo (7, 12), Tháp Cung (−8, 12), Trại Lính (3, 18) ở khúc nhập, Mỏ trên N3 (−34, 8); Draconis tới Pháo (ái lực), Chấm tới Cung, Phẩy tới Trại Lính, Gạch tới Mỏ (đúng sở trường). Chụp `td-1a-route` khi Gạch đang đi (đường A* nét đứt qua cầu nam), gõ 70 WPM, gọi đợt 1 khi Gạch tới mỏ, gọi đợt 2 ngay khi được, rồi cả bốn nhà nhịp 1 s trong 10 s; chụp `td-1a-four-slots` khi bốn nhà cùng có từ. Cặp tầng 2 cần ≤ 5 chữ đầu trống, tức 12 từ giữ chữ và 5 chữ đang nghỉ: bốn nhà nhịp 1 s chỉ chạm lúc đỉnh. Nên nếu chưa thấy cặp nào, pha cuối đặt E = 45 trong hộp cát và gõ 45 WPM, chờ tới khi có cặp, tối đa 120 s (Node, 60 seed: lúc này có khoảng 4 cặp mỗi phút, cặp đầu trong 60 s ở cả 60 seed); chụp `td-1a-tier2` và chặn bằng cổng `tier2PairOnScreen`: cả hai thẻ của cặp đều gạch chân hai chữ đầu (review 1A.3, mục 7). Mỗi lần nhìn đều kiểm thẻ: không chồng, chữ ≥ 18 px, trong vùng an toàn và không dưới chip HUD, chữ đầu không mơ hồ. Đường của Gạch chỉ qua suối ở cầu. Với lệnh Vite thường, kịch bản này vẫn đạt (bằng từ dự phòng); `td-1a-boot` hỏng hai cổng phông như mục trên.
 
 `td-1a-combat.mjs`, `td-1a-stream.mjs` và `td-1a-slots.mjs` ghi `td-1a-<tên>-replay-<cỡ>.json` (seed, mã nội dung, mã bộ từ, nguồn từ, tick, mã băm, nhật ký lệnh) vào `OUT_DIR` rồi tự chạy `scripts/td/replay.ts` trên Node. `td-1a-stream` gõ phím thật qua CDP (`WPM=40` mặc định, đổi được bằng biến môi trường), nên nhật ký của nó có lệnh `key` và chạy lại kiểm cả phần gõ. Cổng `nodeReplaysToBrowserHash` đạt khi Node ra đúng mã băm của Chrome (BUILD_NOW §7 cổng 4). Chạy lại bằng tay:
 

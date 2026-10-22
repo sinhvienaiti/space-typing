@@ -127,7 +127,9 @@ export class WordCards {
       card.slot = s;
       card.seen = this.frame;
       const pink = now < card.pinkUntil;
-      if (W.typed[s] !== card.typed || pink !== card.pink || W.tier[s] !== card.tier) this.render(card, W.typed[s]!, pink, W.tier[s]!);
+      // Two keys tell either word of a tier-2 pair (TK 6.5): the older one, dealt at tier 1, underlines two letters too.
+      const tier = w.typing.letters.partner[w.typing.deck.letters[w.typing.deck.start[W.word[s]!]!]!]! >= 0 ? 2 : W.tier[s]!;
+      if (W.typed[s] !== card.typed || pink !== card.pink || tier !== card.tier) this.render(card, W.typed[s]!, pink, tier);
       card.lockedAt = lock !== s ? -1 : card.lockedAt < 0 ? w.tick : card.lockedAt;
       const late = W.expire[s]! - w.tick < 0.6 * 60;
       if (late !== card.late) card.el.classList.toggle("is-late", (card.late = late));
