@@ -1,6 +1,8 @@
 node_modules/
 dist/
 coverage/
+# Gate evidence and review outputs, the only copy (parent docs/CLAUDE_PROCESS_2026-10-24.md §8).
+tmp/
 .DS_Store
 public/local-assets/
 # Owner's original art for scripts/bg-art: not served, back it up separately.
@@ -25,17 +27,24 @@ public/assets/td/**
 !public/assets/td/**/
 !public/assets/td/README.md
 !public/assets/td/**/manifest.json
+# Space runtime media (GLB models, 3D ship hulls, the defense-maps images) lives
+# on Google Drive and is listed in media.md5 (parent docs/MEDIA_STORAGE.md), so a
+# stray `git add -A` cannot publish it (code review #74). The manifests,
+# model.json and text docs stay visible; files tracked before 24/10 stay tracked.
+public/assets/space-typing/models/**
+!public/assets/space-typing/models/**/
+!public/assets/space-typing/models/**/*.json
+public/assets/space-typing/ships/3d/**
+!public/assets/space-typing/ships/3d/**/
+!public/assets/space-typing/ships/3d/**/*.json
+docs/art-requests/defense-maps/*
+!docs/art-requests/defense-maps/*.md
 # Local account database (PGlite) and server log: pnpm account:local.
 .account-local/
 # Cloudflare local secrets and state (pnpm account:local).
 cloud/.dev.vars
 cloud/.wrangler/
 .wrangler/
-
-# Local archives and review outputs (not for git)
-/art.zip
-/art-src1310.zip
-/output/
 
 # Local archives and review outputs (not for git)
 /art.zip
