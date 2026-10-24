@@ -2,6 +2,7 @@
 
 > **Dành cho:** chủ dự án và AI làm tiếp (Codex, Claude). Đọc tài liệu này trước khi làm tiếp, nhất là khi phiên Claude bị dừng giữa chừng.
 > **Cập nhật:** Claude cập nhật tài liệu này sau mỗi phần việc. Lần cập nhật cuối ở cuối tệp (mục 9).
+> **Từ 24/10:** file sống cho repo cha và cả 4 game (Space Typing, Lời Gọi, Tuyến Cuối, Rồng Giữ Ải), trên cả máy Mac mini M4 lẫn Dell, là [`docs/CLAUDE_PROCESS_2026-10-24.md`](../../../docs/CLAUDE_PROCESS_2026-10-24.md) của repo cha. File này chỉ còn là lịch sử Space Typing tới 24/10 (mục 9).
 > **Yêu cầu gốc của chủ dự án (16/10):**
 > - VFX và CGI cho từng hành động, kể cả hiệu ứng rê chuột và bấm ở ngoài trận;
 > - âm thanh hay;
@@ -20,7 +21,9 @@
 
 ## 1. Môi trường (máy chủ dự án)
 
-- **Thư mục:** `D:\typing-game` (trong WSL: `/mnt/d/typing-game`). Game ở `games/space-typing` (submodule, đang ở trạng thái detached HEAD, **mọi thay đổi chưa commit**; không commit, không stash, không reset khi chưa được chủ dự án cho phép).
+> Mục này ghi máy Windows lúc 16–17/10. Môi trường hiện tại của hai máy (Chrome for Testing và Blender bản Linux trong WSL, nạp qua `scripts/local-env.sh`) ở mục 1 của file process chung (24/10) của repo cha.
+
+- **Thư mục:** `D:\typing-game` (trong WSL: `/mnt/d/typing-game`). Game ở `games/space-typing` (submodule, repo riêng). Nhánh làm việc `feat/space-typing-2026-10-18`, đã push lên GitHub. Mỗi phần việc commit riêng, chỉ ghi đúng đường dẫn đã sửa (không `git add -A`). Không stash, không reset, không `git clean` khi chưa được chủ dự án cho phép.
 - **git, node 24 (nvm), pnpm chỉ có trong WSL Ubuntu.** Chạy lệnh bằng một tệp bash:
   - mở đầu tệp: `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"`, rồi `cd /mnt/d/typing-game/games/space-typing`;
   - chạy: `wsl -e bash <đường dẫn tệp>`;
@@ -453,3 +456,9 @@ Sau đó chụp ảnh bằng Chrome thật (mục 1), xem ảnh và so sánh tr�
   - **Ảnh bản đồ:** game vẽ tạm. Ảnh khung bố cục và prompt: `docs/art-requests/DEFENSE_MAPS_PROMPTS_2026-10-21.md`, `docs/art-requests/defense-maps/`.
   - **Kiểm tra:** TypeScript sạch; vitest 369 tệp / 2.296 test đạt; chụp và tự xem bằng Chrome thật (8 đảo, pha xây, đòn trụ, trụ cháy, thẻ, boss); 442 quái ≈ 3,7 ms/khung (CPU chậm 4 lần ≈ 6,6 ms).
   - Không commit/push/deploy, không reset save.
+- **21/10–24/10/2026 — tóm tắt (ghi trên Dell ngày 24/10):**
+  - **21/10 tối:** báo cáo review mã nguồn, 85 mục (`docs/changelog/2026-10-21-code-review.md`). **Đợt sửa 1** (chống đứng hình, chống mất tiến độ và tiền): `docs/changelog/2026-10-21-fix-batch-1.md`, commit `5c7a9ad2` tới `fa8d0ffa`. Từ đây mỗi bản cập nhật Space có một file trong `docs/changelog/`.
+  - **22–23/10:** Typing Defense "Lời Gọi" từ 1A tới 1A.6 (`src/td`, `td.html`, `docs/td`). Gộp vào nhánh này ở `2dc957b2` (1A) và `36249a35` (1A.6). Nhãn `td-1a6-final` ở `b945808b`. Sinh Tồn: kế hoạch ở `docs/survival/`; mã S0 nằm ở nhánh `feat/survival-s0` (nhãn `survival-s0`), không gộp vào nhánh này.
+  - **23–24/10:** tách thành ba game riêng theo `docs/games/SPLIT_PLAN.md` của repo cha: `games/typing-defense` (Lời Gọi), `games/typing-survival` (Tuyến Cuối), `games/dragon-hold` (Rồng Giữ Ải). Không làm thêm TD hay Sinh Tồn trong Space. Mã TD còn ở đây tới bước dọn S8 (mục 12 của kế hoạch tách: chạy ổn 2 tuần hoặc chủ dự án đồng ý).
+  - **24/10 (Dell):** commit `media.md5` (Mac đã đẩy lên Drive lúc 09:08); `.gitignore` chặn media runtime chưa track trong `models/`, `ships/3d/`, `docs/art-requests/defense-maps/` (review mục 74, một phần); `td.html` hiện dòng "Lời Gọi đã chuyển sang trang mới"; sửa mục 1 của file này. Chi tiết: `docs/changelog/2026-10-24-hygiene-dell.md`.
+  - **Từ đây, cập nhật ở `docs/CLAUDE_PROCESS_2026-10-24.md` của repo cha.** File này chỉ sửa khi có chỗ sai.
