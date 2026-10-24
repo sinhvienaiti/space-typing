@@ -20,7 +20,7 @@ Mỗi bản cập nhật có một file trong thư mục này. File ghi rõ đã
 
 | Ngày | Bản cập nhật | Mục review đã xử lý |
 |---|---|---|
-| 2026-10-24 | [Dọn sau khi nhận từ Mac (Dell): commit `media.md5`, `.gitignore` chặn media runtime, `td.html` báo Lời Gọi đã chuyển, cập nhật file process 17/10](./2026-10-24-hygiene-dell.md) | 74 (một phần) |
+| 2026-10-24 | [Dọn sau khi nhận từ Mac (Dell): commit `media.md5`, `.gitignore` chặn media runtime, `td.html` báo Lời Gọi đã chuyển, cập nhật file process 17/10; sửa sau review: chừa README/LICENSE cạnh model, kiểm phông bằng `document.fonts`](./2026-10-24-hygiene-dell.md) | 74 (một phần) |
 | 2026-10-23 | [Typing Defense 1A.6 "Lời Gọi", đợt R3: bot gõ và không gõ, báo cáo `td:balance`, cổng §12, bộ điều phối giữ ngân sách 20 s từng từ, cây 45 s ra 12 Gỗ, kịch bản `td-1a6-*`](./2026-10-23-td-1a6-r3.md) | Cổng 7 của review R1 (bot gõ làm ra ít hơn); ghi chú "Cho R3" của review R2 |
 | 2026-10-23 | [Typing Defense 1A.6 "Lời Gọi", đợt R2: học (nghĩa, sổ ôn, Hỏi bài), Tab tới lời gọi mờ, tạm dừng chiến thuật, bong bóng, mũi tên mép, HUD, tiếng báo](./2026-10-23-td-1a6-r2.md) | 3 lỗi thấp của review R1 (NPC ở chế độ đi, dân chặt từ xa, op `mode` không đổi ngày đang chạy) |
 | 2026-10-22 | [Kế hoạch chế độ Sinh Tồn: súng gắn từ vựng, tri thức thành năng lượng, hệ phản hồi chiến đấu dùng chung](../survival/SURVIVAL_MODE_PLAN.md) | (kế hoạch; chưa code) |

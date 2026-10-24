@@ -30,15 +30,21 @@ public/assets/td/**
 # Space runtime media (GLB models, 3D ship hulls, the defense-maps images) lives
 # on Google Drive and is listed in media.md5 (parent docs/MEDIA_STORAGE.md), so a
 # stray `git add -A` cannot publish it (code review #74). The manifests,
-# model.json and text docs stay visible; files tracked before 24/10 stay tracked.
+# model.json and text docs (*.md, *.txt: README, CREDITS, LICENSE.txt) stay
+# visible; files tracked before 24/10 stay tracked.
 public/assets/space-typing/models/**
 !public/assets/space-typing/models/**/
 !public/assets/space-typing/models/**/*.json
+!public/assets/space-typing/models/**/*.md
+!public/assets/space-typing/models/**/*.txt
 public/assets/space-typing/ships/3d/**
 !public/assets/space-typing/ships/3d/**/
 !public/assets/space-typing/ships/3d/**/*.json
+!public/assets/space-typing/ships/3d/**/*.md
+!public/assets/space-typing/ships/3d/**/*.txt
 docs/art-requests/defense-maps/*
 !docs/art-requests/defense-maps/*.md
+!docs/art-requests/defense-maps/*.txt
 # Local account database (PGlite) and server log: pnpm account:local.
 .account-local/
 # Cloudflare local secrets and state (pnpm account:local).
