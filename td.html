@@ -8,9 +8,25 @@
     <!-- No icon file: without this the browser asks for /favicon.ico and gets a 404. -->
     <link rel="icon" href="data:," />
     <title>Typing Defense</title>
+    <!--
+      Lời Gọi moved to its own game, games/typing-defense (parent docs/games/SPLIT_PLAN.md §7).
+      This old page keeps running under the notice until the Space clean-up (§12, step S8).
+      No script: the summary folds the notice. It sits between the HUD's side panels and
+      under the word cards, like the HUD, so a word is never hidden.
+    -->
+    <style>
+      .td-moved { position: fixed; top: 12px; left: 50%; width: max-content; max-width: max(240px, min(560px, calc(100vw - 2 * (24px + 284px * var(--hud, 1))))); padding: 7px 12px; border: 2px solid var(--td-ink, #2b2118); border-radius: 10px; background: var(--td-paper, #fff4d6); box-shadow: 3px 3px 0 var(--td-ink, #2b2118); color: var(--td-ink, #2b2118); font: 500 calc(13px * var(--hud, 1)) / 1.35 var(--td-font, ui-sans-serif, system-ui, sans-serif); transform: translateX(-50%); }
+      .td-moved summary { font-weight: 800; cursor: pointer; }
+      .td-moved p { margin: 4px 0 0; }
+      .td-moved a { color: var(--td-jade-ink, #07695c); font-weight: 800; }
+    </style>
   </head>
   <body>
     <canvas id="tdCanvas" aria-label="Bản đồ"></canvas>
+    <details id="tdMoved" class="td-moved" open>
+      <summary>Lời Gọi đã chuyển sang trang mới</summary>
+      <p>Mở <a href="https://td.typing-game.local/" target="_top">td.typing-game.local</a> (bản Play) hoặc <a href="http://127.0.0.1:3006/" target="_top">127.0.0.1:3006</a> (dev). Bản cũ dưới đây còn chạy tới bước dọn Space.</p>
+    </details>
     <div id="tdHud" class="td-hud"><div class="td-panel td-chip">Typing Defense · đang tải từ vựng…</div></div>
     <div id="tdWords" class="td-words" aria-hidden="true"></div>
     <script type="module" src="/src/td/main.ts"></script>
