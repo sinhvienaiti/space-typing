@@ -1017,8 +1017,7 @@
    "bytes": 11479456,
    "image": "art-src/enemies/prism-destroyer.png",
    "usedBy": [
-    "enemies/prism-destroyer-3d",
-    "enemies/rainbow-scout-lod (placeholder)"
+    "enemies/prism-destroyer-3d"
    ]
   },
   "enemies/prism-healer.glb": {
@@ -1177,6 +1176,16 @@
    "image": "art-src/enemies/rainbow-splitter.png",
    "usedBy": [
     "enemies/rainbow-splitter-3d"
+   ]
+  },
+  "enemies/rainbow-tank.glb": {
+   "md5": "200f91fc07e80bc5bdb8b7c59d87a0da",
+   "bytes": 4108044,
+   "image": "art-src/enemies/rainbow-tank.png",
+   "usedBy": [
+    "enemies/rainbow-tank-3d",
+    "enemies/rainbow-scout-3d",
+    "enemies/rainbow-scout-lod"
    ]
   },
   "enemies/shadow-carrier.glb": {
@@ -1765,20 +1774,6 @@
    "standIn": "enemies/rainbow-shield.glb",
    "usedBy": [
     "enemies/rainbow-destroyer-3d"
-   ]
-  },
-  "enemies/rainbow-scout.glb": {
-   "image": "art-src/enemies/rainbow-scout.png",
-   "standIn": "enemies/prism-destroyer.glb",
-   "usedBy": [
-    "enemies/rainbow-scout-lod"
-   ]
-  },
-  "enemies/rainbow-tank.glb": {
-   "image": "art-src/enemies/rainbow-tank.png",
-   "standIn": "enemies/prism-scout.glb",
-   "usedBy": [
-    "enemies/rainbow-tank-3d"
    ]
   },
   "enemies/shadow-destroyer.glb": {

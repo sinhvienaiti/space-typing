@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-21T03:32:58.804Z",
+  "generatedAt": "2026-10-26T08:56:00.083Z",
   "models": {
     "bosses/auriel-hero": {
       "kind": "bosses",
@@ -3606,15 +3606,15 @@
       "id": "rainbow-scout-3d",
       "tiers": {
         "high": {
-          "url": "/assets/space-typing/models/enemies/rainbow-scout-3d/rainbow-scout-3d.high.glb?v=f6206eba6c",
-          "bytes": 1005380
+          "url": "/assets/space-typing/models/enemies/rainbow-scout-3d/rainbow-scout-3d.high.glb?v=6b35b3de0d",
+          "bytes": 547544
         },
         "medium": {
-          "url": "/assets/space-typing/models/enemies/rainbow-scout-3d/rainbow-scout-3d.medium.glb?v=a3457c314e",
-          "bytes": 345936
+          "url": "/assets/space-typing/models/enemies/rainbow-scout-3d/rainbow-scout-3d.medium.glb?v=c565cbfec4",
+          "bytes": 208084
         }
       },
-      "triangles": 7000,
+      "triangles": 5782,
       "sockets": [
         "FX_CORE",
         "FX_MUZZLE"
@@ -3623,9 +3623,9 @@
         "Enemy_Idle"
       ],
       "size": [
-        1.9971,
-        1.988,
-        1.5093
+        2,
+        1.8661,
+        1.3206
       ]
     },
     "enemies/rainbow-scout-lod": {
@@ -3633,12 +3633,12 @@
       "id": "rainbow-scout-lod",
       "tiers": {
         "high": {
-          "url": "/assets/space-typing/models/enemies/rainbow-scout-lod/rainbow-scout-lod.high.glb?v=69d8d93b3b",
-          "bytes": 951304
+          "url": "/assets/space-typing/models/enemies/rainbow-scout-lod/rainbow-scout-lod.high.glb?v=2c66adf8fa",
+          "bytes": 497576
         },
         "medium": {
-          "url": "/assets/space-typing/models/enemies/rainbow-scout-lod/rainbow-scout-lod.medium.glb?v=3b42a5b467",
-          "bytes": 259348
+          "url": "/assets/space-typing/models/enemies/rainbow-scout-lod/rainbow-scout-lod.medium.glb?v=0fde25bc50",
+          "bytes": 158116
         }
       },
       "triangles": 1000,
@@ -3650,9 +3650,9 @@
         "Enemy_Idle"
       ],
       "size": [
-        1.8439,
-        1.9847,
-        1.3701
+        1.9456,
+        1.7698,
+        1.3246
       ]
     },
     "enemies/rainbow-shield-3d": {
@@ -3741,15 +3741,15 @@
       "id": "rainbow-tank-3d",
       "tiers": {
         "high": {
-          "url": "/assets/space-typing/models/enemies/rainbow-tank-3d/rainbow-tank-3d.high.glb?v=210a12d609",
-          "bytes": 950164
+          "url": "/assets/space-typing/models/enemies/rainbow-tank-3d/rainbow-tank-3d.high.glb?v=a0051306e6",
+          "bytes": 547544
         },
         "medium": {
-          "url": "/assets/space-typing/models/enemies/rainbow-tank-3d/rainbow-tank-3d.medium.glb?v=e6ebe745cc",
-          "bytes": 347168
+          "url": "/assets/space-typing/models/enemies/rainbow-tank-3d/rainbow-tank-3d.medium.glb?v=c01a7d2471",
+          "bytes": 208084
         }
       },
-      "triangles": 6000,
+      "triangles": 5782,
       "sockets": [
         "FX_CORE",
         "FX_MUZZLE"
@@ -3758,9 +3758,9 @@
         "Enemy_Idle"
       ],
       "size": [
-        1.997,
-        1.8929,
-        0.3561
+        2,
+        1.8661,
+        1.3206
       ]
     },
     "enemies/shadow-carrier-3d": {

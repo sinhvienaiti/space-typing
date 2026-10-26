@@ -11,11 +11,18 @@
   },
   "enemies/rainbow-tank-3d": {
    "source": "enemies/rainbow-tank.glb",
-   "placeholder": "enemies/prism-scout.glb",
-   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "nose": "+X",
    "triangles": 6000,
    "autoEmissive": 0.06,
-   "note": "placeholder: prism-scout model until rainbow-tank.glb exists",
+   "note": "Tripo model made by the owner (26/10/2026); the scout uses it too",
+   "reviewed": false
+  },
+  "enemies/rainbow-scout-3d": {
+   "source": "enemies/rainbow-tank.glb",
+   "nose": "+X",
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "Scout and tank share one model (owner, 26/10/2026: the two images are the same); the game sizes the scout smaller",
    "reviewed": false
   },
   "enemies/rainbow-shield-3d": {
@@ -1217,12 +1224,11 @@
    "reviewed": false
   },
   "enemies/rainbow-scout-lod": {
-   "source": "enemies/rainbow-scout.glb",
-   "placeholder": "enemies/prism-destroyer.glb",
-   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "source": "enemies/rainbow-tank.glb",
+   "nose": "+X",
    "triangles": 1000,
    "autoEmissive": 0.06,
-   "note": "Defense crowd level of detail (instanced)",
+   "note": "Defense crowd level of detail (instanced). Scout and tank share one model (owner, 26/10/2026: the two images are the same)",
    "reviewed": false
   },
   "enemies/devil-scout-lod": {
